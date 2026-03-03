@@ -20,17 +20,16 @@ classifiers = [
 dependencies = [
     "jupyterlab>=4.0",
     "jupyter-server>=2.0",
+    "python-dotenv>=1.0",
 ]
 
 [project.optional-dependencies]
-# Optional: use Anthropic for chat/completion (default provider)
 anthropic = ["anthropic"]
-# Optional: use OpenAI / Azure
-openai = ["openai"]
-# Optional: use Ollama locally
-ollama = ["httpx"]
-# Optional: RAG (knowledge index)
-rag = ["chromadb"]
+openai    = ["openai"]
+ollama    = ["httpx"]
+rag       = ["chromadb"]
+# Install all LLM providers + RAG at once
+all = ["anthropic", "openai", "httpx", "chromadb"]
 
 [project.urls]
 Homepage = "https://github.com/jmlb/varys"

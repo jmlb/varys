@@ -1,17 +1,20 @@
-# Core requirements (automatically installed with pip install)
+# Core (auto-installed with: pip install git+https://github.com/jmlb/varys)
 jupyterlab>=4.0
 jupyter-server>=2.0
 python-dotenv>=1.0
 
-# Optional: LLM providers — install the one(s) you use
-# pip install varys[anthropic]
-anthropic
+# Install the provider(s) you use:
+#
+#   pip install "varys[anthropic] @ git+https://github.com/jmlb/varys"
+#   pip install "varys[openai]    @ git+https://github.com/jmlb/varys"
+#   pip install "varys[ollama]    @ git+https://github.com/jmlb/varys"
+#   pip install "varys[rag]       @ git+https://github.com/jmlb/varys"
+#
+# Or install everything at once:
+#   pip install "varys[all] @ git+https://github.com/jmlb/varys"
 
-# pip install varys[openai]
+# Uncomment what you need:
+# anthropic
 # openai
-
-# pip install varys[ollama]
-# httpx
-
-# pip install varys[rag]
-# chromadb
+# httpx       # for Ollama
+# chromadb    # for RAG
