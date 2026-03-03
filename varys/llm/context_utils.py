@@ -1,0 +1,275 @@
+"""Shared notebook-context serialisation utilities.
+
+All LLM providers (OpenAI, Bedrock, Google, Ollama) and the task handler's
+advisory path use this single canonical implementation so that the prompt
+format, truncation limits, and selection/active-cell handling are consistent
+across the entire codebase.
+
+Anthropic's ClaudeClient keeps its own _build_content_blocks() because it
+must produce Anthropic-format message blocks (including base64 image blocks
+interleaved with text).  Everything else calls build_notebook_context().
+"""
+from typing import Any, Dict, List, Optional
+
+from ..utils.config import get_config as _get_cfg
+
+# ---------------------------------------------------------------------------
+# Shared constants — overridable via .jupyter-assistant/config/llm.cfg
+# ---------------------------------------------------------------------------
+
+# Maximum characters taken from each cell's source and output before we
+# truncate. Keeping this well below typical LLM context windows avoids
+# runaway token counts while still giving sufficient code context.
+CELL_CONTENT_LIMIT: int = _get_cfg().getint("context", "cell_content_limit", 2_000)
+
+# How many preceding cells to include in inline / multiline completion
+# requests.  Matches the frontend's _extractCells window.
+# Also overridable via completion.cfg [context] prev_cells.
+COMPLETION_PREV_CELLS: int = _get_cfg().getint("context", "prev_cells", 5)
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def format_variable_context(variables: List[Dict[str, Any]]) -> str:
+    """Format resolved @variable_name references into a human-readable prompt section.
+
+    Args:
+        variables: List of ResolvedVariable dicts sent from the frontend.
+                   Each entry has: expr (str) and summary (dict from kernel).
+
+    Returns:
+        A markdown section string, or empty string when the list is empty.
+    """
+    if not variables:
+        return ""
+
+    lines: List[str] = ["## Referenced Variables (@var)", ""]
+
+    for var in variables:
+        expr: str = var.get("expr", "?")
+        s: Dict[str, Any] = var.get("summary", {})
+        vtype: str = s.get("type", "unknown")
+
+        lines.append(f"### @{expr}  ({vtype})")
+
+        if vtype == "error":
+            lines.append(f"⚠️ Could not evaluate: {s.get('error', '')}")
+
+        elif vtype == "dataframe":
+            shape = s.get("shape", [0, 0])
+            mem = s.get("memory_mb")
+            mem_str = f"  ({mem:.1f} MB)" if mem is not None else ""
+            lines.append(f"Shape: {shape[0]:,} rows × {shape[1]} columns{mem_str}")
+            if s.get("columns"):
+                dtypes = s.get("dtypes", {})
+                col_lines = [
+                    f"  {c:<20} {dtypes.get(c, '?')}"
+                    for c in s["columns"]
+                ]
+                lines.append("Columns:")
+                lines.extend(col_lines)
+            missing = s.get("missing", {})
+            if missing:
+                lines.append(f"Missing values: {missing}")
+            if s.get("note"):
+                lines.append(f"⚠️ {s['note']}")
+            if s.get("full_table"):
+                lines.append(f"\n{s['full_table']}")
+            elif s.get("stats"):
+                lines.append(f"\nStatistics:\n{s['stats']}")
+                if s.get("head"):
+                    lines.append(f"\nFirst 5 rows:\n{s['head']}")
+                elif s.get("sample"):
+                    lines.append(f"\nRandom sample:\n{s['sample']}")
+            elif s.get("head_str"):
+                lines.append(f"\n{s['head_str']}")
+
+        elif vtype == "series":
+            lines.append(f"pandas Series — {s.get('name', expr)}, dtype={s.get('dtype')}, length={s.get('length', '?'):,}")
+            if s.get("stats"):
+                lines.append(f"\n{s['stats']}")
+
+        elif vtype == "ndarray":
+            lines.append(f"numpy array — shape={s.get('shape')}, dtype={s.get('dtype')}")
+            if s.get("sample") is not None:
+                lines.append(f"First values: {s['sample']}")
+
+        elif vtype in ("int", "float", "bool"):
+            lines.append(f"Value: {s.get('value')}")
+
+        elif vtype == "str":
+            lines.append(f"String — length={s.get('length', '?')}")
+            lines.append(f'"{s.get("value", "")}"')
+
+        elif vtype in ("list", "tuple"):
+            lines.append(f"{vtype} — length={s.get('length', '?')}")
+            if s.get("sample") is not None:
+                lines.append(f"First items: {s['sample']}")
+
+        elif vtype == "dict":
+            lines.append(f"dict — {s.get('length', '?')} keys")
+            if s.get("keys"):
+                lines.append(f"Keys (up to 20): {s['keys']}")
+            if s.get("sample"):
+                lines.append(f"Sample: {s['sample']}")
+
+        else:
+            if s.get("repr"):
+                lines.append(f"{s['repr']}")
+
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def format_dataframe_context(dataframes: List[Dict[str, Any]]) -> str:
+    """Format live DataFrame schemas into a human-readable section for the prompt.
+
+    Args:
+        dataframes: List of DataFrameSchema dicts sent from the frontend.
+                    Each entry has: name, shape, columns, dtypes, sample, memory_mb.
+
+    Returns:
+        A markdown-style section string, or empty string when the list is empty.
+    """
+    if not dataframes:
+        return ""
+
+    lines: List[str] = ["## Live DataFrame Context (from kernel)", ""]
+    for df in dataframes:
+        name: str = df.get("name", "?")
+        shape = df.get("shape", [0, 0])
+        columns: List[str] = df.get("columns", [])
+        dtypes: Dict[str, str] = df.get("dtypes", {})
+        sample: List[Dict] = df.get("sample", [])
+        mem: Optional[float] = df.get("memoryMb")
+
+        mem_str = f"  ({mem:.1f} MB)" if mem is not None else ""
+        lines.append(f"`{name}` — {shape[0]:,} rows × {shape[1]} cols{mem_str}")
+
+        # Column listing: name (dtype), aligned for readability
+        if columns:
+            max_col_len = max(len(c) for c in columns)
+            for col in columns:
+                dtype = dtypes.get(col, "?")
+                lines.append(f"  {col:<{max_col_len}}  {dtype}")
+
+        # Sample rows
+        if sample:
+            lines.append(f"  Sample ({len(sample)} rows):")
+            for row in sample:
+                # Keep each row repr short
+                row_str = ", ".join(
+                    f"{k}={repr(v)[:40]}" for k, v in list(row.items())[:8]
+                )
+                lines.append(f"    {{{row_str}}}")
+
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def build_notebook_context(
+    user_message: str,
+    notebook_context: Dict[str, Any],
+) -> str:
+    """Serialise *notebook_context* into a flat text block for the LLM prompt.
+
+    Args:
+        user_message:     The raw message the user typed in the chat panel.
+        notebook_context: The ``NotebookContext`` dict sent from the frontend.
+
+    Returns:
+        A multi-line string formatted as::
+
+            ## User Request
+            <user_message>
+
+            ## Notebook
+            Notebook: <path>
+            Cells: <N>
+            Active cell: pos:<K>        (omitted when unknown)
+
+            pos:0  CODE  exec:[1]
+            <source>
+            OUTPUT:
+            <output>
+
+            pos:1  MARKDOWN  exec:[n/a]
+            ...
+
+            ## SELECTED TEXT (lines A–B of pos:C)   (omitted when absent)
+            ...
+    """
+    cells: List[Dict[str, Any]] = notebook_context.get("cells", [])
+    nb_path: str = notebook_context.get("notebookPath", "unknown")
+    active_idx: Optional[int] = notebook_context.get("activeCellIndex")
+    selection: Optional[Dict[str, Any]] = notebook_context.get("selection")
+
+    lines: List[str] = [
+        f"Notebook: {nb_path}",
+        f"Cells: {len(cells)}",
+    ]
+    if active_idx is not None:
+        lines.append(f"Active cell: pos:{active_idx}")
+    lines.append("")
+
+    for cell in cells:
+        idx: int = cell.get("index", 0)
+        ctype: str = cell.get("type", "code")
+        source: str = cell.get("source", "")
+        ec = cell.get("executionCount")
+        output: Optional[str] = cell.get("output")
+
+        ec_str = (
+            f"exec:[{ec}]" if ec is not None
+            else ("exec:[not run]" if ctype == "code" else "exec:[n/a]")
+        )
+        lines.append(f"pos:{idx}  {ctype.upper()}  {ec_str}")
+        lines.append(source[:CELL_CONTENT_LIMIT] if source.strip() else "(empty)")
+        if output and output.strip():
+            lines.append(f"OUTPUT:\n{output[:CELL_CONTENT_LIMIT]}")
+        elif cell.get("imageOutput"):
+            lines.append("OUTPUT: [Visualization — image attached]")
+        lines.append("")
+
+    if selection and selection.get("text", "").strip():
+        sel_idx = selection.get("cellIndex", "?")
+        start_line = selection.get("startLine", "?")
+        end_line = selection.get("endLine", "?")
+        lines += [
+            f"\n## SELECTED TEXT (lines {start_line}–{end_line} of pos:{sel_idx})",
+            "Operate on ONLY this highlighted code:",
+            "```",
+            selection["text"],
+            "```",
+        ]
+
+    base = f"## User Request\n{user_message}\n\n## Notebook\n" + "\n".join(lines)
+
+    # Append selected-output annotation (right-click output overlay)
+    sel_out: Optional[Dict[str, Any]] = notebook_context.get("selectedOutput")
+    if sel_out and isinstance(sel_out, dict):
+        sel_label = sel_out.get("label", "selected output")
+        sel_mime  = sel_out.get("mimeType", "")
+        if sel_mime.startswith("image"):
+            base += f"\n\n## Focused Output\nThe user is asking specifically about: **{sel_label}** (image attached separately)."
+        elif sel_out.get("textData"):
+            td = sel_out["textData"][:_get_cfg().getint("context", "selected_output_limit", 2_000)]
+            base += f"\n\n## Focused Output\nThe user is asking specifically about: **{sel_label}**\n```\n{td}\n```"
+
+    # Append @variable_ref context (explicit references from the chat message)
+    variables: List[Dict[str, Any]] = notebook_context.get("variables") or []
+    var_section = format_variable_context(variables)
+    if var_section:
+        base = base + "\n\n" + var_section
+
+    # Append live DataFrame schemas when the frontend provides them
+    dataframes: List[Dict[str, Any]] = notebook_context.get("dataframes") or []
+    df_section = format_dataframe_context(dataframes)
+    if df_section:
+        base = base + "\n\n" + df_section
+
+    return base

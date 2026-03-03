@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling", "hatch-jupyter-builder>=0.5"]
+build-backend = "hatchling.build"
+
+[project]
+name = "varys"
+version = "0.1.0"
+description = "Varys — your DS assistant for Jupyter Notebook"
+license = "MIT"
+requires-python = ">=3.9"
+authors = [{ name = "Jean-Marc Beaujour", email = "jmlbeaujour@gmail.com" }]
+keywords = ["jupyter", "jupyterlab", "jupyterlab-extension", "ai", "data-science"]
+classifiers = [
+    "Framework :: Jupyter",
+    "Framework :: Jupyter :: JupyterLab",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
+
+dependencies = [
+    "jupyterlab>=4.0",
+    "jupyter-server>=2.0",
+]
+
+[project.optional-dependencies]
+# Optional: use Anthropic for chat/completion (default provider)
+anthropic = ["anthropic"]
+# Optional: use OpenAI / Azure
+openai = ["openai"]
+# Optional: use Ollama locally
+ollama = ["httpx"]
+# Optional: RAG (knowledge index)
+rag = ["chromadb"]
+
+[project.urls]
+Homepage = "https://github.com/jmlb/varys"
+Repository = "https://github.com/jmlb/varys"
+
+[tool.hatch.build.targets.wheel]
+packages = ["varys"]
+
+# If varys/labextension/ is committed, pip install git+url skips the Node build (no Node/jlpm on user machine).
+[tool.hatch.build.hooks.jupyter-builder]
+dependencies = ["hatch-jupyter-builder>=0.5"]
+build-function = "hatch_jupyter_builder.npm_builder"
+ensured-targets = [
+    "varys/labextension/static/style.js",
+    "varys/labextension/package.json",
+]
+skip-if-exists = ["varys/labextension/static/style.js"]
+
+[tool.hatch.build.hooks.jupyter-builder.build-kwargs]
+build_cmd = "build:prod"
+npm = ["jlpm"]
+
+[tool.hatch.build.hooks.jupyter-builder.editable-build-kwargs]
+build_cmd = "install:extension"
+npm = ["jlpm"]
+source_dir = "src"
+build_dir = "varys/labextension"
