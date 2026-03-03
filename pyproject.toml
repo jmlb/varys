@@ -36,6 +36,9 @@ rag = ["chromadb"]
 Homepage = "https://github.com/jmlb/varys"
 Repository = "https://github.com/jmlb/varys"
 
+[project.entry-points."jupyter_server.extension"]
+varys = "varys:_jupyter_server_extension_points"
+
 [tool.hatch.build.targets.wheel]
 packages = ["varys"]
 
