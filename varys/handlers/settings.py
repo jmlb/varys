@@ -22,6 +22,7 @@ from tornado.web import authenticated
 _ENV_KEYS = [
     "DS_CHAT_PROVIDER",
     "DS_COMPLETION_PROVIDER",
+    "COMPLETION_MAX_TOKENS",
     # Anthropic
     "ANTHROPIC_API_KEY",
     "ANTHROPIC_CHAT_MODEL",
@@ -137,8 +138,9 @@ def _reload_settings(handler: JupyterHandler, env_path: Path) -> None:
 
     s = handler.settings
     # No silent fallbacks: empty string means unconfigured; user must set via Settings UI
-    s["ds_assistant_chat_provider"]       = os.environ.get("DS_CHAT_PROVIDER", "").lower()
-    s["ds_assistant_completion_provider"] = os.environ.get("DS_COMPLETION_PROVIDER", "").lower()
+    s["ds_assistant_chat_provider"]         = os.environ.get("DS_CHAT_PROVIDER", "").lower()
+    s["ds_assistant_completion_provider"]   = os.environ.get("DS_COMPLETION_PROVIDER", "").lower()
+    s["ds_assistant_completion_max_tokens"] = int(os.environ.get("COMPLETION_MAX_TOKENS", "128"))
 
     # Credentials
     s["ds_assistant_anthropic_api_key"]          = os.environ.get("ANTHROPIC_API_KEY", "")

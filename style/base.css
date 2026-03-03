@@ -2227,6 +2227,33 @@
 .ds-settings-routing-grid .ds-settings-label {
   white-space: nowrap;
 }
+.ds-settings-routing-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ds-settings-routing-controls .ds-settings-select {
+  flex: 1;
+  min-width: 0;
+}
+.ds-settings-token-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--jp-ui-font-color2, #777);
+  white-space: nowrap;
+}
+.ds-settings-token-input {
+  width: 52px;
+  font-size: 11px;
+  padding: 4px 4px;
+  border: 1px solid var(--jp-border-color1, #ccc);
+  border-radius: 3px;
+  background: var(--jp-layout-color1, #fff);
+  color: var(--jp-ui-font-color1, #333);
+  text-align: center;
+}
 
 /* Shared field rows for provider tabs */
 .ds-settings-row {

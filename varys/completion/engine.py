@@ -109,8 +109,9 @@ class CompletionEngine:
             "Complete the code at <CURSOR>. Output only the inserted text."
         ).strip()
 
+        import os as _os
         cfg = _get_cfg()
-        max_tok = cfg.getint("tokens", "completion_max_tokens", 256)
+        max_tok = int(_os.environ.get("COMPLETION_MAX_TOKENS") or cfg.getint("tokens", "completion_max_tokens", 128))
         response = await self._aclient.messages.create(
             model=self._completion_model,
             max_tokens=max_tok,

@@ -215,8 +215,9 @@ class OllamaProvider(BaseLLMProvider):
                     "lines": cached.splitlines(), "cached": True}
 
         context_block = _build_context_block(previous_cells)
+        import os as _os
         model = self.completion_model
-        num_predict = 256
+        num_predict = int(_os.environ.get("COMPLETION_MAX_TOKENS") or 128)
         timeout = TIMEOUT_COMPLETION
         stop_tokens = ["```", "\n\n\n"]
 
