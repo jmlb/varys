@@ -1456,114 +1456,6 @@ const SettingsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSav
 };
 
 // ---------------------------------------------------------------------------
-// ModelSwitcher — inline model picker below the chat textarea
-// ---------------------------------------------------------------------------
-
-const shortModelName = (model: string): string =>
-  model.includes('/') ? model.split('/').slice(1).join('/') : model;
-
-/** Accent color per provider — used on the button left-border and popup header */
-const PROVIDER_COLORS: Record<string, string> = {
-  ANTHROPIC:   '#d97757',
-  OPENAI:      '#10a37f',
-  GOOGLE:      '#4285f4',
-  BEDROCK:     '#ff9900',
-  AZURE:       '#0078d4',
-  OPENROUTER:  '#7c3aed',
-  OLLAMA:      '#0ea5e9',
-};
-
-const providerColor = (p: string): string =>
-  PROVIDER_COLORS[p.toUpperCase()] ?? '#1976d2';
-
-interface ModelSwitcherProps {
-  provider: string;
-  model: string;
-  zoo: string[];
-  saving: boolean;
-  onSelect: (model: string) => void;
-}
-
-const ModelSwitcher: React.FC<ModelSwitcherProps> = ({
-  provider, model, zoo, saving, onSelect
-}) => {
-  const [open, setOpen] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const color = providerColor(provider);
-
-  // Close popup when clicking outside
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, [open]);
-
-  const noProvider    = !provider;
-  const displayName   = noProvider ? 'No provider set — open Settings' : (shortModelName(model) || '—');
-  const displayProvider = (!provider || provider === 'unknown') ? '?' : provider.toUpperCase();
-
-  return (
-    <div className="ds-model-switcher" ref={wrapperRef}>
-
-      {/* Popup — floats above the button */}
-      {open && (
-        <div className="ds-model-switcher-popup">
-          <div
-            className="ds-model-switcher-popup-header"
-            style={{ borderLeftColor: color, color }}
-          >
-            <span className="ds-model-switcher-popup-provider">{displayProvider}</span>
-            <span className="ds-model-switcher-popup-label">Chat model</span>
-          </div>
-
-          {zoo.length === 0 ? (
-            <div className="ds-model-switcher-empty">
-              No models in zoo.{'\n'}Go to ⚙ Settings → {displayProvider} tab.
-            </div>
-          ) : (
-            <div className="ds-model-switcher-list">
-              {zoo.map(m => {
-                const isActive = m === model;
-                return (
-                  <button
-                    key={m}
-                    className={`ds-model-switcher-option${isActive ? ' ds-model-switcher-option--active' : ''}`}
-                    style={isActive ? { borderLeftColor: color } : undefined}
-                    onClick={() => { onSelect(m); setOpen(false); }}
-                    title={m}
-                  >
-                    <span className="ds-model-switcher-option-name">{m}</span>
-                    {isActive && (
-                      <span className="ds-model-switcher-check" style={{ color }}>✓</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Trigger button — minimal, Cursor-style */}
-      <button
-        className={`ds-model-switcher-btn${open ? ' ds-model-switcher-btn--open' : ''}${saving ? ' ds-model-switcher-btn--saving' : ''}${noProvider ? ' ds-model-switcher-btn--unconfigured' : ''}`}
-        onClick={() => !saving && setOpen(o => !o)}
-        title={noProvider ? 'No provider configured — open Settings to configure' : `${displayProvider} · ${model}\nClick to switch chat model`}
-        disabled={saving}
-      >
-        <span className="ds-model-switcher-model-name">
-          {saving ? 'Switching…' : displayName}
-        </span>
-        <span className="ds-model-switcher-chevron" />
-      </button>
-    </div>
-  );
-};
 
 // ---------------------------------------------------------------------------
 // Slash-command helpers
@@ -2220,10 +2112,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
   });
 
   // Model switcher state
-  const [chatModel, setChatModel] = useState('');
   const [chatProvider, setChatProvider] = useState('');
-  const [chatZoo, setChatZoo] = useState<string[]>([]);
-  const [modelSwitching, setModelSwitching] = useState(false);
 
   // ── Advisory phrases (loaded from .jupyter-assistant/rules/advisory-phrases.md) ──
   // Initialised with the hardcoded defaults; overwritten by server response.
@@ -2255,14 +2144,8 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
           }
         }
         // No fallback: if DS_CHAT_PROVIDER is empty the user must configure it in settings
-        const provider     = (vals['DS_CHAT_PROVIDER'] ?? '').toUpperCase();
-        const zooRaw       = provider ? (vals[`${provider}_MODELS`] ?? '') : '';
-        const zoo          = zooRaw.trim() ? parseZoo(zooRaw) : (provider ? (DEFAULT_ZOO[`${provider}_MODELS`] ?? []) : []);
-        const modelFromEnv = provider ? (vals[`${provider}_CHAT_MODEL`] ?? '') : '';
-        const model        = modelFromEnv;
+        const provider = (vals['DS_CHAT_PROVIDER'] ?? '').toUpperCase();
         setChatProvider(provider);
-        setChatModel(model);
-        setChatZoo(zoo);
         // Load user-configured advisory phrases from the rules file.
         const phrases = data['_advisoryPhrases'];
         if (Array.isArray(phrases) && phrases.length > 0) {
@@ -3114,18 +2997,6 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
   // Model switcher handler
   // -------------------------------------------------------------------------
 
-  const handleModelSelect = async (newModel: string): Promise<void> => {
-    const prev = chatModel;
-    setChatModel(newModel); // optimistic
-    setModelSwitching(true);
-    try {
-      await apiClient.saveSettings({ [`${chatProvider}_CHAT_MODEL`]: newModel });
-    } catch {
-      setChatModel(prev); // revert on error
-    } finally {
-      setModelSwitching(false);
-    }
-  };
 
   // -------------------------------------------------------------------------
   // Thread management
@@ -3802,13 +3673,6 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
           disabled={isLoading}
         />
         <div className="ds-assistant-input-bottom">
-          <ModelSwitcher
-            provider={chatProvider}
-            model={chatModel}
-            zoo={chatZoo}
-            saving={modelSwitching}
-            onSelect={m => void handleModelSelect(m)}
-          />
           {(() => {
             const usage = threads.find(t => t.id === currentThreadId)?.tokenUsage;
             if (!usage || (usage.input === 0 && usage.output === 0)) return null;
