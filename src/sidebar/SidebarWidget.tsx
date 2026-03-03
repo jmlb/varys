@@ -1340,13 +1340,78 @@ const SkillsPanel: React.FC<{ apiClient: APIClient; notebookPath?: string }> = (
 };
 
 // ---------------------------------------------------------------------------
-// SettingsPanel — top-level wrapper with [Models | Skills] tabs
+// ---------------------------------------------------------------------------
+// CommandsPanel — live list of all slash commands (builtins + skills)
+// ---------------------------------------------------------------------------
+
+const CommandsPanel: React.FC<{ apiClient: APIClient }> = ({ apiClient }) => {
+  const [cmds, setCmds] = useState<SlashCommand[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = () => {
+    setLoading(true);
+    apiClient.getCommands()
+      .then(list => { setCmds(list); setLoading(false); })
+      .catch(() => { setLoading(false); });
+  };
+
+  useEffect(() => { refresh(); }, [apiClient]);
+
+  const builtins = cmds.filter(c => c.type === 'builtin');
+  const skills   = cmds.filter(c => c.type === 'skill');
+
+  return (
+    <div className="ds-commands-panel">
+      <div className="ds-commands-toolbar">
+        <span className="ds-commands-count">{cmds.length} commands</span>
+        <button className="ds-commands-refresh-btn" onClick={refresh} title="Reload commands">
+          {loading ? '…' : '↻'}
+        </button>
+      </div>
+
+      <div className="ds-commands-section">
+        <div className="ds-commands-section-title">Built-in</div>
+        {builtins.map(c => (
+          <div key={c.command} className="ds-commands-row">
+            <code className="ds-commands-name">{c.command}</code>
+            <span className="ds-commands-desc">{c.description}</span>
+          </div>
+        ))}
+      </div>
+
+      {skills.length > 0 && (
+        <div className="ds-commands-section">
+          <div className="ds-commands-section-title">Skills</div>
+          {skills.map(c => (
+            <div key={c.command} className="ds-commands-row">
+              <code className="ds-commands-name">{c.command}</code>
+              <span className="ds-commands-desc">{c.description}</span>
+              {c.skill_name && (
+                <span className="ds-commands-skill-badge" title={`From skill: ${c.skill_name}`}>
+                  {c.skill_name}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!loading && skills.length === 0 && (
+        <p className="ds-commands-empty">
+          No skill commands loaded yet. Import or create a skill with a <code>/command</code> in its front matter.
+        </p>
+      )}
+    </div>
+  );
+};
+
+// SettingsPanel — top-level wrapper with [Models | Skills | Commands] tabs
 // ---------------------------------------------------------------------------
 
 const SettingsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSaved?: () => void; notebookPath?: string }> = ({
   apiClient, onClose, onSaved, notebookPath = ''
 }) => {
-  const [topTab, setTopTab] = useState<'models' | 'skills'>('models');
+  const [topTab, setTopTab] = useState<'models' | 'skills' | 'commands'>('models');
   return (
     <div className="ds-settings-outer">
       <div className="ds-settings-top-tabs">
@@ -1358,14 +1423,26 @@ const SettingsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSav
           className={`ds-settings-top-tab${topTab === 'skills' ? ' ds-settings-top-tab--active' : ''}`}
           onClick={() => setTopTab('skills')}
         >📚 Skills</button>
+        <button
+          className={`ds-settings-top-tab${topTab === 'commands' ? ' ds-settings-top-tab--active' : ''}`}
+          onClick={() => setTopTab('commands')}
+        >/ Commands</button>
       </div>
 
       {topTab === 'models' ? (
         <ModelsPanel apiClient={apiClient} onClose={onClose} onSaved={onSaved} notebookPath={notebookPath} />
-      ) : (
+      ) : topTab === 'skills' ? (
         <>
           <SkillsPanel apiClient={apiClient} notebookPath={notebookPath} />
-          {/* Footer shared with models for cancel */}
+          <div className="ds-settings-footer">
+            <div className="ds-settings-actions">
+              <button className="ds-settings-cancel-btn" onClick={onClose}>Close</button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <CommandsPanel apiClient={apiClient} />
           <div className="ds-settings-footer">
             <div className="ds-settings-actions">
               <button className="ds-settings-cancel-btn" onClick={onClose}>Close</button>

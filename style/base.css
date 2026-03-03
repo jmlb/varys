@@ -2589,6 +2589,89 @@
 }
 
 /* ----------------------------------------------------------
+   Commands panel
+   ---------------------------------------------------------- */
+
+.ds-commands-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ds-commands-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ds-commands-count {
+  font-size: 11px;
+  color: var(--jp-ui-font-color2, #777);
+}
+.ds-commands-refresh-btn {
+  background: none;
+  border: 1px solid var(--jp-border-color1, #ccc);
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--jp-ui-font-color1, #333);
+  line-height: 1.4;
+}
+.ds-commands-refresh-btn:hover {
+  background: var(--jp-layout-color2, #f0f0f0);
+}
+.ds-commands-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ds-commands-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--jp-ui-font-color2, #888);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--jp-border-color2, #e0e0e0);
+  margin-bottom: 2px;
+}
+.ds-commands-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+}
+.ds-commands-name {
+  font-size: 12px;
+  font-family: var(--jp-code-font-family, monospace);
+  color: var(--jp-brand-color1, #1976d2);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.ds-commands-desc {
+  font-size: 11px;
+  color: var(--jp-ui-font-color1, #333);
+  flex: 1;
+}
+.ds-commands-skill-badge {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--jp-brand-color3, #d0e6ff);
+  color: var(--jp-brand-color1, #1976d2);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.ds-commands-empty {
+  font-size: 11px;
+  color: var(--jp-ui-font-color2, #888);
+  font-style: italic;
+  margin: 0;
+}
+
+/* ----------------------------------------------------------
    Skills panel — flex row: list left, editor right
    ---------------------------------------------------------- */
 
