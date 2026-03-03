@@ -115,20 +115,24 @@
   border-radius: 6px;
   max-width: 100%;
   word-wrap: break-word;
-  white-space: pre-wrap;
   line-height: 1.45;
 }
 
+/* pre-wrap only for user messages — assistant messages render HTML, so pre-wrap
+   would make trailing \n characters appear as blank space in the bubble */
 .ds-assistant-message-user {
-  background: var(--jp-brand-color3, #c8e6c9);
+  white-space: pre-wrap;
   align-self: flex-end;
   border-bottom-right-radius: 2px;
+  background: linear-gradient(135deg, #e4e7ef 0%, #d8dce8 100%);
+  border-left: 3px solid #8892b0;
 }
 
 .ds-assistant-message-assistant {
-  background: var(--jp-layout-color2);
   align-self: flex-start;
   border-bottom-left-radius: 2px;
+  background: linear-gradient(135deg, #f5f5f8 0%, #ebebf0 100%);
+  border-left: 3px solid #b0b8cc;
 }
 
 .ds-assistant-message-system {
@@ -1901,32 +1905,40 @@
    affect the sidebar panel and not the rest of JupyterLab.
    ---------------------------------------------------------- */
 
-/* ── Day theme (crisp white / light) ── */
+/* ── Day theme (gray-ish / light) ── */
 .ds-chat-day {
-  --ds-bg:          #ffffff;
-  --ds-header-bg:   #f4f4f4;
-  --ds-border:      #e0e0e0;
-  --ds-msg-user:    #dceeff;
-  --ds-msg-asst:    #f2f2f2;
-  --ds-msg-system:  #fff8e1;
-  --ds-msg-warning: #fff3cd;
-  --ds-input-bg:    #fafafa;
-  --ds-text:        #1a1a1a;
-  --ds-text-dim:    #666666;
+  --ds-bg:              #f7f7f9;
+  --ds-header-bg:       #eeeff3;
+  --ds-border:          #d8dae0;
+  --ds-msg-user-from:   #e4e7ef;
+  --ds-msg-user-to:     #d8dce8;
+  --ds-msg-user-accent: #8892b0;
+  --ds-msg-asst-from:   #f5f5f8;
+  --ds-msg-asst-to:     #ebebf0;
+  --ds-msg-asst-accent: #b0b8cc;
+  --ds-msg-system:      #faf8f0;
+  --ds-msg-warning:     #fdf3dc;
+  --ds-input-bg:        #ffffff;
+  --ds-text:            #1e1e2e;
+  --ds-text-dim:        #5a5f72;
 }
 
-/* ── Night theme (deep dark) ── */
+/* ── Night theme (gray-ish / dark) ── */
 .ds-chat-night {
-  --ds-bg:          #1e1e2e;
-  --ds-header-bg:   #16213e;
-  --ds-border:      #2e3050;
-  --ds-msg-user:    #1a3a5c;
-  --ds-msg-asst:    #252540;
-  --ds-msg-system:  #2a2a1e;
-  --ds-msg-warning: #3a2a10;
-  --ds-input-bg:    #1a1a2e;
-  --ds-text:        #e8e8f0;
-  --ds-text-dim:    #9090a8;
+  --ds-bg:              #1c1c24;
+  --ds-header-bg:       #22222e;
+  --ds-border:          #35354a;
+  --ds-msg-user-from:   #2a2d3e;
+  --ds-msg-user-to:     #242638;
+  --ds-msg-user-accent: #6272a4;
+  --ds-msg-asst-from:   #232330;
+  --ds-msg-asst-to:     #1e1e2a;
+  --ds-msg-asst-accent: #44475a;
+  --ds-msg-system:      #2a2a1e;
+  --ds-msg-warning:     #3a2a10;
+  --ds-input-bg:        #1a1a24;
+  --ds-text:            #e8e8f0;
+  --ds-text-dim:        #8890a8;
 }
 
 /* Apply theme vars to the concrete elements */
@@ -1951,14 +1963,16 @@
 /* Message bubbles */
 .ds-chat-day .ds-assistant-message-user,
 .ds-chat-night .ds-assistant-message-user {
-  background: var(--ds-msg-user) !important;
-  color:      var(--ds-text) !important;
+  background:  linear-gradient(135deg, var(--ds-msg-user-from) 0%, var(--ds-msg-user-to) 100%) !important;
+  border-left: 3px solid var(--ds-msg-user-accent) !important;
+  color:       var(--ds-text) !important;
 }
 
 .ds-chat-day .ds-assistant-message-assistant,
 .ds-chat-night .ds-assistant-message-assistant {
-  background: var(--ds-msg-asst) !important;
-  color:      var(--ds-text) !important;
+  background:  linear-gradient(135deg, var(--ds-msg-asst-from) 0%, var(--ds-msg-asst-to) 100%) !important;
+  border-left: 3px solid var(--ds-msg-asst-accent) !important;
+  color:       var(--ds-text) !important;
 }
 
 .ds-chat-day .ds-assistant-message-system,
@@ -2120,16 +2134,16 @@
 
 /* Collapse fade gradient — must match the bubble background in each theme */
 .ds-chat-day .ds-assistant-message-user .ds-msg-fade {
-  background: linear-gradient(to bottom, transparent 0%, #e3f0ff 100%);
+  background: linear-gradient(to bottom, transparent 0%, #d8dce8 100%);
 }
 .ds-chat-day .ds-assistant-message-assistant .ds-msg-fade {
-  background: linear-gradient(to bottom, transparent 0%, #f5f5f5 100%);
+  background: linear-gradient(to bottom, transparent 0%, #ebebf0 100%);
 }
 .ds-chat-night .ds-assistant-message-user .ds-msg-fade {
-  background: linear-gradient(to bottom, transparent 0%, #1a2a3a 100%);
+  background: linear-gradient(to bottom, transparent 0%, #242638 100%);
 }
 .ds-chat-night .ds-assistant-message-assistant .ds-msg-fade {
-  background: linear-gradient(to bottom, transparent 0%, #1e1e2e 100%);
+  background: linear-gradient(to bottom, transparent 0%, #1e1e2a 100%);
 }
 .ds-chat-night .ds-msg-toggle-btn {
   color: #7eb8f7;
