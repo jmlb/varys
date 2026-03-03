@@ -3623,7 +3623,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                     <div className={`ds-msg-collapsible-wrap${collapsed ? ' ds-msg-collapsed' : ''}`}>
                       <div
                         className="ds-assistant-message-content ds-markdown"
-                        dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.displayContent ?? msg.content) }}
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown((msg.displayContent ?? msg.content).replace(/[\r\n\s]+$/, '')) }}
                       />
                       {/* Context chip */}
                       {msg.role === 'user' && msg.contextChip && (
