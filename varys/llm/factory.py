@@ -102,7 +102,7 @@ def get_provider_info(settings: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
     """Return provider + model for each task — used by the health endpoint."""
     result: Dict[str, Dict[str, str]] = {}
     for task in ("chat", "inline", "multiline"):
-        provider_name = settings.get(f"ds_assistant_{task}_provider", "anthropic").lower()
+        provider_name = settings.get(f"ds_assistant_{task}_provider", "").lower()
         model = (
             settings.get(f"ds_assistant_{provider_name}_{task}_model")
             or _DEFAULTS.get(provider_name, {}).get(task, "")
@@ -193,6 +193,12 @@ def _build_provider(
             site_name=settings.get("ds_assistant_openrouter_site_name", "JupyterLab DS Assistant"),
         )
 
+    if not provider_name:
+        raise ValueError(
+            f"No provider configured for task '{task}'. "
+            "Open the Varys settings panel and set DS_CHAT_PROVIDER "
+            "(e.g. anthropic, openai, ollama, google, bedrock, azure, openrouter)."
+        )
     raise ValueError(
         f"Unknown provider '{provider_name}' for task '{task}'. "
         "Supported: anthropic, ollama, openai, google, bedrock, azure, openrouter."

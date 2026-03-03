@@ -84,7 +84,12 @@ _MASK_PLACEHOLDER = "••••••••"
 
 
 def _env_path(settings: dict) -> Path:
-    return Path(settings.get("ds_assistant_root_dir", ".")) / ".env"
+    """Return path to the Varys .env config file.
+
+    Stored in ~/.jupyter/varys.env so it persists across projects and is
+    never accidentally committed to a repo.
+    """
+    return Path.home() / ".jupyter" / "varys.env"
 
 
 def _read_env(path: Path) -> dict:

@@ -40,15 +40,20 @@ class DSAssistantExtension(ExtensionApp):
         """Initialize extension settings."""
         self.log.info("Varys: Initializing settings")
 
-        # Load .env if present in cwd
-        env_path = Path(self.serverapp.root_dir) / ".env"
-        if env_path.exists():
-            try:
-                from dotenv import load_dotenv
-                load_dotenv(env_path)
-                self.log.info(f"Varys: Loaded .env from {env_path}")
-            except ImportError:
-                self.log.warning("Varys: python-dotenv not installed, skipping .env")
+        # Load ~/.jupyter/varys.env (user-level, persists across projects)
+        # then optionally overlay with a project-level .env in root_dir.
+        env_paths = [
+            Path.home() / ".jupyter" / "varys.env",
+            Path(self.serverapp.root_dir) / ".env",
+        ]
+        try:
+            from dotenv import load_dotenv
+            for env_path in env_paths:
+                if env_path.exists():
+                    load_dotenv(env_path, override=True)
+                    self.log.info(f"Varys: Loaded env from {env_path}")
+        except ImportError:
+            self.log.warning("Varys: python-dotenv not installed, skipping .env files")
 
         # Initialise the centralised config loader so every module can call
         # get_config() without needing the root_dir passed explicitly.
@@ -60,9 +65,9 @@ class DSAssistantExtension(ExtensionApp):
         # Values are provider names in upper-case matching the .env blocks,
         # e.g. "ANTHROPIC" or "OLLAMA".  Stored lower-case internally.
         # ----------------------------------------------------------------
-        chat_provider      = os.environ.get("DS_CHAT_PROVIDER", "ANTHROPIC").upper()
-        inline_provider    = os.environ.get("DS_INLINE_PROVIDER", "ANTHROPIC").upper()
-        multiline_provider = os.environ.get("DS_MULTILINE_PROVIDER", "ANTHROPIC").upper()
+        chat_provider      = os.environ.get("DS_CHAT_PROVIDER", "").upper()
+        inline_provider    = os.environ.get("DS_INLINE_PROVIDER", "").upper()
+        multiline_provider = os.environ.get("DS_MULTILINE_PROVIDER", "").upper()
 
         # ----------------------------------------------------------------
         # Provider blocks — read every {PROVIDER}_{TASK}_MODEL entry.
