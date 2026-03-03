@@ -16,13 +16,6 @@ import logging
 from typing import Any, Dict, Literal
 
 from .base import BaseLLMProvider
-from .anthropic_provider import AnthropicProvider
-from .ollama_provider import OllamaProvider
-from .openai_provider import OpenAIProvider
-from .google_provider import GoogleProvider
-from .bedrock_provider import BedrockProvider
-from .azure_provider import AzureProvider
-from .openrouter_provider import OpenRouterProvider
 
 log = logging.getLogger(__name__)
 
@@ -131,6 +124,7 @@ def _build_provider(
     log.info("Varys factory: task=%s  provider=%s  model=%s", task, provider_name, model)
 
     if provider_name == "ollama":
+        from .ollama_provider import OllamaProvider
         return OllamaProvider(
             base_url=settings.get("ds_assistant_ollama_url", "http://localhost:11434"),
             chat_model=model,
@@ -139,6 +133,7 @@ def _build_provider(
         )
 
     if provider_name == "anthropic":
+        from .anthropic_provider import AnthropicProvider
         return AnthropicProvider(
             api_key=settings.get("ds_assistant_anthropic_api_key", ""),
             chat_model=model,
@@ -147,6 +142,7 @@ def _build_provider(
         )
 
     if provider_name == "openai":
+        from .openai_provider import OpenAIProvider
         return OpenAIProvider(
             api_key=settings.get("ds_assistant_openai_api_key", ""),
             chat_model=model,
@@ -155,6 +151,7 @@ def _build_provider(
         )
 
     if provider_name == "google":
+        from .google_provider import GoogleProvider
         return GoogleProvider(
             api_key=settings.get("ds_assistant_google_api_key", ""),
             chat_model=model,
@@ -163,6 +160,7 @@ def _build_provider(
         )
 
     if provider_name == "bedrock":
+        from .bedrock_provider import BedrockProvider
         return BedrockProvider(
             access_key_id=settings.get("ds_assistant_aws_access_key_id", ""),
             secret_access_key=settings.get("ds_assistant_aws_secret_access_key", ""),
@@ -174,6 +172,7 @@ def _build_provider(
         )
 
     if provider_name == "azure":
+        from .azure_provider import AzureProvider
         return AzureProvider(
             api_key=settings.get("ds_assistant_azure_openai_api_key", ""),
             endpoint=settings.get("ds_assistant_azure_openai_endpoint", ""),
@@ -184,6 +183,7 @@ def _build_provider(
         )
 
     if provider_name == "openrouter":
+        from .openrouter_provider import OpenRouterProvider
         return OpenRouterProvider(
             api_key=settings.get("ds_assistant_openrouter_api_key", ""),
             chat_model=model,
