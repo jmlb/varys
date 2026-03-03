@@ -296,76 +296,8 @@ function generateId(): string {
 // Chat component
 // ---------------------------------------------------------------------------
 
-interface TaskProviderInfo {
-  provider: string;
-  model: string;
-}
 
-interface ProviderStatus {
-  provider: string;   // chat provider (backward compat)
-  model: string;
-  healthy: boolean;
-  // per-task breakdown
-  providers: {
-    chat: TaskProviderInfo;
-    inline: TaskProviderInfo;
-    multiline: TaskProviderInfo;
-  };
-}
 
-// ---------------------------------------------------------------------------
-// Provider badge helpers
-// ---------------------------------------------------------------------------
-
-function providerLabel(p: string): string {
-  return p === 'ollama' ? '🖥' : '☁';
-}
-
-function shortModel(model: string): string {
-  const base = model.split(':')[0];
-  if (base.startsWith('claude-')) {
-    const parts = base.split('-');
-    return parts[1] ?? base; // "sonnet", "haiku"
-  }
-  return base.split('-')[0]; // "qwen2.5", "codellama"
-}
-
-const ProviderBadge: React.FC<{ status: ProviderStatus }> = ({ status }) => {
-  const { chat, inline, multiline } = status.providers;
-  const allSame =
-    chat.provider === inline.provider && chat.provider === multiline.provider;
-
-  const tooltipLines = [
-    `chat: ${chat.provider} / ${chat.model || '—'}`,
-    `inline: ${inline.provider} / ${inline.model || '—'}`,
-    `multiline: ${multiline.provider} / ${multiline.model || '—'}`
-  ].join('\n');
-
-  if (allSame) {
-    return (
-      <span
-        className={`ds-provider-badge ds-provider-badge-${chat.provider}`}
-        title={tooltipLines}
-      >
-        {providerLabel(chat.provider)}&nbsp;
-        <span className="ds-provider-model">{shortModel(chat.model)}</span>
-      </span>
-    );
-  }
-
-  const completionProvider = inline.provider;
-  return (
-    <span className="ds-provider-badge ds-provider-badge-hybrid" title={tooltipLines}>
-      <span className={`ds-provider-segment ds-provider-segment-${chat.provider}`}>
-        {providerLabel(chat.provider)}&nbsp;chat
-      </span>
-      <span className="ds-provider-separator">·</span>
-      <span className={`ds-provider-segment ds-provider-segment-${completionProvider}`}>
-        {providerLabel(completionProvider)}&nbsp;↹
-      </span>
-    </span>
-  );
-};
 
 // ---------------------------------------------------------------------------
 // Settings panel
@@ -1456,6 +1388,98 @@ const SettingsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSav
 };
 
 // ---------------------------------------------------------------------------
+// ModelSwitcher — inline model picker at the bottom of the chat textarea
+// ---------------------------------------------------------------------------
+
+const shortModelName = (model: string): string =>
+  model.includes('/') ? model.split('/').slice(1).join('/') : model;
+
+const PROVIDER_COLORS: Record<string, string> = {
+  ANTHROPIC:   '#d97757',
+  OPENAI:      '#10a37f',
+  GOOGLE:      '#4285f4',
+  BEDROCK:     '#ff9900',
+  AZURE:       '#0078d4',
+  OPENROUTER:  '#7c3aed',
+  OLLAMA:      '#0ea5e9',
+};
+const providerColor = (p: string): string =>
+  PROVIDER_COLORS[p.toUpperCase()] ?? '#1976d2';
+
+interface ModelSwitcherProps {
+  provider: string;
+  model: string;
+  zoo: string[];
+  saving: boolean;
+  onSelect: (model: string) => void;
+}
+
+const ModelSwitcher: React.FC<ModelSwitcherProps> = ({
+  provider, model, zoo, saving, onSelect
+}) => {
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const color = providerColor(provider);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node))
+        setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  const noProvider    = !provider;
+  const displayName   = noProvider ? 'No provider set — open Settings' : (shortModelName(model) || '—');
+  const displayProvider = (!provider || provider === 'unknown') ? '?' : provider.toUpperCase();
+
+  return (
+    <div className="ds-model-switcher" ref={wrapperRef}>
+      {open && (
+        <div className="ds-model-switcher-popup">
+          <div className="ds-model-switcher-popup-header" style={{ borderLeftColor: color, color }}>
+            <span className="ds-model-switcher-popup-provider">{displayProvider}</span>
+            <span className="ds-model-switcher-popup-label">Chat model</span>
+          </div>
+          {zoo.length === 0 ? (
+            <div className="ds-model-switcher-empty">
+              No models in zoo.{'\n'}Go to ⚙ Settings → {displayProvider} tab.
+            </div>
+          ) : (
+            <div className="ds-model-switcher-list">
+              {zoo.map(m => {
+                const isActive = m === model;
+                return (
+                  <button
+                    key={m}
+                    className={`ds-model-switcher-option${isActive ? ' ds-model-switcher-option--active' : ''}`}
+                    style={isActive ? { borderLeftColor: color } : undefined}
+                    onClick={() => { onSelect(m); setOpen(false); }}
+                    title={m}
+                  >
+                    <span className="ds-model-switcher-option-name">{m}</span>
+                    {isActive && <span className="ds-model-switcher-check" style={{ color }}>✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+      <button
+        className={`ds-model-switcher-btn${open ? ' ds-model-switcher-btn--open' : ''}${saving ? ' ds-model-switcher-btn--saving' : ''}${noProvider ? ' ds-model-switcher-btn--unconfigured' : ''}`}
+        onClick={() => !saving && setOpen(o => !o)}
+        title={noProvider ? 'No provider configured — open Settings' : `${displayProvider} · ${model}\nClick to switch chat model`}
+        disabled={saving}
+      >
+        <span className="ds-model-switcher-model-name">{saving ? 'Switching…' : displayName}</span>
+        <span className="ds-model-switcher-chevron" />
+      </button>
+    </div>
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Slash-command helpers
@@ -2100,19 +2124,12 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [providerStatus, setProviderStatus] = useState<ProviderStatus>({
-    provider: 'unknown',
-    model: '',
-    healthy: false,
-    providers: {
-      chat: { provider: 'unknown', model: '' },
-      inline: { provider: 'unknown', model: '' },
-      multiline: { provider: 'unknown', model: '' }
-    }
-  });
 
   // Model switcher state
   const [chatProvider, setChatProvider] = useState('');
+  const [chatModel,    setChatModel]    = useState('');
+  const [chatZoo,      setChatZoo]      = useState<string[]>([]);
+  const [modelSwitching, setModelSwitching] = useState(false);
 
   // ── Advisory phrases (loaded from .jupyter-assistant/rules/advisory-phrases.md) ──
   // Initialised with the hardcoded defaults; overwritten by server response.
@@ -2144,8 +2161,13 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
           }
         }
         // No fallback: if DS_CHAT_PROVIDER is empty the user must configure it in settings
-        const provider = (vals['DS_CHAT_PROVIDER'] ?? '').toUpperCase();
+        const provider     = (vals['DS_CHAT_PROVIDER'] ?? '').toUpperCase();
+        const zooRaw       = provider ? (vals[`${provider}_MODELS`] ?? '') : '';
+        const zoo          = zooRaw.trim() ? parseZoo(zooRaw) : (provider ? (DEFAULT_ZOO[`${provider}_MODELS`] ?? []) : []);
+        const model        = provider ? (vals[`${provider}_CHAT_MODEL`] ?? '') : '';
         setChatProvider(provider);
+        setChatModel(model);
+        setChatZoo(zoo);
         // Load user-configured advisory phrases from the rules file.
         const phrases = data['_advisoryPhrases'];
         if (Array.isArray(phrases) && phrases.length > 0) {
@@ -2162,28 +2184,6 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
   useEffect(() => {
     apiClient
       .healthCheck()
-      .then((info: Record<string, unknown>) => {
-        const raw = (info.providers ?? {}) as Record<string, Record<string, string>>;
-        setProviderStatus({
-          provider: (info.provider as string) || 'unknown',
-          model: (info.model as string) || '',
-          healthy: (info.status as string) === 'ok',
-          providers: {
-            chat: {
-              provider: raw.chat?.provider || (info.provider as string) || 'unknown',
-              model: raw.chat?.model || (info.model as string) || ''
-            },
-            inline: {
-              provider: raw.inline?.provider || (info.provider as string) || 'unknown',
-              model: raw.inline?.model || ''
-            },
-            multiline: {
-              provider: raw.multiline?.provider || (info.provider as string) || 'unknown',
-              model: raw.multiline?.model || ''
-            }
-          }
-        });
-      })
       .catch(() => { /* server not ready yet */ });
 
     loadModelSettings();
@@ -2999,6 +2999,19 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
 
 
   // -------------------------------------------------------------------------
+  const handleModelSelect = async (newModel: string): Promise<void> => {
+    const prev = chatModel;
+    setChatModel(newModel);
+    setModelSwitching(true);
+    try {
+      await apiClient.saveSettings({ [`${chatProvider}_CHAT_MODEL`]: newModel });
+    } catch {
+      setChatModel(prev);
+    } finally {
+      setModelSwitching(false);
+    }
+  };
+
   // Thread management
   // -------------------------------------------------------------------------
 
@@ -3333,9 +3346,6 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
       {/* Header */}
       <div className="ds-assistant-header">
         <span className="ds-assistant-title">DS Assistant</span>
-        {providerStatus.provider !== 'unknown' && (
-          <ProviderBadge status={providerStatus} />
-        )}
         <button
           className="ds-tags-panel-btn"
           onClick={() => setShowTags(true)}
@@ -3673,6 +3683,13 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
           disabled={isLoading}
         />
         <div className="ds-assistant-input-bottom">
+          <ModelSwitcher
+            provider={chatProvider}
+            model={chatModel}
+            zoo={chatZoo}
+            saving={modelSwitching}
+            onSelect={m => void handleModelSelect(m)}
+          />
           {(() => {
             const usage = threads.find(t => t.id === currentThreadId)?.tokenUsage;
             if (!usage || (usage.input === 0 && usage.output === 0)) return null;
