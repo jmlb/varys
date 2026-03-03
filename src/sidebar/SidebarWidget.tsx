@@ -444,10 +444,9 @@ const TAB_GROUPS: TabGroup[] = [
     providerKey: null,
     zooKey: null,
     fields: [
-      { key: 'DS_CHAT_PROVIDER',      label: 'Chat',      type: 'select' },
-      { key: 'DS_INLINE_PROVIDER',    label: 'Inline',    type: 'select' },
-      { key: 'DS_MULTILINE_PROVIDER', label: 'Multiline', type: 'select' },
-      { key: 'DS_EMBED_PROVIDER',     label: 'Embedding', type: 'select' },
+      { key: 'DS_CHAT_PROVIDER',        label: 'Chat',        type: 'select' },
+      { key: 'DS_COMPLETION_PROVIDER',  label: 'Completion',  type: 'select' },
+      { key: 'DS_EMBED_PROVIDER',       label: 'Embedding',   type: 'select' },
     ]
   },
   {
@@ -456,11 +455,10 @@ const TAB_GROUPS: TabGroup[] = [
     providerKey: 'ANTHROPIC',
     zooKey: 'ANTHROPIC_MODELS',
     fields: [
-      { key: 'ANTHROPIC_API_KEY',        label: 'API key',         type: 'password' },
-      { key: 'ANTHROPIC_CHAT_MODEL',     label: 'Chat model',      type: 'model-select' },
-      { key: 'ANTHROPIC_INLINE_MODEL',   label: 'Inline model',    type: 'model-select' },
-      { key: 'ANTHROPIC_MULTILINE_MODEL',label: 'Multiline model', type: 'model-select' },
-      { key: 'ANTHROPIC_EMBED_MODEL',    label: 'Embedding model', type: 'model-select' },
+      { key: 'ANTHROPIC_API_KEY',            label: 'API key',          type: 'password' },
+      { key: 'ANTHROPIC_CHAT_MODEL',         label: 'Chat model',       type: 'model-select' },
+      { key: 'ANTHROPIC_COMPLETION_MODEL',   label: 'Completion model', type: 'model-select' },
+      { key: 'ANTHROPIC_EMBED_MODEL',        label: 'Embedding model',  type: 'model-select' },
     ]
   },
   {
@@ -469,11 +467,10 @@ const TAB_GROUPS: TabGroup[] = [
     providerKey: 'OPENAI',
     zooKey: 'OPENAI_MODELS',
     fields: [
-      { key: 'OPENAI_API_KEY',        label: 'API key',         type: 'password' },
-      { key: 'OPENAI_CHAT_MODEL',     label: 'Chat model',      type: 'model-select' },
-      { key: 'OPENAI_INLINE_MODEL',   label: 'Inline model',    type: 'model-select' },
-      { key: 'OPENAI_MULTILINE_MODEL',label: 'Multiline model', type: 'model-select' },
-      { key: 'OPENAI_EMBED_MODEL',    label: 'Embedding model', type: 'model-select' },
+      { key: 'OPENAI_API_KEY',            label: 'API key',          type: 'password' },
+      { key: 'OPENAI_CHAT_MODEL',         label: 'Chat model',       type: 'model-select' },
+      { key: 'OPENAI_COMPLETION_MODEL',   label: 'Completion model', type: 'model-select' },
+      { key: 'OPENAI_EMBED_MODEL',        label: 'Embedding model',  type: 'model-select' },
     ]
   },
   {
@@ -482,11 +479,10 @@ const TAB_GROUPS: TabGroup[] = [
     providerKey: 'GOOGLE',
     zooKey: 'GOOGLE_MODELS',
     fields: [
-      { key: 'GOOGLE_API_KEY',        label: 'API key',         type: 'password' },
-      { key: 'GOOGLE_CHAT_MODEL',     label: 'Chat model',      type: 'model-select' },
-      { key: 'GOOGLE_INLINE_MODEL',   label: 'Inline model',    type: 'model-select' },
-      { key: 'GOOGLE_MULTILINE_MODEL',label: 'Multiline model', type: 'model-select' },
-      { key: 'GOOGLE_EMBED_MODEL',    label: 'Embedding model', type: 'model-select' },
+      { key: 'GOOGLE_API_KEY',            label: 'API key',          type: 'password' },
+      { key: 'GOOGLE_CHAT_MODEL',         label: 'Chat model',       type: 'model-select' },
+      { key: 'GOOGLE_COMPLETION_MODEL',   label: 'Completion model', type: 'model-select' },
+      { key: 'GOOGLE_EMBED_MODEL',        label: 'Embedding model',  type: 'model-select' },
     ]
   },
   {
@@ -495,14 +491,13 @@ const TAB_GROUPS: TabGroup[] = [
     providerKey: 'BEDROCK',
     zooKey: 'BEDROCK_MODELS',
     fields: [
-      { key: 'AWS_ACCESS_KEY_ID',       label: 'Access key ID',   type: 'password' },
-      { key: 'AWS_SECRET_ACCESS_KEY',   label: 'Secret access key',type: 'password' },
-      { key: 'AWS_SESSION_TOKEN',       label: 'Session token',   type: 'password', placeholder: '(optional)' },
-      { key: 'AWS_REGION',              label: 'Region',          type: 'text', placeholder: 'us-east-1' },
-      { key: 'BEDROCK_CHAT_MODEL',      label: 'Chat model ID',   type: 'model-select' },
-      { key: 'BEDROCK_INLINE_MODEL',    label: 'Inline model ID', type: 'model-select' },
-      { key: 'BEDROCK_MULTILINE_MODEL', label: 'Multiline model ID',type: 'model-select' },
-      { key: 'BEDROCK_EMBED_MODEL',     label: 'Embedding model', type: 'model-select' },
+      { key: 'AWS_ACCESS_KEY_ID',             label: 'Access key ID',    type: 'password' },
+      { key: 'AWS_SECRET_ACCESS_KEY',         label: 'Secret access key',type: 'password' },
+      { key: 'AWS_SESSION_TOKEN',             label: 'Session token',    type: 'password', placeholder: '(optional)' },
+      { key: 'AWS_REGION',                    label: 'Region',           type: 'text', placeholder: 'us-east-1' },
+      { key: 'BEDROCK_CHAT_MODEL',            label: 'Chat model ID',    type: 'model-select' },
+      { key: 'BEDROCK_COMPLETION_MODEL',      label: 'Completion model ID', type: 'model-select' },
+      { key: 'BEDROCK_EMBED_MODEL',           label: 'Embedding model',  type: 'model-select' },
     ]
   },
   {
@@ -511,13 +506,12 @@ const TAB_GROUPS: TabGroup[] = [
     providerKey: 'AZURE',
     zooKey: 'AZURE_MODELS',
     fields: [
-      { key: 'AZURE_OPENAI_API_KEY',      label: 'API key',         type: 'password' },
-      { key: 'AZURE_OPENAI_ENDPOINT',     label: 'Endpoint URL',    type: 'text', placeholder: 'https://YOUR-RESOURCE.openai.azure.com/' },
-      { key: 'AZURE_OPENAI_API_VERSION',  label: 'API version',     type: 'text', placeholder: '2024-02-01' },
-      { key: 'AZURE_CHAT_MODEL',          label: 'Chat deployment',     type: 'model-select' },
-      { key: 'AZURE_INLINE_MODEL',        label: 'Inline deployment',   type: 'model-select' },
-      { key: 'AZURE_MULTILINE_MODEL',     label: 'Multiline deployment',type: 'model-select' },
-      { key: 'AZURE_EMBED_MODEL',         label: 'Embedding deployment',type: 'model-select' },
+      { key: 'AZURE_OPENAI_API_KEY',          label: 'API key',              type: 'password' },
+      { key: 'AZURE_OPENAI_ENDPOINT',         label: 'Endpoint URL',         type: 'text', placeholder: 'https://YOUR-RESOURCE.openai.azure.com/' },
+      { key: 'AZURE_OPENAI_API_VERSION',      label: 'API version',          type: 'text', placeholder: '2024-02-01' },
+      { key: 'AZURE_CHAT_MODEL',              label: 'Chat deployment',       type: 'model-select' },
+      { key: 'AZURE_COMPLETION_MODEL',        label: 'Completion deployment', type: 'model-select' },
+      { key: 'AZURE_EMBED_MODEL',             label: 'Embedding deployment',  type: 'model-select' },
     ]
   },
   {
@@ -526,13 +520,12 @@ const TAB_GROUPS: TabGroup[] = [
     providerKey: 'OPENROUTER',
     zooKey: 'OPENROUTER_MODELS',
     fields: [
-      { key: 'OPENROUTER_API_KEY',         label: 'API key',              type: 'password' },
-      { key: 'OPENROUTER_SITE_URL',        label: 'Site URL (optional)',  type: 'text', placeholder: 'https://your-app.com' },
-      { key: 'OPENROUTER_SITE_NAME',       label: 'Site name (optional)', type: 'text', placeholder: 'Varys' },
-      { key: 'OPENROUTER_CHAT_MODEL',      label: 'Chat model',      type: 'model-select' },
-      { key: 'OPENROUTER_INLINE_MODEL',    label: 'Inline model',    type: 'model-select' },
-      { key: 'OPENROUTER_MULTILINE_MODEL', label: 'Multiline model', type: 'model-select' },
-      { key: 'OPENROUTER_EMBED_MODEL',     label: 'Embedding model', type: 'model-select' },
+      { key: 'OPENROUTER_API_KEY',             label: 'API key',              type: 'password' },
+      { key: 'OPENROUTER_SITE_URL',            label: 'Site URL (optional)',  type: 'text', placeholder: 'https://your-app.com' },
+      { key: 'OPENROUTER_SITE_NAME',           label: 'Site name (optional)', type: 'text', placeholder: 'Varys' },
+      { key: 'OPENROUTER_CHAT_MODEL',          label: 'Chat model',           type: 'model-select' },
+      { key: 'OPENROUTER_COMPLETION_MODEL',    label: 'Completion model',     type: 'model-select' },
+      { key: 'OPENROUTER_EMBED_MODEL',         label: 'Embedding model',      type: 'model-select' },
     ]
   },
   {
@@ -541,11 +534,10 @@ const TAB_GROUPS: TabGroup[] = [
     providerKey: 'OLLAMA',
     zooKey: 'OLLAMA_MODELS',
     fields: [
-      { key: 'OLLAMA_URL',             label: 'Server URL',      type: 'text', placeholder: 'http://localhost:11434' },
-      { key: 'OLLAMA_CHAT_MODEL',      label: 'Chat model',      type: 'model-select' },
-      { key: 'OLLAMA_INLINE_MODEL',    label: 'Inline model',    type: 'model-select' },
-      { key: 'OLLAMA_MULTILINE_MODEL', label: 'Multiline model', type: 'model-select' },
-      { key: 'OLLAMA_EMBED_MODEL',     label: 'Embedding model', type: 'model-select' },
+      { key: 'OLLAMA_URL',                     label: 'Server URL',       type: 'text', placeholder: 'http://localhost:11434' },
+      { key: 'OLLAMA_CHAT_MODEL',              label: 'Chat model',       type: 'model-select' },
+      { key: 'OLLAMA_COMPLETION_MODEL',        label: 'Completion model', type: 'model-select' },
+      { key: 'OLLAMA_EMBED_MODEL',             label: 'Embedding model',  type: 'model-select' },
     ]
   },
   {
@@ -765,9 +757,74 @@ const ModelsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSaved
     if (masked[key]) setMasked(m => ({ ...m, [key]: false }));
   };
 
+  const _validateBeforeSave = (): string | null => {
+    const PROVIDER_API_KEYS: Record<string, string> = {
+      ANTHROPIC:   'ANTHROPIC_API_KEY',
+      OPENAI:      'OPENAI_API_KEY',
+      GOOGLE:      'GOOGLE_API_KEY',
+      AZURE:       'AZURE_OPENAI_API_KEY',
+      OPENROUTER:  'OPENROUTER_API_KEY',
+      BEDROCK:     'AWS_ACCESS_KEY_ID',
+    };
+    const PROVIDER_MODEL_KEYS: Record<string, Record<string, string>> = {
+      ANTHROPIC:   { chat: 'ANTHROPIC_CHAT_MODEL',    completion: 'ANTHROPIC_COMPLETION_MODEL' },
+      OPENAI:      { chat: 'OPENAI_CHAT_MODEL',        completion: 'OPENAI_COMPLETION_MODEL' },
+      GOOGLE:      { chat: 'GOOGLE_CHAT_MODEL',        completion: 'GOOGLE_COMPLETION_MODEL' },
+      AZURE:       { chat: 'AZURE_CHAT_MODEL',         completion: 'AZURE_COMPLETION_MODEL' },
+      OPENROUTER:  { chat: 'OPENROUTER_CHAT_MODEL',   completion: 'OPENROUTER_COMPLETION_MODEL' },
+      BEDROCK:     { chat: 'BEDROCK_CHAT_MODEL',       completion: 'BEDROCK_COMPLETION_MODEL' },
+      OLLAMA:      { chat: 'OLLAMA_CHAT_MODEL',        completion: 'OLLAMA_COMPLETION_MODEL' },
+    };
+
+    const chatProvider = (values['DS_CHAT_PROVIDER'] ?? '').toUpperCase();
+    const completionProvider = (values['DS_COMPLETION_PROVIDER'] ?? '').toUpperCase();
+
+    // Check that chat provider is set
+    if (!chatProvider) {
+      return 'DS_CHAT_PROVIDER is empty. Select a provider for Chat in the Routing tab.';
+    }
+
+    // Check API key for chat provider (skip Ollama — no key needed)
+    if (chatProvider in PROVIDER_API_KEYS) {
+      const keyField = PROVIDER_API_KEYS[chatProvider];
+      const keyVal = (values[keyField] ?? '').trim();
+      if (!keyVal || keyVal === '••••••••') {
+        return `${keyField} is empty. Set the API key for ${chatProvider} in its tab.`;
+      }
+    }
+
+    // Check chat model
+    const chatModelKey = PROVIDER_MODEL_KEYS[chatProvider]?.['chat'];
+    if (chatModelKey && !(values[chatModelKey] ?? '').trim()) {
+      return `${chatModelKey} is empty. Select a chat model for ${chatProvider}.`;
+    }
+
+    // If a completion provider is set, validate it too
+    if (completionProvider) {
+      if (completionProvider in PROVIDER_API_KEYS) {
+        const keyField = PROVIDER_API_KEYS[completionProvider];
+        const keyVal = (values[keyField] ?? '').trim();
+        if (!keyVal || keyVal === '••••••••') {
+          return `${keyField} is empty. Set the API key for ${completionProvider} in its tab.`;
+        }
+      }
+      const completionModelKey = PROVIDER_MODEL_KEYS[completionProvider]?.['completion'];
+      if (completionModelKey && !(values[completionModelKey] ?? '').trim()) {
+        return `${completionModelKey} is empty. Select a completion model for ${completionProvider}.`;
+      }
+    }
+
+    return null;
+  };
+
   const handleSave = async () => {
-    setSaving(true);
     setStatus(null);
+    const validationError = _validateBeforeSave();
+    if (validationError) {
+      setStatus({ type: 'error', text: validationError });
+      return;
+    }
+    setSaving(true);
     try {
       const result = await apiClient.saveSettings(values);
       if (result.error) {
@@ -777,7 +834,6 @@ const ModelsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSaved
           type: 'success',
           text: `Saved ${(result.updated ?? []).length} setting(s). Active immediately.`
         });
-        // Notify parent so the model switcher refreshes immediately.
         onSaved?.();
       }
     } catch (err) {
@@ -792,19 +848,17 @@ const ModelsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSaved
   }
 
   const activeProviders = new Set([
-    (values['DS_CHAT_PROVIDER']      ?? '').toUpperCase(),
-    (values['DS_INLINE_PROVIDER']    ?? '').toUpperCase(),
-    (values['DS_MULTILINE_PROVIDER'] ?? '').toUpperCase(),
-    (values['DS_EMBED_PROVIDER']     ?? '').toUpperCase(),
+    (values['DS_CHAT_PROVIDER']       ?? '').toUpperCase(),
+    (values['DS_COMPLETION_PROVIDER'] ?? '').toUpperCase(),
+    (values['DS_EMBED_PROVIDER']      ?? '').toUpperCase(),
   ]);
 
   const currentGroup = TAB_GROUPS.find(g => g.id === activeTab) ?? TAB_GROUPS[0];
 
   const TASK_LABELS: Record<string, string> = {
-    DS_CHAT_PROVIDER:      'Chat',
-    DS_INLINE_PROVIDER:    'Inline',
-    DS_MULTILINE_PROVIDER: 'Multiline',
-    DS_EMBED_PROVIDER:     'Embedding',
+    DS_CHAT_PROVIDER:       'Chat',
+    DS_COMPLETION_PROVIDER: 'Completion',
+    DS_EMBED_PROVIDER:      'Embedding',
   };
 
   return (
@@ -855,17 +909,21 @@ const ModelsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSaved
                 const zoo = currentGroup.zooKey ? getZooModels(currentGroup.zooKey, values) : [];
                 const cur = values[field.key] ?? '';
                 const options = cur && !zoo.includes(cur) ? [cur, ...zoo] : zoo;
+                const isEmpty = !cur;
                 return (
                   <div key={field.key} className="ds-settings-row">
-                    <label className="ds-settings-label">{field.label}</label>
+                    <label className="ds-settings-label">
+                      {field.label}
+                      {isEmpty && <span className="ds-settings-required" title="Required"> *</span>}
+                    </label>
                     <select
-                      className="ds-settings-select"
+                      className={`ds-settings-select${isEmpty ? ' ds-settings-select--empty' : ''}`}
                       value={cur}
                       onChange={e => handleChange(field.key, e.target.value)}
                     >
-                      {options.length === 0 && (
-                        <option value="">— add models to zoo below —</option>
-                      )}
+                      <option value="">
+                        {options.length === 0 ? '— add models to zoo below —' : '— select model —'}
+                      </option>
                       {options.map(m => (
                         <option key={m} value={m}>{m}</option>
                       ))}

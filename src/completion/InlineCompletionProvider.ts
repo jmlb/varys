@@ -10,7 +10,6 @@ import {
   IInlineCompletionItem,
   IInlineCompletionList,
   IInlineCompletionProvider,
-  InlineCompletionTriggerKind
 } from '@jupyterlab/completer';
 import { INotebookTracker, NotebookPanel } from '@jupyterlab/notebook';
 import { JSONValue } from '@lumino/coreutils';
@@ -81,12 +80,6 @@ export class DSAssistantInlineProvider
       return empty;
     }
 
-    // Explicit Ctrl+Space → multiline; auto trigger → single-line
-    const completionType =
-      context.triggerKind === InlineCompletionTriggerKind.Invoke
-        ? 'multiline'
-        : 'inline';
-
     // Map JupyterLab mimeType to a language hint for the backend
     const language = request.mimeType === 'text/x-python'
       ? 'python'
@@ -94,7 +87,7 @@ export class DSAssistantInlineProvider
         ? 'r'
         : request.mimeType === 'text/x-julia'
           ? 'julia'
-          : 'python'; // default: most notebooks are Python
+          : 'python';
 
     const previousCells = this._gatherPreviousCells(context);
 
@@ -104,7 +97,6 @@ export class DSAssistantInlineProvider
         suffix,
         language,
         previousCells,
-        completionType
       });
 
       if (!result.suggestion) {

@@ -9,13 +9,14 @@
     "ai",
     "data-science"
   ],
-  "homepage": "https://github.com/yourusername/varys",
+  "homepage": "https://github.com/jmlb/varys",
   "bugs": {
-    "url": "https://github.com/yourusername/varys/issues"
+    "url": "https://github.com/jmlb/varys/issues"
   },
   "license": "MIT",
   "author": {
-    "name": "Varys"
+    "name": "Jean-Marc Beaujour",
+    "email": "jmlbeaujour@gmail.com"
   },
   "files": [
     "lib/**/*.{d.ts,eot,gif,html,jpg,js,js.map,json,png,svg,woff2,ttf}",
@@ -27,7 +28,7 @@
   "style": "style/index.css",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/varys"
+    "url": "https://github.com/jmlb/varys"
   },
   "scripts": {
     "build": "jlpm run build:lib && jlpm run build:labextension:dev",

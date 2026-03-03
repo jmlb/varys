@@ -79,20 +79,17 @@ class OpenAIProvider(BaseLLMProvider):
         self,
         api_key: str,
         chat_model: str = "gpt-4o",
-        inline_model: str = "gpt-4o-mini",
-        multiline_model: str = "gpt-4o",
+        completion_model: str = "gpt-4o-mini",
         base_url: Optional[str] = None,
         api_version: Optional[str] = None,
     ) -> None:
         super().__init__()
         self.api_key = api_key
         self.chat_model = chat_model
-        self.inline_model = inline_model
-        self.multiline_model = multiline_model
+        self.completion_model = completion_model
         self.base_url = base_url
         self.api_version = api_version
         self._cache = CompletionCache()
-        # Single async client reused across all requests.
         self._aclient = self._make_async_client()
 
     def _make_async_client(self):
@@ -165,43 +162,35 @@ class OpenAIProvider(BaseLLMProvider):
         suffix: str,
         language: str,
         previous_cells: List[Dict[str, Any]],
-        completion_type: str = "inline",
     ) -> Dict[str, Any]:
         imports = _extract_imports(previous_cells)
-        cache_key = CompletionCache.make_key(prefix, language, f"openai-{completion_type}", imports)
+        cache_key = CompletionCache.make_key(prefix, language, "openai-completion", imports)
         cached = self._cache.get(cache_key)
         if cached:
-            return {"suggestion": cached, "type": completion_type, "lines": cached.splitlines(), "cached": True}
+            return {"suggestion": cached, "type": "completion", "lines": cached.splitlines(), "cached": True}
 
         context = _build_context_block(previous_cells)
-        model = self.multiline_model if completion_type == "multiline" else self.inline_model
-        system = (
-            "Python code completion. Provide 3-5 lines continuing the code."
-            if completion_type == "multiline"
-            else _INLINE_SYSTEM
-        )
         prompt = f"{context}\n\n{prefix}" if context else prefix
 
         try:
             resp = await self._aclient.chat.completions.create(
-                model=model,
+                model=self.completion_model,
                 messages=[
-                    {"role": "system", "content": system},
+                    {"role": "system", "content": _INLINE_SYSTEM},
                     {"role": "user", "content": f"Complete:\n{prompt}"},
                 ],
-                max_tokens=128 if completion_type == "inline" else 256,
+                max_tokens=256,
                 temperature=0.1,
-                stop=["\n"] if completion_type == "inline" else None,
             )
             raw = resp.choices[0].message.content or ""
             suggestion = re.sub(r"^```[a-z]*\n?", "", raw.strip(), flags=re.MULTILINE)
             suggestion = re.sub(r"\n?```$", "", suggestion, flags=re.MULTILINE).strip()
             if suggestion:
                 self._cache.set(cache_key, suggestion)
-            return {"suggestion": suggestion, "type": completion_type, "lines": suggestion.splitlines(), "cached": False}
+            return {"suggestion": suggestion, "type": "completion", "lines": suggestion.splitlines(), "cached": False}
         except Exception as e:
             log.warning("OpenAI complete error: %s", e)
-            return {"suggestion": "", "type": completion_type, "lines": [], "cached": False}
+            return {"suggestion": "", "type": "completion", "lines": [], "cached": False}
 
     async def chat(
         self,

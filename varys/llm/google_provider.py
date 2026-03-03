@@ -54,14 +54,12 @@ class GoogleProvider(BaseLLMProvider):
         self,
         api_key: str,
         chat_model: str = "gemini-2.0-flash",
-        inline_model: str = "gemini-2.0-flash",
-        multiline_model: str = "gemini-2.0-flash",
+        completion_model: str = "gemini-2.0-flash",
     ) -> None:
         super().__init__()
         self.api_key = api_key
         self.chat_model = chat_model
-        self.inline_model = inline_model
-        self.multiline_model = multiline_model
+        self.completion_model = completion_model
         self._cache = CompletionCache()
 
     def _genai(self):
@@ -138,31 +136,23 @@ class GoogleProvider(BaseLLMProvider):
         suffix: str,
         language: str,
         previous_cells: List[Dict[str, Any]],
-        completion_type: str = "inline",
     ) -> Dict[str, Any]:
         imports = _extract_imports(previous_cells)
-        cache_key = CompletionCache.make_key(prefix, language, f"google-{completion_type}", imports)
+        cache_key = CompletionCache.make_key(prefix, language, "google-completion", imports)
         cached = self._cache.get(cache_key)
         if cached:
-            return {"suggestion": cached, "type": completion_type, "lines": cached.splitlines(), "cached": True}
+            return {"suggestion": cached, "type": "completion", "lines": cached.splitlines(), "cached": True}
 
         context = _build_context_block(previous_cells)
-        model_name = self.multiline_model if completion_type == "multiline" else self.inline_model
-        system = (
-            "Python code completion. Provide 3-5 lines continuing the code."
-            if completion_type == "multiline"
-            else _INLINE_SYSTEM
-        )
         prompt = (f"{context}\n\n{prefix}" if context else prefix)
 
         genai = self._genai()
         model = genai.GenerativeModel(
-            model_name=model_name,
-            system_instruction=system,
+            model_name=self.completion_model,
+            system_instruction=_INLINE_SYSTEM,
             generation_config=genai.GenerationConfig(
                 temperature=0.1,
-                max_output_tokens=128 if completion_type == "inline" else 256,
-                stop_sequences=["\n"] if completion_type == "inline" else [],
+                max_output_tokens=256,
             ),
         )
         try:
@@ -172,10 +162,10 @@ class GoogleProvider(BaseLLMProvider):
             suggestion = re.sub(r"\n?```$", "", suggestion, flags=re.MULTILINE).strip()
             if suggestion:
                 self._cache.set(cache_key, suggestion)
-            return {"suggestion": suggestion, "type": completion_type, "lines": suggestion.splitlines(), "cached": False}
+            return {"suggestion": suggestion, "type": "completion", "lines": suggestion.splitlines(), "cached": False}
         except Exception as e:
             log.warning("Google complete error: %s", e)
-            return {"suggestion": "", "type": completion_type, "lines": [], "cached": False}
+            return {"suggestion": "", "type": "completion", "lines": [], "cached": False}
 
     async def health_check(self) -> bool:
         try:

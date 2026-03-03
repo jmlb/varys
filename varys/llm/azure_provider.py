@@ -16,18 +16,14 @@ class AzureProvider(OpenAIProvider):
         endpoint: str,
         api_version: str = "2024-02-01",
         chat_model: str = "gpt-4o",
-        inline_model: str = "gpt-4o-mini",
-        multiline_model: str = "gpt-4o",
+        completion_model: str = "gpt-4o-mini",
     ) -> None:
-        # Set Azure-specific attributes before calling super().__init__() so
-        # _make_async_client() (called inside super) can access them.
         self.endpoint = endpoint.rstrip("/")
         self.api_version = api_version
         super().__init__(
             api_key=api_key,
             chat_model=chat_model,
-            inline_model=inline_model,
-            multiline_model=multiline_model,
+            completion_model=completion_model,
         )
 
     def _make_async_client(self):

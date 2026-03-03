@@ -80,12 +80,7 @@
   "jupyterlab": {
     "extension": true,
     "outputDir": "varys/labextension",
-    "schemaDir": "schema",
-    "_build": {
-      "load": "static/remoteEntry.7c6a044f589110c3d5b5.js",
-      "extension": "./extension",
-      "style": "./style"
-    }
+    "schemaDir": "schema"
   },
   "jupyter-releaser": {
     "hooks": {

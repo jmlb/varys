@@ -223,7 +223,6 @@ export interface CompletionRequest {
   suffix: string;
   language: string;
   previousCells: Array<{ index: number; type: string; source: string }>;
-  completionType: 'inline' | 'multiline';
 }
 
 export interface CompletionResult {

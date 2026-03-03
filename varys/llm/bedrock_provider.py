@@ -68,8 +68,7 @@ class BedrockProvider(BaseLLMProvider):
         secret_access_key: str,
         region: str = "us-east-1",
         chat_model: str = "anthropic.claude-3-5-sonnet-20241022-v2:0",
-        inline_model: str = "anthropic.claude-3-haiku-20240307-v1:0",
-        multiline_model: str = "anthropic.claude-3-5-sonnet-20241022-v2:0",
+        completion_model: str = "anthropic.claude-3-haiku-20240307-v1:0",
         session_token: str = "",
     ) -> None:
         super().__init__()
@@ -78,8 +77,7 @@ class BedrockProvider(BaseLLMProvider):
         self.session_token = session_token
         self.region = region
         self.chat_model = chat_model
-        self.inline_model = inline_model
-        self.multiline_model = multiline_model
+        self.completion_model = completion_model
         self._cache = CompletionCache()
         self._boto_client = self._make_client()
 
@@ -170,33 +168,22 @@ class BedrockProvider(BaseLLMProvider):
         suffix: str,
         language: str,
         previous_cells: List[Dict[str, Any]],
-        completion_type: str = "inline",
     ) -> Dict[str, Any]:
         imports = _extract_imports(previous_cells)
-        cache_key = CompletionCache.make_key(prefix, language, f"bedrock-{completion_type}", imports)
+        cache_key = CompletionCache.make_key(prefix, language, "bedrock-completion", imports)
         cached = self._cache.get(cache_key)
         if cached:
-            return {"suggestion": cached, "type": completion_type, "lines": cached.splitlines(), "cached": True}
+            return {"suggestion": cached, "type": "completion", "lines": cached.splitlines(), "cached": True}
 
         context = _build_context_block(previous_cells)
-        model = self.multiline_model if completion_type == "multiline" else self.inline_model
-        system_txt = (
-            "Python code completion. Provide 3-5 lines continuing the code."
-            if completion_type == "multiline"
-            else _INLINE_SYSTEM
-        )
         prompt = (f"{context}\n\n{prefix}" if context else prefix)
 
         def _call():
             resp = self._boto_client.converse(
-                modelId=model,
-                system=[{"text": system_txt}],
+                modelId=self.completion_model,
+                system=[{"text": _INLINE_SYSTEM}],
                 messages=[{"role": "user", "content": [{"text": f"Complete:\n{prompt}"}]}],
-                inferenceConfig={
-                    "maxTokens": 128 if completion_type == "inline" else 256,
-                    "temperature": 0.1,
-                    "stopSequences": ["\n"] if completion_type == "inline" else [],
-                },
+                inferenceConfig={"maxTokens": 256, "temperature": 0.1},
             )
             for block in resp.get("output", {}).get("message", {}).get("content", []):
                 if "text" in block:
@@ -209,10 +196,10 @@ class BedrockProvider(BaseLLMProvider):
             suggestion = re.sub(r"\n?```$", "", suggestion, flags=re.MULTILINE).strip()
             if suggestion:
                 self._cache.set(cache_key, suggestion)
-            return {"suggestion": suggestion, "type": completion_type, "lines": suggestion.splitlines(), "cached": False}
+            return {"suggestion": suggestion, "type": "completion", "lines": suggestion.splitlines(), "cached": False}
         except Exception as e:
             log.warning("Bedrock complete error: %s", e)
-            return {"suggestion": "", "type": completion_type, "lines": [], "cached": False}
+            return {"suggestion": "", "type": "completion", "lines": [], "cached": False}
 
     async def health_check(self) -> bool:
         def _check():

@@ -21,50 +21,42 @@ from tornado.web import authenticated
 # Keys exposed to the UI (in display order)
 _ENV_KEYS = [
     "DS_CHAT_PROVIDER",
-    "DS_INLINE_PROVIDER",
-    "DS_MULTILINE_PROVIDER",
+    "DS_COMPLETION_PROVIDER",
     # Anthropic
     "ANTHROPIC_API_KEY",
     "ANTHROPIC_CHAT_MODEL",
-    "ANTHROPIC_INLINE_MODEL",
-    "ANTHROPIC_MULTILINE_MODEL",
+    "ANTHROPIC_COMPLETION_MODEL",
     # OpenAI
     "OPENAI_API_KEY",
     "OPENAI_CHAT_MODEL",
-    "OPENAI_INLINE_MODEL",
-    "OPENAI_MULTILINE_MODEL",
+    "OPENAI_COMPLETION_MODEL",
     # Google
     "GOOGLE_API_KEY",
     "GOOGLE_CHAT_MODEL",
-    "GOOGLE_INLINE_MODEL",
-    "GOOGLE_MULTILINE_MODEL",
+    "GOOGLE_COMPLETION_MODEL",
     # AWS Bedrock
     "AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY",
     "AWS_SESSION_TOKEN",
     "AWS_REGION",
     "BEDROCK_CHAT_MODEL",
-    "BEDROCK_INLINE_MODEL",
-    "BEDROCK_MULTILINE_MODEL",
+    "BEDROCK_COMPLETION_MODEL",
     # Azure OpenAI
     "AZURE_OPENAI_API_KEY",
     "AZURE_OPENAI_ENDPOINT",
     "AZURE_OPENAI_API_VERSION",
     "AZURE_CHAT_MODEL",
-    "AZURE_INLINE_MODEL",
-    "AZURE_MULTILINE_MODEL",
+    "AZURE_COMPLETION_MODEL",
     # Ollama
     "OLLAMA_URL",
     "OLLAMA_CHAT_MODEL",
-    "OLLAMA_INLINE_MODEL",
-    "OLLAMA_MULTILINE_MODEL",
+    "OLLAMA_COMPLETION_MODEL",
     # OpenRouter
     "OPENROUTER_API_KEY",
     "OPENROUTER_SITE_URL",
     "OPENROUTER_SITE_NAME",
     "OPENROUTER_CHAT_MODEL",
-    "OPENROUTER_INLINE_MODEL",
-    "OPENROUTER_MULTILINE_MODEL",
+    "OPENROUTER_COMPLETION_MODEL",
     # Model zoos (comma-separated lists, one per provider)
     "ANTHROPIC_MODELS",
     "OPENAI_MODELS",
@@ -144,10 +136,9 @@ def _reload_settings(handler: JupyterHandler, env_path: Path) -> None:
         pass
 
     s = handler.settings
-    # No silent fallback: empty string means unconfigured; user must set via Settings UI
-    s["ds_assistant_chat_provider"]      = os.environ.get("DS_CHAT_PROVIDER", "").lower()
-    s["ds_assistant_inline_provider"]    = os.environ.get("DS_INLINE_PROVIDER", "").lower()
-    s["ds_assistant_multiline_provider"] = os.environ.get("DS_MULTILINE_PROVIDER", "").lower()
+    # No silent fallbacks: empty string means unconfigured; user must set via Settings UI
+    s["ds_assistant_chat_provider"]       = os.environ.get("DS_CHAT_PROVIDER", "").lower()
+    s["ds_assistant_completion_provider"] = os.environ.get("DS_COMPLETION_PROVIDER", "").lower()
 
     # Credentials
     s["ds_assistant_anthropic_api_key"]          = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -161,13 +152,12 @@ def _reload_settings(handler: JupyterHandler, env_path: Path) -> None:
     s["ds_assistant_azure_openai_endpoint"]      = os.environ.get("AZURE_OPENAI_ENDPOINT", "")
     s["ds_assistant_azure_openai_api_version"]   = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-02-01")
     s["ds_assistant_ollama_url"]                 = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-
-    s["ds_assistant_openrouter_api_key"]   = os.environ.get("OPENROUTER_API_KEY", "")
-    s["ds_assistant_openrouter_site_url"]  = os.environ.get("OPENROUTER_SITE_URL", "")
-    s["ds_assistant_openrouter_site_name"] = os.environ.get("OPENROUTER_SITE_NAME", "Varys")
+    s["ds_assistant_openrouter_api_key"]         = os.environ.get("OPENROUTER_API_KEY", "")
+    s["ds_assistant_openrouter_site_url"]        = os.environ.get("OPENROUTER_SITE_URL", "")
+    s["ds_assistant_openrouter_site_name"]       = os.environ.get("OPENROUTER_SITE_NAME", "Varys")
 
     for provider in ("ANTHROPIC", "OPENAI", "GOOGLE", "BEDROCK", "AZURE", "OPENROUTER", "OLLAMA"):
-        for task in ("chat", "inline", "multiline"):
+        for task in ("chat", "completion"):
             s[f"ds_assistant_{provider.lower()}_{task}_model"] = os.environ.get(
                 f"{provider}_{task.upper()}_MODEL", ""
             )

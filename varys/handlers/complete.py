@@ -1,4 +1,4 @@
-"""Inline completion handler — /varys/complete"""
+"""Completion handler — /varys/complete"""
 import json
 import traceback
 
@@ -12,7 +12,7 @@ _EMPTY = {"suggestion": "", "lines": []}
 
 
 class CompleteHandler(JupyterHandler):
-    """Handle inline completion requests from the frontend."""
+    """Handle code completion requests from the frontend."""
 
     @authenticated
     async def post(self):
@@ -29,30 +29,19 @@ class CompleteHandler(JupyterHandler):
         suffix = body.get("suffix", "")
         language = body.get("language", "python")
         previous_cells = body.get("previousCells", [])
-        completion_type = body.get("completionType", "inline")
 
         min_prefix = _get_cfg().getint("context", "min_prefix_length", 2)
         if len(prefix.strip()) < min_prefix:
-            self.finish(json.dumps({**_EMPTY, "type": completion_type}))
-            return
-
-        # Skip Anthropic key check when the completion task uses a different provider
-        task = completion_type if completion_type in ("inline", "multiline") else "inline"
-        active_provider = self.settings.get(f"ds_assistant_{task}_provider", "anthropic")
-        if active_provider == "anthropic" and not self.settings.get("ds_assistant_anthropic_api_key"):
-            self.finish(json.dumps({**_EMPTY, "type": completion_type}))
+            self.finish(json.dumps({**_EMPTY, "type": "completion"}))
             return
 
         try:
-            # Each completion type can use a different provider/model
-            task = completion_type if completion_type in ("inline", "multiline") else "inline"
-            provider = create_provider(self.settings, task=task)
+            provider = create_provider(self.settings, task="completion")
             result = await provider.complete(
                 prefix=prefix,
                 suffix=suffix,
                 language=language,
                 previous_cells=previous_cells,
-                completion_type=completion_type,
             )
             self.log.info(
                 "Varys complete — prefix=%r  suggestion=%r  cached=%s",
@@ -60,8 +49,10 @@ class CompleteHandler(JupyterHandler):
             )
             self.finish(json.dumps(result))
 
+        except ValueError as exc:
+            self.log.warning("Varys completion config error: %s", exc)
+            self.finish(json.dumps({**_EMPTY, "type": "completion", "error": str(exc)}))
+
         except Exception:
-            self.log.error(
-                f"Varys completion error:\n{traceback.format_exc()}"
-            )
-            self.finish(json.dumps({**_EMPTY, "type": completion_type}))
+            self.log.error(f"Varys completion error:\n{traceback.format_exc()}")
+            self.finish(json.dumps({**_EMPTY, "type": "completion"}))

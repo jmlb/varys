@@ -17,15 +17,13 @@ class AnthropicProvider(BaseLLMProvider):
         self,
         api_key: str,
         chat_model: str = "claude-sonnet-4-6",
-        inline_model: str = "claude-haiku-4-5-20251001",
-        multiline_model: str = "claude-sonnet-4-6",
+        completion_model: str = "claude-haiku-4-5-20251001",
     ) -> None:
         super().__init__()
         self._chat_client = ClaudeClient(api_key=api_key, model=chat_model)
         self._completion_engine = CompletionEngine(
             api_key=api_key,
-            inline_model=inline_model,
-            multiline_model=multiline_model,
+            completion_model=completion_model,
         )
 
     async def plan_task(
@@ -54,14 +52,12 @@ class AnthropicProvider(BaseLLMProvider):
         suffix: str,
         language: str,
         previous_cells: List[Dict[str, Any]],
-        completion_type: str = "inline",
     ) -> Dict[str, Any]:
         return await self._completion_engine.complete(
             prefix=prefix,
             suffix=suffix,
             language=language,
             previous_cells=previous_cells,
-            completion_type=completion_type,
         )
 
     async def chat(

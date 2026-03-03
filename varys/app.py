@@ -73,24 +73,18 @@ class DSAssistantExtension(ExtensionApp):
         self.log.info("Varys: Config loaded from %s/.jupyter-assistant/config/", self.serverapp.root_dir)
 
         # ----------------------------------------------------------------
-        # Task routing  (DS_CHAT_PROVIDER / DS_INLINE_PROVIDER / DS_MULTILINE_PROVIDER)
-        # Values are provider names in upper-case matching the .env blocks,
-        # e.g. "ANTHROPIC" or "OLLAMA".  Stored lower-case internally.
+        # Task routing: DS_CHAT_PROVIDER / DS_COMPLETION_PROVIDER
+        # Values are provider names matching the .env blocks (e.g. ANTHROPIC).
+        # Stored lower-case internally.
         # ----------------------------------------------------------------
-        chat_provider      = os.environ.get("DS_CHAT_PROVIDER", "").upper()
-        inline_provider    = os.environ.get("DS_INLINE_PROVIDER", "").upper()
-        multiline_provider = os.environ.get("DS_MULTILINE_PROVIDER", "").upper()
+        chat_provider       = os.environ.get("DS_CHAT_PROVIDER", "").upper()
+        completion_provider = os.environ.get("DS_COMPLETION_PROVIDER", "").upper()
 
-        # ----------------------------------------------------------------
-        # Provider blocks — read every {PROVIDER}_{TASK}_MODEL entry.
-        # New providers are automatically picked up without code changes.
-        # ----------------------------------------------------------------
-        providers_in_use = {chat_provider, inline_provider, multiline_provider}
+        providers_in_use = {chat_provider, completion_provider}
         settings_patch: dict = {
-            "ds_assistant_root_dir": self.serverapp.root_dir,
-            "ds_assistant_chat_provider":      chat_provider.lower(),
-            "ds_assistant_inline_provider":    inline_provider.lower(),
-            "ds_assistant_multiline_provider": multiline_provider.lower(),
+            "ds_assistant_root_dir":            self.serverapp.root_dir,
+            "ds_assistant_chat_provider":       chat_provider.lower(),
+            "ds_assistant_completion_provider": completion_provider.lower(),
         }
 
         # ----------------------------------------------------------------
@@ -125,11 +119,10 @@ class DSAssistantExtension(ExtensionApp):
         embed_provider = os.environ.get("DS_EMBED_PROVIDER", "").upper()
         settings_patch["ds_assistant_embed_provider"] = embed_provider.lower()
 
-        # Collect {PROVIDER}_{TASK}_MODEL for every provider in use
-        # (now includes 'embed' alongside chat / inline / multiline)
+        # Collect {PROVIDER}_{TASK}_MODEL for every provider
         all_providers = {"ANTHROPIC", "OLLAMA", "OPENAI", "GOOGLE", "BEDROCK", "AZURE", "OPENROUTER"}
         for provider in all_providers:
-            for task in ("chat", "inline", "multiline", "embed"):
+            for task in ("chat", "completion", "embed"):
                 env_key  = f"{provider}_{task.upper()}_MODEL"
                 sett_key = f"ds_assistant_{provider.lower()}_{task}_model"
                 settings_patch[sett_key] = os.environ.get(env_key, "")
@@ -138,10 +131,9 @@ class DSAssistantExtension(ExtensionApp):
 
         self.log.info(
             f"Varys: "
-            f"chat={chat_provider}  "
-            f"inline={inline_provider}  "
-            f"multiline={multiline_provider}  "
-            f"embed={embed_provider or '(none)'}"
+            f"chat={chat_provider or '(not set)'}  "
+            f"completion={completion_provider or '(not set)'}  "
+            f"embed={embed_provider or '(not set)'}"
         )
 
         # ----------------------------------------------------------------

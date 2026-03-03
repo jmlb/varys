@@ -2262,6 +2262,15 @@
   border-color: var(--jp-brand-color1, #1976d2);
   box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
 }
+.ds-settings-select--empty {
+  border-color: var(--jp-warn-color1, #f57c00);
+  color: var(--jp-warn-color1, #f57c00);
+}
+.ds-settings-required {
+  color: var(--jp-warn-color1, #f57c00);
+  font-weight: bold;
+  margin-left: 2px;
+}
 
 /* Sticky footer */
 .ds-settings-footer {

@@ -49,10 +49,9 @@ class BaseLLMProvider(ABC):
         suffix: str,
         language: str,
         previous_cells: List[Dict[str, Any]],
-        completion_type: str = "inline",
     ) -> Dict[str, Any]:
         """
-        Return an inline/multiline code completion.
+        Return a code completion.
 
         Returns a dict matching the CompletionResult schema:
           {suggestion, type, lines, cached}

@@ -30,20 +30,16 @@ class OpenRouterProvider(OpenAIProvider):
         self,
         api_key: str,
         chat_model: str = "anthropic/claude-sonnet-4-6",
-        inline_model: str = "google/gemini-2.0-flash",
-        multiline_model: str = "anthropic/claude-sonnet-4-6",
+        completion_model: str = "google/gemini-2.0-flash",
         site_url: str = "",
         site_name: str = "Varys",
     ) -> None:
-        # Set these before calling super().__init__() so _make_async_client()
-        # can access them when called from the parent constructor.
         self.site_url = site_url
         self.site_name = site_name
         super().__init__(
             api_key=api_key,
             chat_model=chat_model,
-            inline_model=inline_model,
-            multiline_model=multiline_model,
+            completion_model=completion_model,
             base_url=_OPENROUTER_BASE,
         )
 

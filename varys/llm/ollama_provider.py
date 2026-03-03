@@ -17,7 +17,7 @@ from ..utils.config import get_config as _get_cfg
 
 # ---------------------------------------------------------------------------
 # Timeouts and keep_alive — overridable via .jupyter-assistant/config/llm.cfg
-# [ollama] timeout_chat / timeout_inline / timeout_multiline / keep_alive
+# [ollama] timeout_chat / timeout_completion / keep_alive
 # ---------------------------------------------------------------------------
 
 def _timeout(key: str, default: int) -> int:
@@ -26,9 +26,8 @@ def _timeout(key: str, default: int) -> int:
 def _keep_alive() -> str:
     return _get_cfg().get("ollama", "keep_alive", "30m")
 
-TIMEOUT_CHAT      = _timeout("timeout_chat",      120)
-TIMEOUT_INLINE    = _timeout("timeout_inline",     15)
-TIMEOUT_MULTILINE = _timeout("timeout_multiline",  30)
+TIMEOUT_CHAT       = _timeout("timeout_chat",       120)
+TIMEOUT_COMPLETION = _timeout("timeout_completion",  30)
 
 # ---------------------------------------------------------------------------
 # System prompts
@@ -129,17 +128,13 @@ class OllamaProvider(BaseLLMProvider):
         self,
         base_url: str = "http://localhost:11434",
         chat_model: str = "qwen2.5-coder:7b-instruct",
-        inline_model: str = "qwen2.5-coder:7b-instruct",
-        multiline_model: str = "qwen2.5-coder:7b-instruct",
+        completion_model: str = "qwen2.5-coder:7b-instruct",
     ) -> None:
         super().__init__()
         self.base_url = base_url.rstrip("/")
         self.chat_model = chat_model
-        self.inline_model = inline_model
-        self.multiline_model = multiline_model
+        self.completion_model = completion_model
         self._cache = CompletionCache()
-        # Persistent HTTP client — avoids TCP connection setup on every request.
-        # The timeout here is the default; individual calls can override it.
         self._http = httpx.AsyncClient(timeout=httpx.Timeout(TIMEOUT_CHAT))
 
     # ------------------------------------------------------------------
@@ -208,38 +203,24 @@ class OllamaProvider(BaseLLMProvider):
         suffix: str,
         language: str,
         previous_cells: List[Dict[str, Any]],
-        completion_type: str = "inline",
     ) -> Dict[str, Any]:
         imports_snapshot = _extract_imports(previous_cells)
         cache_key = CompletionCache.make_key(
-            prefix, language, f"ollama-{completion_type}", imports_snapshot
+            prefix, language, "ollama-completion", imports_snapshot
         )
         cached = self._cache.get(cache_key)
         if cached is not None:
-            log.debug(
-                "Ollama complete [%s] — cache HIT  prefix=%r  suggestion=%r",
-                completion_type, prefix[-40:], cached,
-            )
-            return {"suggestion": cached, "type": completion_type,
+            log.debug("Ollama complete — cache HIT  prefix=%r  suggestion=%r", prefix[-40:], cached)
+            return {"suggestion": cached, "type": "completion",
                     "lines": cached.splitlines(), "cached": True}
 
         context_block = _build_context_block(previous_cells)
+        model = self.completion_model
+        num_predict = 256
+        timeout = TIMEOUT_COMPLETION
+        stop_tokens = ["```", "\n\n\n"]
 
-        if completion_type == "multiline":
-            model = self.multiline_model
-            num_predict = 256
-            timeout = TIMEOUT_MULTILINE
-            stop_tokens = ["```", "\n\n\n"]
-        else:
-            model = self.inline_model
-            num_predict = 64
-            timeout = TIMEOUT_INLINE
-            stop_tokens = ["\n"]
-
-        log.info(
-            "Ollama complete [%s] → model=%s  url=%s  prefix=%r",
-            completion_type, model, self.base_url, prefix[-60:],
-        )
+        log.info("Ollama complete → model=%s  url=%s  prefix=%r", model, self.base_url, prefix[-60:])
 
         # Raw continuation mode: prompt ends with the prefix, model continues
         # naturally. Works better than chat/instruct format for code completion.
@@ -268,21 +249,17 @@ class OllamaProvider(BaseLLMProvider):
             raw = resp.json()
             suggestion = raw.get("response", "").strip()
             log.info(
-                "Ollama complete [%s] ← model=%s  suggestion=%r  "
+                "Ollama complete ← model=%s  suggestion=%r  "
                 "eval_count=%s  eval_duration_ms=%s",
-                completion_type,
                 raw.get("model", model),
                 suggestion,
                 raw.get("eval_count", "?"),
                 round(raw.get("eval_duration", 0) / 1e6),
             )
         except httpx.TimeoutException:
-            log.warning(
-                "Ollama complete [%s] TIMEOUT after %ss  model=%s",
-                completion_type, timeout, model,
-            )
+            log.warning("Ollama complete TIMEOUT after %ss  model=%s", timeout, model)
         except Exception as exc:
-            log.warning("Ollama complete [%s] ERROR: %s", completion_type, exc)
+            log.warning("Ollama complete ERROR: %s", exc)
 
         suggestion = self._clean(suggestion)
 
@@ -291,7 +268,7 @@ class OllamaProvider(BaseLLMProvider):
 
         return {
             "suggestion": suggestion,
-            "type": completion_type,
+            "type": "completion",
             "lines": suggestion.splitlines(),
             "cached": False,
         }
