@@ -44,6 +44,7 @@ packages = ["varys"]
 
 [tool.hatch.build.targets.wheel.shared-data]
 "varys/labextension" = "share/jupyter/labextensions/varys"
+"jupyter-config/jupyter_server_config.d/varys.json" = "etc/jupyter/jupyter_server_config.d/varys.json"
 
 # If varys/labextension/ is committed, pip install git+url skips the Node build (no Node/jlpm on user machine).
 [tool.hatch.build.hooks.jupyter-builder]
