@@ -311,18 +311,38 @@ After editing Python files, restart the Jupyter server. After editing TypeScript
 
 ```
 varys/
-├── varys/                     Python package (server extension)
-│   ├── handlers/              Jupyter Server request handlers
-│   ├── llm/                   LLM provider adapters (Anthropic, OpenAI, Ollama…)
-│   ├── completion/            Inline code completion engine
-│   ├── skills/                Skill loader and registry
-│   ├── bundled_skills/        Skills shipped with the package
-│   └── labextension/          Pre-built frontend bundle
-├── src/                       TypeScript / React frontend
-│   ├── sidebar/               Main chat + settings UI
-│   ├── completion/            Inline completion provider
-│   └── api/                   Backend API client
-└── style/                     CSS
+├── varys/                         Python package (server extension)
+│   ├── handlers/                  Jupyter Server request handlers
+│   ├── llm/                       LLM provider adapters (Anthropic, OpenAI, Ollama…)
+│   ├── completion/                Inline code completion engine
+│   ├── skills/                    Skill loader and registry
+│   ├── bundled_skills/            Skills shipped with the package
+│   ├── bundled_config/            Default config files (llm, completion, rag, reproducibility)
+│   ├── memory/                    Long-term preference storage
+│   ├── modules/                   Feature modules
+│   │   └── reproducibility_guardian/  Passive cell-run analysis engine
+│   ├── rag/                       RAG knowledge base (indexing + retrieval)
+│   ├── report/                    Notebook-to-markdown report generator
+│   ├── utils/                     Shared path and config utilities
+│   ├── magic.py                   %%ai IPython cell magic
+│   └── labextension/              Pre-built frontend bundle
+├── src/                           TypeScript / React frontend
+│   ├── sidebar/                   Main chat + settings UI (SidebarWidget.tsx)
+│   ├── completion/                Inline ghost-text completion provider
+│   ├── editor/                    Cell insert / modify / delete operations (CellEditor.ts)
+│   ├── context/                   Notebook reader and kernel variable resolver
+│   ├── reproducibility/           Reproducibility Guardian React panel
+│   ├── tags/                      Cell tags & metadata panel
+│   ├── outputs/                   Cell output overlay helpers
+│   ├── ui/                        Shared UI components (DiffView, ActionBar)
+│   ├── utils/                     LCS diff utilities
+│   └── api/                       Backend API client
+├── style/                         CSS and icon assets
+├── docs/                          Technical deep-dive docs
+├── documentation/                 User-facing HTML wiki
+├── readme_files/                  Screenshots for README
+├── schema/                        JupyterLab settings schema
+└── jupyter-config/                Jupyter server extension registration
 ```
 
 ---
@@ -331,4 +351,4 @@ varys/
 
 MIT — see [LICENSE](LICENSE).
 
-**Author:** Jean-Marc Beaujour · [jmlbeaujour@gmail.com](mailto:jmlbeaujour@gmail.com) · [github.com/jmlb](https://github.com/jmlb)
+**Author:** Jean-Marc B. · [jmlbeaujour@gmail.com](mailto:jmlbeaujour@gmail.com) · [github.com/jmlb](https://github.com/jmlb)
