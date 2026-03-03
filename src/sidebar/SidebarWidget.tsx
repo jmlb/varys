@@ -1357,8 +1357,9 @@ const CommandsPanel: React.FC<{ apiClient: APIClient }> = ({ apiClient }) => {
 
   useEffect(() => { refresh(); }, [apiClient]);
 
-  const builtins = cmds.filter(c => c.type === 'builtin');
-  const skills   = cmds.filter(c => c.type === 'skill');
+  const byCmd = (a: SlashCommand, b: SlashCommand) => a.command.localeCompare(b.command);
+  const builtins = cmds.filter(c => c.type === 'builtin').sort(byCmd);
+  const skills   = cmds.filter(c => c.type === 'skill').sort(byCmd);
 
   return (
     <div className="ds-commands-panel">
