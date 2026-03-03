@@ -47,3 +47,4 @@ export declare class DSAssistantInlineProvider implements IInlineCompletionProvi
     private _gatherPreviousCells;
     private _extractCells;
 }
+//# sourceMappingURL=InlineCompletionProvider.d.ts.map

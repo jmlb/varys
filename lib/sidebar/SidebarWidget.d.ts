@@ -2,7 +2,6 @@
  * SidebarWidget - Main chat interface for Varys.
  * Renders as a ReactWidget in the JupyterLab right sidebar.
  */
-/// <reference types="react" />
 import { ReactWidget } from '@jupyterlab/apputils';
 import { INotebookTracker } from '@jupyterlab/notebook';
 import { APIClient } from '../api/client';
@@ -78,3 +77,4 @@ export declare class DSAssistantSidebar extends ReactWidget {
     render(): JSX.Element;
 }
 export {};
+//# sourceMappingURL=SidebarWidget.d.ts.map

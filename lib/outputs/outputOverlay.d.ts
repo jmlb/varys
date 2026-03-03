@@ -39,3 +39,4 @@ export declare function extractPlotLabels(source: string): string[];
  *   - Cells are added or removed
  */
 export declare function initOutputOverlay(tracker: INotebookTracker, onSend: OnSendOutputToChat): void;
+//# sourceMappingURL=outputOverlay.d.ts.map

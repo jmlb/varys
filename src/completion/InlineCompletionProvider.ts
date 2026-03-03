@@ -76,7 +76,7 @@ export class DSAssistantInlineProvider
     const suffix = request.text.slice(request.offset);
 
     // Skip trivially short prefixes to avoid noisy requests
-    if (prefix.trimEnd().length < 2) {
+    if (prefix.replace(/\s+$/, '').length < 2) {
       return empty;
     }
 

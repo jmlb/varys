@@ -75,3 +75,4 @@ export declare class NotebookReader {
      */
     getCurrentCellIndex(): number;
 }
+//# sourceMappingURL=NotebookReader.d.ts.map

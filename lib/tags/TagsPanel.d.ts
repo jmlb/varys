@@ -16,3 +16,4 @@ export interface TagsPanelProps {
     notebookTracker: INotebookTracker;
 }
 export declare const TagsPanel: React.FC<TagsPanelProps>;
+//# sourceMappingURL=TagsPanel.d.ts.map

@@ -56,3 +56,4 @@ export declare function reconstructFromHunks(lines: DiffLine[], hunks: DiffHunk[
  * before and after each hunk for readability.
  */
 export declare function collapseContext(lines: DiffLine[], contextLines?: number): DiffLine[];
+//# sourceMappingURL=diffUtils.d.ts.map

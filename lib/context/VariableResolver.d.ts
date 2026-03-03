@@ -33,3 +33,4 @@ export declare class VariableResolver {
      */
     resolve(message: string): Promise<ResolvedVariable[]>;
 }
+//# sourceMappingURL=VariableResolver.d.ts.map

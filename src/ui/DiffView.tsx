@@ -180,7 +180,7 @@ const CellDiffSection: React.FC<{
     // Reconstruct and bubble up
     const finalContent = reconstructFromHunks(
       diffLines, hunks,
-      Object.fromEntries(Object.entries(next).map(([k, v]) => [k, v === 'pending' ? 'accepted' : v as 'accepted' | 'rejected'])),
+      Object.entries(next).reduce<Record<string, 'accepted' | 'rejected'>>((acc, [k, v]) => { acc[k] = v === 'pending' ? 'accepted' : v as 'accepted' | 'rejected'; return acc; }, {}),
     );
     onCellDecisions(info.cellIndex, finalContent, true);
   };

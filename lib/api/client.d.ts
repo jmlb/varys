@@ -205,7 +205,6 @@ export interface CompletionRequest {
         type: string;
         source: string;
     }>;
-    completionType: 'inline' | 'multiline';
 }
 export interface CompletionResult {
     suggestion: string;
@@ -341,3 +340,4 @@ export declare class APIClient {
     }>;
     private getXSRFToken;
 }
+//# sourceMappingURL=client.d.ts.map

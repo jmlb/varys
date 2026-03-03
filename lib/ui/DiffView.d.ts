@@ -41,3 +41,4 @@ export interface DiffViewProps {
     hasCodeCells?: boolean;
 }
 export declare const DiffView: React.FC<DiffViewProps>;
+//# sourceMappingURL=DiffView.d.ts.map

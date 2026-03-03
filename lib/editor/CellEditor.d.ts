@@ -95,3 +95,4 @@ export declare class CellEditor {
      */
     undoOperation(operationId: string): void;
 }
+//# sourceMappingURL=CellEditor.d.ts.map

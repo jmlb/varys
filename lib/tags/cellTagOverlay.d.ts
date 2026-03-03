@@ -18,3 +18,4 @@ import { INotebookTracker } from '@jupyterlab/notebook';
  * Returns a cleanup function.
  */
 export declare function initCellTagOverlay(tracker: INotebookTracker): () => void;
+//# sourceMappingURL=cellTagOverlay.d.ts.map
