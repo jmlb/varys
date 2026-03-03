@@ -68,7 +68,7 @@ Typing `/eda` triggers a full exploratory data analysis. Varys reads the loaded 
 
 ![EDA demo — visualisations](readme_files/varys_eda_demo_housing_dataset_viz.png)
 
-After accepting the plan, Varys inserts and runs all cells. Distribution histograms for numeric features and bar charts for categorical features are generated and rendered directly in the notebook — already wired to the actual column names and dtypes.
+After accepting the plan, Varys inserts and runs all cells. Distribution histograms for numeric features and bar charts for categorical features are generated and rendered directly in the notebook: already wired to the actual column names and dtypes.
 
 </details>
 
@@ -95,7 +95,7 @@ The Routing tab lets you assign different providers to different tasks. Here, ch
 
 ![Settings — skills](readme_files/varys_skills_settings_panel.png)
 
-The Skills tab lists all installed skills with enable/disable toggles. Clicking a skill opens its `SKILL.md` and `README.md` for live editing directly in the panel — no file manager needed.
+The Skills tab lists all installed skills with enable/disable toggles. Clicking a skill opens its `SKILL.md` and `README.md` for live editing directly in the panel: no file manager needed.
 
 </details>
 
@@ -104,7 +104,7 @@ The Skills tab lists all installed skills with enable/disable toggles. Clicking 
 
 ![Settings — commands](readme_files/varys_command_settings_panel.png)
 
-The Commands tab lists every available slash command — built-in and skill-defined — with descriptions. It updates automatically as skills are added or removed.
+The Commands tab lists every available slash command (built-in and skill-defined) with descriptions. It updates automatically as skills are added or removed.
 
 </details>
 
@@ -149,16 +149,11 @@ what does cell [3] do?
 | `/plot <description>` | Generate a publication-quality visualization |
 | `/review` | Static code-quality review: bugs, style, maintainability |
 | `/ds-review` | Data-science methodology review: leakage, bias, statistical correctness |
-| `/annotate` | Number and title every code cell with a markdown description |
 | `/readme` | Generate or update the top-cell README for this notebook |
 | `/report` | Generate a downloadable markdown report |
 | `/load <file>` | Load a CSV / Excel / JSON as a pandas DataFrame |
-| `/generate` | Full pipeline: load → EDA → annotate → README |
 | `/unittest` | Generate pytest test cases for notebook cell functions |
 | `/ask <query>` | Search the RAG knowledge base and answer using indexed documents |
-| `/learn <pref>` | Save a preference or fact to long-term memory |
-| `/index [path]` | Index files in `.jupyter-assistant/knowledge/` |
-| `/rag` | Show knowledge-base status |
 | `/chat <msg>` | Answer in chat only — no notebook cells written |
 | `/clear` | Start a new chat thread |
 | `/help` | List all available commands |
