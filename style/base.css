@@ -349,16 +349,23 @@
     var(--jp-layout-color1, #fff) 100%
   );
 }
+/* Shared action row — push-to-cell left, expand/collapse right */
+.ds-msg-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
 /* Expand / collapse icon button */
 .ds-msg-toggle-btn {
-  display: block;
-  margin: 2px 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
-  width: 36px;
-  height: 36px;
-  line-height: 36px;
-  text-align: center;
-  font-size: 20px;
+  width: 28px;
+  height: 28px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--jp-ui-font-color2, #888);
   background: transparent;
@@ -863,11 +870,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-top: 4px;
   padding: 0;
-  width: 36px;
-  height: 36px;
-  font-size: 20px;
+  width: 28px;
+  height: 28px;
+  font-size: 18px;
   font-weight: 700;
   line-height: 1;
   color: #6f42c1;

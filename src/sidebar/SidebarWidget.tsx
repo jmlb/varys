@@ -3636,43 +3636,44 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                     </div>
                   );
                 })()}
-                {/* Collapse toggle — only for long non-streaming messages */}
-                {!activeStreamId || msg.id !== activeStreamId ? (
-                  (msg.content?.length ?? 0) >= COLLAPSE_THRESHOLD ? (
-                    <button
-                      className="ds-msg-toggle-btn"
-                      title={collapsedMsgs.has(msg.id) ? 'Expand' : 'Collapse'}
-                      onClick={() => toggleCollapse(msg.id)}
-                    >
-                      {collapsedMsgs.has(msg.id) ? '⌄' : '⌃'}
-                    </button>
-                  ) : null
-                ) : null}
-                {/* Push-to-cell button: shown ONLY when the assistant turn contained
-                    code blocks but produced no cell operations (i.e. the retry gate
-                    fell back to chat mode). Hidden when hadCellOps=true, which is set
-                    as soon as applyOperations is called for auto or preview mode. */}
-                {msg.role === 'assistant' && msg.id !== activeStreamId && !msg.hadCellOps && (() => {
-                  const blocks = extractCodeBlocks(msg.content);
-                  if (blocks.length === 0) return null;
-                  const allCode = blocks.join('\n\n');
+                {/* Action row: push-to-cell (left) + collapse toggle (right) — same flex row */}
+                {(() => {
+                  const showToggle = (!activeStreamId || msg.id !== activeStreamId)
+                    && (msg.content?.length ?? 0) >= COLLAPSE_THRESHOLD;
+                  const showPush = msg.role === 'assistant'
+                    && msg.id !== activeStreamId
+                    && !msg.hadCellOps
+                    && extractCodeBlocks(msg.content).length > 0;
+                  if (!showToggle && !showPush) return null;
+                  const allCode = showPush ? extractCodeBlocks(msg.content).join('\n\n') : '';
                   return (
-                    <button
-                      className="ds-push-to-cell-btn"
-                      title="Push to cell"
-                      onClick={() => {
-                        const nb = notebookTracker.currentWidget?.content;
-                        const insertIdx = nb
-                          ? (nb.activeCellIndex ?? nb.model!.cells.length - 1) + 1
-                          : 0;
-                        void cellEditor.insertCell(insertIdx, 'code', allCode)
-                          .then(() => {
-                            addMessage('system', `✓ Code pushed to new cell at pos:${insertIdx}.`);
-                          });
-                      }}
-                    >
-                      ↵
-                    </button>
+                    <div className="ds-msg-actions-row">
+                      {showPush ? (
+                        <button
+                          className="ds-push-to-cell-btn"
+                          title="Push to cell"
+                          onClick={() => {
+                            const nb = notebookTracker.currentWidget?.content;
+                            const insertIdx = nb
+                              ? (nb.activeCellIndex ?? nb.model!.cells.length - 1) + 1
+                              : 0;
+                            void cellEditor.insertCell(insertIdx, 'code', allCode)
+                              .then(() => {
+                                addMessage('system', `✓ Code pushed to new cell at pos:${insertIdx}.`);
+                              });
+                          }}
+                        >↵</button>
+                      ) : <span />}
+                      {showToggle ? (
+                        <button
+                          className="ds-msg-toggle-btn"
+                          title={collapsedMsgs.has(msg.id) ? 'Expand' : 'Collapse'}
+                          onClick={() => toggleCollapse(msg.id)}
+                        >
+                          {collapsedMsgs.has(msg.id) ? '⌄' : '⌃'}
+                        </button>
+                      ) : null}
+                    </div>
                   );
                 })()}
               </>
