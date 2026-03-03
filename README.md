@@ -52,6 +52,72 @@ Full install guide (Ollama, RAG, upgrade, uninstall): [INSTALL.md](INSTALL.md)
 
 ---
 
+## Screenshots
+
+**Chat sidebar — ready state**
+
+![Varys chat window](readme_files/varys_window.png)
+
+The Varys sidebar opens inside JupyterLab. The header shows the active thread, quick-access buttons (Tags, Reproducibility Guardian, theme toggle, Help, Settings), and the model switcher at the bottom.
+
+---
+
+**EDA in one command — cell plan**
+
+![EDA demo — cell plan](readme_files/varys_eda_demo_housing_dataset.png)
+
+Typing `/eda` triggers a full exploratory data analysis. Varys reads the loaded DataFrame from the kernel, plans 13 new cells (shape, dtypes, missing values, descriptive statistics, distributions, correlations, outlier detection), and shows a diff panel before inserting anything.
+
+---
+
+**EDA in one command — generated visualisations**
+
+![EDA demo — visualisations](readme_files/varys_eda_demo_housing_dataset_viz.png)
+
+After accepting the plan, Varys inserts and runs all cells. Distribution histograms for numeric features and bar charts for categorical features are generated and rendered directly in the notebook — already wired to the actual column names and dtypes.
+
+---
+
+**Visual diff view — code refactor**
+
+![Visual diff view](readme_files/varys_refactor_code_diff_view.png)
+
+Before any AI edit is applied, Varys shows a line-level diff: green for additions, red for removals. Each change can be individually accepted or rejected, and the entire operation can be undone atomically.
+
+---
+
+**Settings — provider routing**
+
+![Settings — routing](readme_files/varys_settings_model_providers.png)
+
+The Routing tab lets you assign different providers to different tasks. Here, chat uses Anthropic (Claude) while completion uses Ollama (local, free). The token limit for inline completion is configurable inline.
+
+---
+
+**Settings — Skills editor**
+
+![Settings — skills](readme_files/varys_skills_settings_panel.png)
+
+The Skills tab lists all installed skills with enable/disable toggles. Clicking a skill opens its `SKILL.md` and `README.md` for live editing directly in the panel — no file manager needed.
+
+---
+
+**Settings — Commands tab**
+
+![Settings — commands](readme_files/varys_command_settings_panel.png)
+
+The Commands tab lists every available slash command — built-in and skill-defined — with descriptions. It updates automatically as skills are added or removed.
+
+---
+
+**Right-click context menu — AI actions**
+
+![Context menu AI actions](readme_files/varys_context_menu_ai_actions.png)
+
+Right-clicking any notebook cell exposes a Varys submenu with one-click actions: Explain this cell, Fix errors, Optimize code, Add documentation, Generate tests, Refactor cell, and Edit with AI.
+
+---
+
 ## Quick start
 
 ```

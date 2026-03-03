@@ -61,3 +61,6 @@ htmlcov/
 # Environment variables
 .env
 .env.local
+
+# Articles / drafts
+MEDIUM_ARTICLE.md

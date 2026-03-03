@@ -3288,7 +3288,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     return (
       <div className="ds-assistant-sidebar">
         <div className="ds-assistant-header">
-          <span className="ds-assistant-title">DS Assistant — Settings</span>
+          <span className="ds-assistant-title"><span className="ds-varys-spider">🕷️</span> Varys — Settings</span>
           <button
             className="ds-settings-close-btn"
             onClick={() => setShowSettings(false)}
@@ -3309,7 +3309,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     return (
       <div className="ds-assistant-sidebar">
         <div className="ds-assistant-header">
-          <span className="ds-assistant-title">DS Assistant — Reproducibility</span>
+          <span className="ds-assistant-title"><span className="ds-varys-spider">🕷️</span> Varys — Reproducibility</span>
           <button
             className="ds-settings-close-btn"
             onClick={() => setShowRepro(false)}
@@ -3329,7 +3329,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     return (
       <div className="ds-assistant-sidebar">
         <div className="ds-assistant-header">
-          <span className="ds-assistant-title">DS Assistant — Tags</span>
+          <span className="ds-assistant-title"><span className="ds-varys-spider">🕷️</span> Varys — Tags</span>
           <button
             className="ds-settings-close-btn"
             onClick={() => setShowTags(false)}
@@ -3345,7 +3345,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     <div className={`ds-assistant-sidebar ds-chat-${chatTheme}`}>
       {/* Header */}
       <div className="ds-assistant-header">
-        <span className="ds-assistant-title">DS Assistant</span>
+        <span className="ds-assistant-title"><span className="ds-varys-spider">🕷️</span> Varys</span>
         <button
           className="ds-tags-panel-btn"
           onClick={() => setShowTags(true)}

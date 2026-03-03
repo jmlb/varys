@@ -35,6 +35,9 @@
   font-weight: 600;
   letter-spacing: 0.02em;
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Provider badge (Anthropic / Ollama) */
@@ -2125,6 +2128,13 @@
 .ds-chat-day .ds-assistant-title,
 .ds-chat-night .ds-assistant-title {
   color: var(--ds-text) !important;
+}
+
+.ds-varys-spider {
+  font-size: 1.2em;
+  filter: sepia(1) saturate(5) hue-rotate(-10deg) brightness(0.95);
+  display: inline-block;
+  line-height: 1;
 }
 
 /* Loading / progress text */
