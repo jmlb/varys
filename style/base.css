@@ -1900,9 +1900,11 @@
   opacity: 1;
 }
 
-/* Gear sits at far right — push it with auto margin */
+/* Gear sits at far right — push it with auto margin; 1.5× larger than sibling icons */
 .ds-settings-gear-btn {
   margin-left: auto;
+  font-size: 22px;
+  padding: 2px 5px;
 }
 
 /* ----------------------------------------------------------

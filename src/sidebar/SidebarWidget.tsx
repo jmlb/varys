@@ -3370,7 +3370,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
         <button
           className="ds-settings-gear-btn"
           onClick={() => setShowSettings(true)}
-          title="Configure providers and models"
+          title="Settings"
         >⚙</button>
       </div>
 
