@@ -36,6 +36,23 @@ class DSAssistantExtension(ExtensionApp):
     default_url = "/varys"
     load_other_extensions = True
 
+    def _load_env_file(self, path: Path) -> None:
+        """Load key=value pairs from an env file into os.environ."""
+        import re
+        try:
+            for line in path.read_text(encoding="utf-8").splitlines():
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#"):
+                    continue
+                m = re.match(r"^([A-Z0-9_]+)\s*=\s*(.*)", stripped)
+                if m:
+                    key, val = m.group(1), m.group(2).strip()
+                    val = re.sub(r"\s+#.*$", "", val).strip('"\'')
+                    os.environ[key] = val
+            self.log.info(f"Varys: Loaded env from {path}")
+        except Exception as exc:
+            self.log.warning(f"Varys: could not read {path}: {exc}")
+
     def initialize_settings(self):
         """Initialize extension settings."""
         self.log.info("Varys: Initializing settings")
@@ -46,14 +63,9 @@ class DSAssistantExtension(ExtensionApp):
             Path.home() / ".jupyter" / "varys.env",
             Path(self.serverapp.root_dir) / ".env",
         ]
-        try:
-            from dotenv import load_dotenv
-            for env_path in env_paths:
-                if env_path.exists():
-                    load_dotenv(env_path, override=True)
-                    self.log.info(f"Varys: Loaded env from {env_path}")
-        except ImportError:
-            self.log.warning("Varys: python-dotenv not installed, skipping .env files")
+        for env_path in env_paths:
+            if env_path.exists():
+                self._load_env_file(env_path)
 
         # Initialise the centralised config loader so every module can call
         # get_config() without needing the root_dir passed explicitly.
@@ -123,8 +135,6 @@ class DSAssistantExtension(ExtensionApp):
                 settings_patch[sett_key] = os.environ.get(env_key, "")
 
         self.settings.update(settings_patch)
-        # Also update the web app settings so handlers can access them
-        self.serverapp.web_app.settings.update(settings_patch)
 
         self.log.info(
             f"Varys: "
