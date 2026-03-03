@@ -210,7 +210,7 @@ def _build_provider(
     if provider_name == "ollama":
         from .ollama_provider import OllamaProvider
         return OllamaProvider(
-            base_url=settings.get("ds_assistant_ollama_url", "http://localhost:11434"),
+            base_url=settings.get("ds_assistant_ollama_url") or "http://localhost:11434",
             chat_model=model,
             completion_model=model,
         )
