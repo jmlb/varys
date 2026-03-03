@@ -118,6 +118,8 @@ class DSAssistantExtension(ExtensionApp):
                 settings_patch[sett_key] = os.environ.get(env_key, "")
 
         self.settings.update(settings_patch)
+        # Also update the web app settings so handlers can access them
+        self.serverapp.web_app.settings.update(settings_patch)
 
         self.log.info(
             f"Varys: "
