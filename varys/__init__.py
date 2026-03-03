@@ -19,3 +19,10 @@ def _jupyter_labextension_paths():
 
 def _jupyter_server_extension_points():
     return [{"module": "varys", "app": DSAssistantExtension}]
+
+
+def load_jupyter_server_extension(serverapp):
+    """Load the Jupyter server extension (legacy support)."""
+    extension = DSAssistantExtension()
+    extension.serverapp = serverapp
+    extension.initialize()
