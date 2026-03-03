@@ -13,9 +13,28 @@ This means adding a new provider (e.g. openai) only requires:
   - Adding an OpenAIProvider class and a branch in _build_provider()
 """
 import logging
+import os
+import re
+from pathlib import Path
 from typing import Any, Dict, Literal
 
 from .base import BaseLLMProvider
+
+
+def _load_varys_env() -> None:
+    """Load ~/.jupyter/varys.env into os.environ if not already loaded."""
+    env_file = Path.home() / ".jupyter" / "varys.env"
+    if not env_file.exists():
+        return
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        m = re.match(r"^([A-Z0-9_]+)\s*=\s*(.*)", stripped)
+        if m:
+            key, val = m.group(1), re.sub(r"\s+#.*$", "", m.group(2)).strip().strip("\"'")
+            if key not in os.environ:
+                os.environ[key] = val
 
 log = logging.getLogger(__name__)
 
@@ -81,13 +100,32 @@ def create_provider(settings: Dict[str, Any], task: TaskType = "chat") -> BaseLL
     """
     Return a provider instance configured for *task*.
 
-    Settings key conventions (set by app.py):
-      ds_assistant_{task}_provider          → provider name (lower-case)
-      ds_assistant_{provider}_{task}_model  → model for that combination
+    Resolution order:
+      1. handler settings dict (ds_assistant_{task}_provider)
+      2. os.environ (DS_CHAT_PROVIDER / DS_INLINE_PROVIDER / DS_MULTILINE_PROVIDER)
+      3. ~/.jupyter/varys.env (loaded on demand if os.environ has nothing)
     """
-    provider_name = settings.get(f"ds_assistant_{task}_provider", "anthropic").lower()
+    _load_varys_env()
+    env_key = {"chat": "DS_CHAT_PROVIDER", "inline": "DS_INLINE_PROVIDER",
+               "multiline": "DS_MULTILINE_PROVIDER"}.get(task, f"DS_{task.upper()}_PROVIDER")
+    provider_name = (
+        settings.get(f"ds_assistant_{task}_provider")
+        or os.environ.get(env_key, "")
+    ).lower()
+
+    api_key_map = {
+        "anthropic":  ("ds_assistant_anthropic_api_key",  "ANTHROPIC_API_KEY"),
+        "openai":     ("ds_assistant_openai_api_key",     "OPENAI_API_KEY"),
+        "google":     ("ds_assistant_google_api_key",     "GOOGLE_API_KEY"),
+        "openrouter": ("ds_assistant_openrouter_api_key", "OPENROUTER_API_KEY"),
+    }
+    for skey, ekey in api_key_map.values():
+        if not settings.get(skey):
+            settings[skey] = os.environ.get(ekey, "")
+
     model = (
         settings.get(f"ds_assistant_{provider_name}_{task}_model")
+        or os.environ.get(f"{provider_name.upper()}_{task.upper()}_MODEL", "")
         or _DEFAULTS.get(provider_name, {}).get(task, "")
     )
     key = _cache_key(provider_name, task, model, settings)
