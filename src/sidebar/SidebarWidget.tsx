@@ -3364,7 +3364,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
         >{chatTheme === 'day' ? '🌙' : '☀️'}</button>
         <button
           className="ds-wiki-help-btn"
-          onClick={() => window.open('/varys/wiki', '_blank')}
+          onClick={() => window.open('https://github.com/jmlb/varys#readme', '_blank')}
           title="Open documentation wiki"
         >?</button>
         <button
