@@ -126,6 +126,7 @@
 .ds-assistant-message-user {
   white-space: pre-wrap;
   align-self: flex-end;
+  max-width: 50%;
   border-bottom-right-radius: 2px;
   background: linear-gradient(135deg, #e4e7ef 0%, #d8dce8 100%);
   border-left: 3px solid #8892b0;
