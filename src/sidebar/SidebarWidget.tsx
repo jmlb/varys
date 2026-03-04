@@ -2613,7 +2613,9 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
             extractor.headerEmitted = true;
           }
           const newChars = extractor.feed(partial);
-          if (newChars) {
+          // Skip literal "null" — the LLM sometimes returns null for empty
+          // content fields, which would display as the word "null" in the bubble.
+          if (newChars && newChars !== 'null') {
             pushToStreamQueue(newChars);
           }
         },
@@ -2764,15 +2766,21 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
       }
 
       // ── Chat / advisory mode ─────────────────────────────────────────
-      if (response.cellInsertionMode === 'chat' && response.chatResponse) {
+      // Use chatResponse when available; fall back to summary so the message
+      // is never blank. Always REPLACE (not append) so any ✍/null streaming
+      // artefacts from json_delta are wiped out.
+      if (response.cellInsertionMode === 'chat') {
+        const chatText = response.chatResponse
+          || response.summary
+          || 'Done.';
         if (streamStarted) {
           setMessages(prev => prev.map(m =>
             m.id === streamMsgId
-              ? { ...m, content: response.chatResponse!, isChatOnly: true }
+              ? { ...m, content: chatText, isChatOnly: true }
               : m
           ));
         } else {
-          addMessage('assistant', response.chatResponse, { isChatOnly: true });
+          addMessage('assistant', chatText, { isChatOnly: true });
         }
         // Show RAG source citations if the response was augmented
         if (response.ragSources && Array.isArray(response.ragSources) && response.ragSources.length > 0) {
@@ -2806,11 +2814,16 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
       }
 
       if (!response.steps || response.steps.length === 0) {
-        appendToStream(
-          streamStarted
-            ? `\n\n${response.summary ?? 'Done — no cell changes were required.'}`
-            : (response.summary ?? 'Done — no cell changes were required.')
-        );
+        const summary = response.summary ?? 'Done — no cell changes were required.';
+        if (streamStarted) {
+          // Replace streaming content (may contain ✍/null artefacts from
+          // json_delta) with the clean summary.
+          setMessages(prev => prev.map(m =>
+            m.id === streamMsgId ? { ...m, content: summary } : m
+          ));
+        } else {
+          addMessage('assistant', summary);
+        }
         return;
       }
 
