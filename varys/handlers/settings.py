@@ -141,7 +141,7 @@ def _reload_settings(handler: JupyterHandler, env_path: Path) -> None:
     # No silent fallbacks: empty string means unconfigured; user must set via Settings UI
     s["ds_assistant_chat_provider"]         = os.environ.get("DS_CHAT_PROVIDER", "").lower()
     s["ds_assistant_completion_provider"]   = os.environ.get("DS_COMPLETION_PROVIDER", "").lower()
-    s["ds_assistant_completion_max_tokens"] = int(os.environ.get("COMPLETION_MAX_TOKENS", "128"))
+    s["ds_assistant_completion_max_tokens"] = int(os.environ.get("COMPLETION_MAX_TOKENS", "") or "128")
 
     # Credentials
     s["ds_assistant_anthropic_api_key"]          = os.environ.get("ANTHROPIC_API_KEY", "")
