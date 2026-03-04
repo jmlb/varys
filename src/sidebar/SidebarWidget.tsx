@@ -3538,7 +3538,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                   const showPush = msg.role === 'assistant'
                     && msg.id !== activeStreamId
                     && !msg.hadCellOps
-                    && (codeBlocks.length > 0 || !!msg.isChatOnly);
+                    && !!(msg.content?.trim());
                   if (!showToggle && !showPush) return null;
                   const hasCode = codeBlocks.length > 0;
                   const allCode = hasCode ? codeBlocks.join('\n\n') : '';
