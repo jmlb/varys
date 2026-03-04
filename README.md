@@ -173,7 +173,7 @@ Skill commands are discovered dynamically — add a skill with a `command:` in i
 | **OpenAI** (GPT / o-series) | `[openai]` | Yes |
 | **Google Gemini** | `[openai]`* | Yes |
 | **Ollama** (local models) | `[ollama]` | No |
-| **AWS Bedrock** | `[all]` | IAM credentials |
+| **AWS Bedrock** | `[bedrock]` | IAM key or AWS profile (SSO) |
 | **Azure OpenAI** | `[all]` | Yes |
 | **OpenRouter** | `[all]` | Yes |
 
@@ -247,6 +247,45 @@ ollama serve
 ```
 
 In Varys Settings → Routing, set the completion or chat provider to `ollama` and pick your model. Leave `OLLAMA_URL` blank — Varys defaults to `http://localhost:11434`.
+
+---
+
+## AWS Bedrock setup
+
+Install the boto3 dependency:
+
+```bash
+pip install "varys[bedrock] @ git+https://github.com/jmlb/varys"
+```
+
+**Option A — Profile-based auth (SSO / aws-azure-login)**
+
+For enterprise environments where AWS credentials are issued via Azure AD or another SSO provider. No explicit keys needed.
+
+In Varys Settings → Bedrock tab:
+- **AWS profile**: the profile name in `~/.aws/credentials` (e.g. `id-np`)
+- **Auth refresh command**: the command that refreshes expired tokens (e.g. `aws-azure-login --profile ITOSS --no-prompt`)
+- Leave *Access key ID* and *Secret access key* blank
+
+Varys checks the token expiry before every request and runs the refresh command automatically — only when the token is within 5 minutes of expiring.
+
+**Option B — Explicit IAM keys**
+
+Set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_REGION` in Settings → Bedrock tab.
+
+**Model ID format**
+
+Newer Claude models require a cross-region inference profile ID (prefix with your region code):
+
+```
+# ❌ raw model ID — returns "on-demand throughput not supported"
+anthropic.claude-sonnet-4-5-20250514-v1:0
+
+# ✅ cross-region inference profile
+us.anthropic.claude-sonnet-4-5-20250514-v1:0
+```
+
+Use `eu.` or `ap.` for European / Asia Pacific regions. Find the exact ID in the AWS console under *Bedrock → Cross-region inference*.
 
 ---
 

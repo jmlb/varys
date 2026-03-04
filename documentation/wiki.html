@@ -655,12 +655,65 @@ jupyter server extension list
       <tr><td><strong>Anthropic</strong></td><td><code>ANTHROPIC_API_KEY</code></td><td>Claude models. Recommended for chat. Supports vision and tool-use streaming.</td></tr>
       <tr><td><strong>OpenAI</strong></td><td><code>OPENAI_API_KEY</code></td><td>GPT-4o, o1, o3-mini, etc.</td></tr>
       <tr><td><strong>Google Gemini</strong></td><td><code>GOOGLE_API_KEY</code></td><td>Gemini Pro / Flash via OpenAI-compatible endpoint.</td></tr>
-      <tr><td><strong>AWS Bedrock</strong></td><td><code>AWS_ACCESS_KEY_ID</code> + <code>AWS_SECRET_ACCESS_KEY</code></td><td>Claude on AWS. Also set <code>AWS_REGION</code>.</td></tr>
+      <tr><td><strong>AWS Bedrock</strong></td><td><code>AWS_PROFILE</code> <em>or</em> <code>AWS_ACCESS_KEY_ID</code> + <code>AWS_SECRET_ACCESS_KEY</code></td><td>Claude on AWS via profile-based or explicit IAM credentials. See <a href="#bedrock-setup">Bedrock setup</a>.</td></tr>
       <tr><td><strong>Azure OpenAI</strong></td><td><code>AZURE_OPENAI_API_KEY</code></td><td>Requires <code>AZURE_OPENAI_ENDPOINT</code> and <code>AZURE_OPENAI_DEPLOYMENT</code>.</td></tr>
       <tr><td><strong>OpenRouter</strong></td><td><code>OPENROUTER_API_KEY</code></td><td>Access 400+ models via OpenAI-compatible API.</td></tr>
       <tr><td><strong>Ollama</strong></td><td>—</td><td>Local inference, no API key. Requires <code>ollama serve</code> running. Default URL: <code>http://localhost:11434</code>.</td></tr>
     </table>
   </div>
+
+  <h2 id="bedrock-setup">AWS Bedrock setup</h2>
+  <p>Varys supports two authentication modes for Bedrock. <strong>Profile-based auth</strong> (recommended for enterprise environments using Azure AD / SSO) and <strong>explicit IAM key auth</strong>.</p>
+
+  <h3>Option A — Profile-based auth (SSO / aws-azure-login)</h3>
+  <p>Use this when your organisation manages AWS credentials through Azure AD or another SSO provider. No access keys are required in Varys.</p>
+  <ol>
+    <li>Run your org's credential-refresh tool once in a terminal to write a token to <code>~/.aws/credentials</code>:<br>
+      <code>aws-azure-login --profile ITOSS --no-prompt</code></li>
+    <li>In Varys Settings → Bedrock tab, set:
+      <ul>
+        <li><strong>AWS profile</strong>: the profile name written to <code>~/.aws/credentials</code> (e.g. <code>id-np</code>)</li>
+        <li><strong>Auth refresh command</strong>: the command to refresh expired tokens (e.g. <code>aws-azure-login --profile ITOSS --no-prompt</code>)</li>
+        <li><strong>Region</strong>: e.g. <code>us-east-1</code></li>
+        <li>Leave <em>Access key ID</em> and <em>Secret access key</em> blank.</li>
+      </ul>
+    </li>
+  </ol>
+  <p>With <strong>Auth refresh command</strong> set, Varys automatically re-runs it the moment credentials are within 5 minutes of expiry — no manual refresh needed between sessions.</p>
+
+  <div class="code-block-wrap">
+    <span class="code-label">~/.jupyter/varys.env</span>
+    <button class="copy-btn" style="right:78px">Copy</button>
+    <pre><code>DS_CHAT_PROVIDER=BEDROCK
+AWS_PROFILE=id-np
+AWS_AUTH_REFRESH=aws-azure-login --profile ITOSS --no-prompt
+AWS_REGION=us-east-1
+BEDROCK_CHAT_MODEL=us.anthropic.claude-sonnet-4-5-20250514-v1:0</code></pre>
+  </div>
+
+  <h3>Option B — Explicit IAM keys</h3>
+  <p>For direct IAM user credentials (long-lived keys with no SSO).</p>
+  <div class="code-block-wrap">
+    <span class="code-label">~/.jupyter/varys.env</span>
+    <button class="copy-btn" style="right:78px">Copy</button>
+    <pre><code>DS_CHAT_PROVIDER=BEDROCK
+AWS_ACCESS_KEY_ID=AKIA...
+AWS_SECRET_ACCESS_KEY=...
+AWS_REGION=us-east-1
+BEDROCK_CHAT_MODEL=us.anthropic.claude-sonnet-4-5-20250514-v1:0</code></pre>
+  </div>
+
+  <h3>Model ID format — cross-region inference profiles</h3>
+  <p>Newer Claude models on Bedrock require a <strong>cross-region inference profile ID</strong>, not the raw model ID. Prefix the model ID with your region code:</p>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Raw model ID (❌ unsupported on-demand)</th><th>Cross-region profile ID (✅ use this)</th></tr>
+      <tr><td><code>anthropic.claude-sonnet-4-5-20250514-v1:0</code></td><td><code>us.anthropic.claude-sonnet-4-5-20250514-v1:0</code></td></tr>
+      <tr><td><code>anthropic.claude-3-5-sonnet-20241022-v2:0</code></td><td><code>us.anthropic.claude-3-5-sonnet-20241022-v2:0</code></td></tr>
+      <tr><td><code>anthropic.claude-3-haiku-20240307-v1:0</code></td><td><code>us.anthropic.claude-3-haiku-20240307-v1:0</code></td></tr>
+    </table>
+  </div>
+  <p>Use <code>eu.</code> or <code>ap.</code> instead of <code>us.</code> if your Bedrock region is in Europe or Asia Pacific. You can also find the exact ARN in the AWS console under <em>Bedrock → Cross-region inference</em>.</p>
 
   <h2>Per-task routing</h2>
   <p>Set different providers for chat and completion in <code>~/.jupyter/varys.env</code>:</p>
@@ -1177,9 +1230,12 @@ Extract the file path from the user message.
       <tr><td>ANTHROPIC_API_KEY</td><td>Anthropic</td></tr>
       <tr><td>OPENAI_API_KEY</td><td>OpenAI</td></tr>
       <tr><td>GOOGLE_API_KEY</td><td>Google Gemini</td></tr>
-      <tr><td>AWS_ACCESS_KEY_ID</td><td>AWS Bedrock</td></tr>
-      <tr><td>AWS_SECRET_ACCESS_KEY</td><td>AWS Bedrock</td></tr>
-      <tr><td>AWS_REGION</td><td>AWS Bedrock</td></tr>
+      <tr><td>AWS_PROFILE</td><td>AWS Bedrock — named profile from <code>~/.aws/credentials</code> (profile-based / SSO auth)</td></tr>
+      <tr><td>AWS_AUTH_REFRESH</td><td>AWS Bedrock — shell command run automatically when the profile token is expired (e.g. <code>aws-azure-login --profile ITOSS --no-prompt</code>)</td></tr>
+      <tr><td>AWS_ACCESS_KEY_ID</td><td>AWS Bedrock — explicit IAM access key (leave blank when using <code>AWS_PROFILE</code>)</td></tr>
+      <tr><td>AWS_SECRET_ACCESS_KEY</td><td>AWS Bedrock — explicit IAM secret key (leave blank when using <code>AWS_PROFILE</code>)</td></tr>
+      <tr><td>AWS_SESSION_TOKEN</td><td>AWS Bedrock — temporary session token (optional, for STS-issued credentials)</td></tr>
+      <tr><td>AWS_REGION</td><td>AWS Bedrock — region, e.g. <code>us-east-1</code></td></tr>
       <tr><td>AZURE_OPENAI_API_KEY</td><td>Azure OpenAI</td></tr>
       <tr><td>AZURE_OPENAI_ENDPOINT</td><td>Azure OpenAI</td></tr>
       <tr><td>AZURE_OPENAI_DEPLOYMENT</td><td>Azure OpenAI</td></tr>
