@@ -120,6 +120,12 @@ interface Message {
   };
   /** For code-review messages: individually applicable fix steps */
   codeReviewSteps?: OperationStep[];
+  /**
+   * True when this assistant turn was produced by /chat (advisory-only mode).
+   * Used to always show the push-to-cell button so the user can save the
+   * response as a markdown cell even when there are no code blocks.
+   */
+  isChatOnly?: boolean;
 }
 
 // Report generation is triggered only by the explicit /report command.
@@ -2211,11 +2217,18 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     });
   }, [messages, activeStreamId]);
 
-  const addMessage = (role: Message['role'], content: string, displayContent?: string): void => {
+  const addMessage = (
+    role: Message['role'],
+    content: string,
+    extraProps?: string | Partial<Omit<Message, 'id' | 'role' | 'content' | 'timestamp'>>
+  ): void => {
     const id = generateId();
+    const extra: Partial<Message> = typeof extraProps === 'string'
+      ? { displayContent: extraProps }
+      : (extraProps ?? {});
     setMessages(prev => [
       ...prev,
-      { id, role, content, displayContent, timestamp: new Date() }
+      { id, role, content, timestamp: new Date(), ...extra }
     ]);
   };
 
@@ -2755,11 +2768,11 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
         if (streamStarted) {
           setMessages(prev => prev.map(m =>
             m.id === streamMsgId
-              ? { ...m, content: response.chatResponse! }
+              ? { ...m, content: response.chatResponse!, isChatOnly: true }
               : m
           ));
         } else {
-          addMessage('assistant', response.chatResponse);
+          addMessage('assistant', response.chatResponse, { isChatOnly: true });
         }
         // Show RAG source citations if the response was augmented
         if (response.ragSources && Array.isArray(response.ragSources) && response.ragSources.length > 0) {
@@ -3521,26 +3534,30 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                 {(() => {
                   const showToggle = (!activeStreamId || msg.id !== activeStreamId)
                     && (msg.content?.length ?? 0) >= COLLAPSE_THRESHOLD;
+                  const codeBlocks = extractCodeBlocks(msg.content);
                   const showPush = msg.role === 'assistant'
                     && msg.id !== activeStreamId
                     && !msg.hadCellOps
-                    && extractCodeBlocks(msg.content).length > 0;
+                    && (codeBlocks.length > 0 || !!msg.isChatOnly);
                   if (!showToggle && !showPush) return null;
-                  const allCode = showPush ? extractCodeBlocks(msg.content).join('\n\n') : '';
+                  const hasCode = codeBlocks.length > 0;
+                  const allCode = hasCode ? codeBlocks.join('\n\n') : '';
                   return (
                     <div className="ds-msg-actions-row">
                       {showPush ? (
                         <button
                           className="ds-push-to-cell-btn"
-                          title="Push to cell"
+                          title={hasCode ? 'Push code to cell' : 'Push response to markdown cell'}
                           onClick={() => {
                             const nb = notebookTracker.currentWidget?.content;
                             const insertIdx = nb
                               ? (nb.activeCellIndex ?? nb.model!.cells.length - 1) + 1
                               : 0;
-                            void cellEditor.insertCell(insertIdx, 'code', allCode)
+                            const cellType = hasCode ? 'code' : 'markdown';
+                            const cellContent = hasCode ? allCode : msg.content;
+                            void cellEditor.insertCell(insertIdx, cellType, cellContent)
                               .then(() => {
-                                addMessage('system', `✓ Code pushed to new cell at pos:${insertIdx}.`);
+                                addMessage('system', `✓ ${hasCode ? 'Code' : 'Response'} pushed to new ${cellType} cell at pos:${insertIdx}.`);
                               });
                           }}
                         >↵</button>
