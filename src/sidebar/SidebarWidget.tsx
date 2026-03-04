@@ -2367,8 +2367,21 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
           return;
         }
       } else {
+        // Check if it's a known skill command
+        const knownSkill = commands.find(
+          c => c.type === 'skill' && c.command === parsed.command
+        );
+        if (!knownSkill) {
+          // Unknown command — reject immediately, do not send to LLM
+          addMessage('system',
+            `Unknown command \`${parsed.command}\`. ` +
+            `Type \`/help\` to see all available commands, or check **Settings → Skills** to import skill commands.`
+          );
+          setInput('');
+          return;
+        }
         slashCommand = parsed.command;
-        message      = parsed.rest || rawInput; // fall back to full text if no args
+        message      = parsed.rest || rawInput;
       }
     } else {
       message = rawInput;

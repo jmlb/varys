@@ -31,6 +31,9 @@ from typing import Dict, List, Optional
 
 log = logging.getLogger(__name__)
 
+# Bundled skills shipped inside the package (always available, no import needed).
+_BUNDLED_SKILLS_DIR = Path(__file__).parent.parent / "bundled_skills"
+
 # Legacy Tier-2 keyword map.
 #
 # ⚠️  DEPRECATED — do not add new entries here.
@@ -277,15 +280,41 @@ class SkillLoader:
                 result.append(self._make_skill(name, tier=1))
                 loaded_names.add(name)
 
-        # Add the skill that owns this command
+        # Add the skill that owns this command (project-level first)
         skill_name = self._command_map.get(cmd_lower)
         if skill_name and skill_name not in loaded_names and skill_name not in disabled:
             result.append(self._make_skill(skill_name, tier=2))
-            log.debug("Varys skills: command '%s' → skill '%s'", cmd_lower, skill_name)
+            log.debug("Varys skills: command '%s' → project skill '%s'", cmd_lower, skill_name)
         elif not skill_name:
-            log.warning("Varys skills: unknown command '%s'", cmd_lower)
+            # Fall back to bundled skills — works without manual import
+            bundled_skill = self._load_bundled_by_command(cmd_lower)
+            if bundled_skill:
+                result.append(bundled_skill)
+                log.debug("Varys skills: command '%s' → bundled skill '%s'",
+                          cmd_lower, bundled_skill["name"])
+            else:
+                log.warning("Varys skills: unknown command '%s'", cmd_lower)
 
         return result
+
+    def _load_bundled_by_command(self, command: str) -> Optional[Dict[str, str]]:
+        """Return a skill dict for a bundled skill that declares *command*, or None."""
+        if not _BUNDLED_SKILLS_DIR.exists():
+            return None
+        for entry in sorted(_BUNDLED_SKILLS_DIR.iterdir()):
+            if not entry.is_dir():
+                continue
+            skill_file = entry / "SKILL.md"
+            if not skill_file.exists():
+                continue
+            try:
+                meta, body = _parse_front_matter(skill_file.read_text(encoding="utf-8"))
+                cmd = str(meta.get("command", "")).strip().lower()
+                if cmd == command:
+                    return {"name": entry.name, "content": body, "tier": 2}
+            except Exception:
+                pass
+        return None
 
     def validate_command(self, command: str, skill_name: str) -> Optional[str]:
         """Check *command* for the named skill.  Return an error string or None.
@@ -311,6 +340,10 @@ class SkillLoader:
     def list_commands(self) -> List[Dict[str, str]]:
         """Return all slash commands: built-ins first, then skill commands.
 
+        Includes commands from bundled skills even if they haven't been imported
+        into the project yet, so users can use e.g. /readme without a manual
+        import step.
+
         Each entry: {command, description, type ('builtin' | 'skill'), skill_name?}
         """
         if not self._scanned:
@@ -322,6 +355,8 @@ class SkillLoader:
             for cmd, desc in BUILTIN_COMMANDS.items()
         ]
 
+        # Project-level skills (explicitly imported)
+        registered_commands: set = set()
         for cmd, skill_name in sorted(self._command_map.items()):
             if skill_name in disabled:
                 continue
@@ -332,6 +367,31 @@ class SkillLoader:
                 "type": "skill",
                 "skill_name": skill_name,
             })
+            registered_commands.add(cmd)
+
+        # Bundled skills — expose their commands without requiring import
+        if _BUNDLED_SKILLS_DIR.exists():
+            for entry in sorted(_BUNDLED_SKILLS_DIR.iterdir()):
+                if not entry.is_dir():
+                    continue
+                skill_file = entry / "SKILL.md"
+                if not skill_file.exists():
+                    continue
+                try:
+                    meta, _ = _parse_front_matter(skill_file.read_text(encoding="utf-8"))
+                    cmd = str(meta.get("command", "")).strip().lower()
+                    if not cmd or cmd in BUILTIN_COMMANDS or cmd in registered_commands:
+                        continue
+                    desc = str(meta.get("description", entry.name))
+                    result.append({
+                        "command": cmd,
+                        "description": desc,
+                        "type": "skill",
+                        "skill_name": entry.name,
+                    })
+                    registered_commands.add(cmd)
+                except Exception:
+                    pass
 
         return result
 
