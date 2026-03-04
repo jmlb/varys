@@ -1,5 +1,7 @@
 # Varys — AI Data Science Assistant for JupyterLab
 
+![Header](readme_files/header.png)
+
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 [![JupyterLab 4+](https://img.shields.io/badge/JupyterLab-4%2B-orange.svg)](https://jupyter.org/)
