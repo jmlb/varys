@@ -2604,16 +2604,18 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
           clearInterval(progressTimer);
           setProgressText(text);
         },
-        // onJsonDelta — raw partial JSON from the tool call; extract cell content
+        // onJsonDelta — raw partial JSON from the tool call; extract cell content.
+        // We do NOT push a ✍ header here: the LLM preamble text (streamed as
+        // 'chunk' events before the tool call) already gives the user feedback.
+        // Adding ✍ here pollutes the bubble when the LLM ends up with no steps.
         (partial: string) => {
           const extractor = jsonExtractorRef.current;
           if (!extractor.headerEmitted) {
             ensureStreamStarted();
-            pushToStreamQueue('\n\n✍ ');
             extractor.headerEmitted = true;
           }
           const newChars = extractor.feed(partial);
-          // Skip literal "null" — the LLM sometimes returns null for empty
+          // Skip literal "null" — the LLM sometimes emits null for empty
           // content fields, which would display as the word "null" in the bubble.
           if (newChars && newChars !== 'null') {
             pushToStreamQueue(newChars);
@@ -2814,15 +2816,23 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
       }
 
       if (!response.steps || response.steps.length === 0) {
-        const summary = response.summary ?? 'Done — no cell changes were required.';
+        // Prefer chatResponse (full LLM answer) when available; otherwise fall
+        // back to summary. For streamStarted messages, keep the existing
+        // streamed preamble text rather than replacing it — the only thing we
+        // need to strip is any stray json_delta artefacts (already prevented
+        // above by not pushing ✍ and skipping null).
+        const fallback = response.chatResponse
+          || response.summary
+          || 'Done — no cell changes were required.';
         if (streamStarted) {
-          // Replace streaming content (may contain ✍/null artefacts from
-          // json_delta) with the clean summary.
-          setMessages(prev => prev.map(m =>
-            m.id === streamMsgId ? { ...m, content: summary } : m
-          ));
+          // Do nothing — the streamed preamble is already the correct content.
+          // If for some reason the content is empty, fill in the fallback.
+          setMessages(prev => prev.map(m => {
+            if (m.id !== streamMsgId) return m;
+            return m.content?.trim() ? m : { ...m, content: fallback };
+          }));
         } else {
-          addMessage('assistant', summary);
+          addMessage('assistant', fallback);
         }
         return;
       }
