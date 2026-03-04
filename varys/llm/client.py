@@ -6,6 +6,11 @@ from typing import Any, Callable, Awaitable, Dict, List, Optional
 
 import anthropic
 
+# 'OverloadedError' was removed in newer anthropic SDK versions (529 is now
+# surfaced as APIStatusError).  Fall back to InternalServerError so the retry
+# logic still catches transient overload responses on all SDK versions.
+_AnthropicOverloadedError = getattr(anthropic, "OverloadedError", anthropic.InternalServerError)
+
 from .context_utils import CELL_CONTENT_LIMIT, format_dataframe_context
 
 
@@ -430,7 +435,7 @@ class ClaudeClient:
             except anthropic.BadRequestError as e:
                 raise RuntimeError(f"Bad request to Claude API: {e}") from e
 
-            except (anthropic.OverloadedError, anthropic.RateLimitError,
+            except (_AnthropicOverloadedError, anthropic.RateLimitError,
                     anthropic.InternalServerError, anthropic.APIConnectionError) as e:
                 # Transient errors — retry with exponential backoff
                 if attempt < max_retries - 1:
@@ -552,7 +557,7 @@ class ClaudeClient:
             except anthropic.BadRequestError as e:
                 raise RuntimeError(f"Bad request to Claude API: {e}") from e
 
-            except (anthropic.OverloadedError, anthropic.RateLimitError,
+            except (_AnthropicOverloadedError, anthropic.RateLimitError,
                     anthropic.InternalServerError, anthropic.APIConnectionError) as e:
                 if attempt < max_retries - 1:
                     delay = base_delay * (2 ** attempt)
