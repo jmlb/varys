@@ -2597,7 +2597,10 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
         // onChunk — explanation text Claude emits before the tool call
         (chunk: string) => {
           ensureStreamStarted();
-          pushToStreamQueue(chunk);
+          // Skip bare "null" tokens the LLM sometimes writes instead of JSON null
+          if (chunk.trim() !== 'null') {
+            pushToStreamQueue(chunk);
+          }
         },
         // onProgress — status label while the tool-call JSON is being generated
         (text: string) => {
@@ -2623,6 +2626,18 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
       );
       clearInterval(progressTimer);
       stopStreamQueue();
+
+      // Strip any stray bare-"null" tokens the LLM appended to its streaming
+      // preamble (e.g. writing the JSON keyword literally instead of JSON null).
+      // This must run after stopStreamQueue so all queued chunks have been
+      // flushed into the message before we clean it.
+      if (streamStarted) {
+        setMessages(prev => prev.map(m => {
+          if (m.id !== streamMsgId) return m;
+          const cleaned = (m.content ?? '').replace(/(\s*\bnull\b)+\s*$/g, '').replace(/\s+$/, '');
+          return cleaned !== m.content ? { ...m, content: cleaned } : m;
+        }));
+      }
 
       // ── Accumulate token usage for the current thread ─────────────────
       if (response.tokenUsage) {
@@ -2770,9 +2785,9 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
       // is never blank. Always REPLACE (not append) so any ✍/null streaming
       // artefacts from json_delta are wiped out.
       if (response.cellInsertionMode === 'chat') {
-        const chatText = response.chatResponse
+        const chatText = (response.chatResponse
           || response.summary
-          || 'Done.';
+          || 'Done.').replace(/(\s*\bnull\b)+\s*$/g, '').trim();
         if (streamStarted) {
           setMessages(prev => prev.map(m =>
             m.id === streamMsgId
@@ -2806,9 +2821,14 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
       }
 
       // ── Clarification needed (no tool call) ──────────────────────────
-      if (response.clarificationNeeded) {
+      // Guard against the LLM writing the string "null" instead of JSON null
+      const realClarification = response.clarificationNeeded &&
+        response.clarificationNeeded !== 'null'
+          ? response.clarificationNeeded
+          : null;
+      if (realClarification) {
         appendToStream(
-          streamStarted ? `\n\n${response.clarificationNeeded}` : response.clarificationNeeded
+          streamStarted ? `\n\n${realClarification}` : realClarification
         );
         return;
       }
@@ -3536,10 +3556,19 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                   const collapsed = !isStreaming && isLong && collapsedMsgs.has(msg.id);
                   return (
                     <div className={`ds-msg-collapsible-wrap${collapsed ? ' ds-msg-collapsed' : ''}`}>
-                      <div
-                        className="ds-assistant-message-content ds-markdown"
-                        dangerouslySetInnerHTML={{ __html: renderMarkdown((msg.displayContent ?? msg.content).replace(/[\r\n\s]+$/, '')) }}
-                      />
+                      {msg.role === 'user' ? (
+                        // User messages are plain text — render as-is so that
+                        // pre-wrap handles line breaks without the trailing \n
+                        // that marked.parse() appends causing a blank line.
+                        <div className="ds-assistant-message-content">
+                          {(msg.displayContent ?? msg.content).trim()}
+                        </div>
+                      ) : (
+                        <div
+                          className="ds-assistant-message-content ds-markdown"
+                          dangerouslySetInnerHTML={{ __html: renderMarkdown((msg.displayContent ?? msg.content).replace(/[\r\n\s]+$/, '')) }}
+                        />
+                      )}
                       {/* Context chip */}
                       {msg.role === 'user' && msg.contextChip && (
                         <ContextChipBubble chip={msg.contextChip} />

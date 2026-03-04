@@ -1,5 +1,6 @@
 """Claude API client for DS Assistant."""
 import asyncio
+import re as _re
 import uuid
 from typing import Any, Callable, Awaitable, Dict, List, Optional
 
@@ -390,9 +391,13 @@ class ClaudeClient:
                 # Extract the tool_use block - guaranteed structured output
                 for block in response.content:
                     if block.type == "tool_use" and block.name == "create_operation_plan":
-                        data = block.input
+                        data = dict(block.input)
                         data["operationId"] = operation_id or f"op_{uuid.uuid4().hex[:8]}"
-                        if "clarificationNeeded" not in data:
+                        # Normalise clarificationNeeded: the LLM sometimes sets it
+                        # to the *string* "null" instead of JSON null.  Treat both
+                        # as absent so the retry gate and frontend behave correctly.
+                        clarif = data.get("clarificationNeeded")
+                        if not clarif or (isinstance(clarif, str) and clarif.strip().lower() == "null"):
                             data["clarificationNeeded"] = None
                         return data
 
@@ -504,7 +509,10 @@ class ClaudeClient:
                     if block.type == "tool_use" and block.name == "create_operation_plan":
                         data = dict(block.input)
                         data["operationId"] = operation_id or f"op_{uuid.uuid4().hex[:8]}"
-                        if "clarificationNeeded" not in data:
+                        # Normalise clarificationNeeded: the LLM sometimes sets it
+                        # to the *string* "null" instead of JSON null.
+                        clarif = data.get("clarificationNeeded")
+                        if not clarif or (isinstance(clarif, str) and clarif.strip().lower() == "null"):
                             data["clarificationNeeded"] = None
                         return data
 
@@ -515,6 +523,9 @@ class ClaudeClient:
                 text_only = next(
                     (b.text for b in final_msg.content if hasattr(b, "text")), ""
                 )
+                # Strip stray bare-"null" tokens that the LLM writes when it
+                # intends the JSON keyword null (e.g. "clarificationNeeded: null").
+                text_only = _re.sub(r'(\s*\bnull\b)+\s*$', '', text_only).strip()
                 return {
                     "operationId": operation_id or f"op_{uuid.uuid4().hex[:8]}",
                     "steps": [],

@@ -136,6 +136,7 @@ def _sync_credentials(settings: Dict[str, Any]) -> None:
         ("ds_assistant_azure_openai_api_key",      "AZURE_OPENAI_API_KEY"),
         ("ds_assistant_aws_access_key_id",         "AWS_ACCESS_KEY_ID"),
         ("ds_assistant_aws_secret_access_key",     "AWS_SECRET_ACCESS_KEY"),
+        ("ds_assistant_aws_session_token",         "AWS_SESSION_TOKEN"),
         ("ds_assistant_ollama_url",                "OLLAMA_URL"),
     ]
     for skey, ekey in pairs:
@@ -151,7 +152,8 @@ _NEEDS_API_KEY = {
     "google":     "ds_assistant_google_api_key",
     "openrouter": "ds_assistant_openrouter_api_key",
     "azure":      "ds_assistant_azure_openai_api_key",
-    "bedrock":    "ds_assistant_aws_access_key_id",
+    # bedrock is intentionally absent: it supports profile-based auth via
+    # AWS_PROFILE / ~/.aws/credentials with no explicit key required.
 }
 
 

@@ -500,8 +500,11 @@ class TaskHandler(JupyterHandler):
                     accumulated: list = []
 
                     async def _on_chunk(text: str) -> None:
-                        accumulated.append(text)
-                        self.write(f"data: {json.dumps({'type': 'chunk', 'text': text})}\n\n")
+                        cleaned = _re.sub(r'(\s*\bnull\b)+\s*$', '', text)
+                        if not cleaned:
+                            return
+                        accumulated.append(cleaned)
+                        self.write(f"data: {json.dumps({'type': 'chunk', 'text': cleaned})}\n\n")
                         await self.flush()
                         # Yield the event loop so Tornado actually sends this
                         # chunk over the TCP socket before the next token
@@ -514,6 +517,9 @@ class TaskHandler(JupyterHandler):
                         chat_history=chat_history,
                     )
 
+                    chat_response_text = _re.sub(
+                        r'(\s*\bnull\b)+\s*$', '', "".join(accumulated)
+                    ).strip()
                     done_event: dict = {
                         "type":              "done",
                         "operationId":       op_id,
@@ -521,7 +527,7 @@ class TaskHandler(JupyterHandler):
                         "requiresApproval":  False,
                         "clarificationNeeded": None,
                         "summary":           "Advisory response",
-                        "chatResponse":      "".join(accumulated),
+                        "chatResponse":      chat_response_text,
                         "cellInsertionMode": "chat",
                     }
                     usage = getattr(provider, "last_usage", None)
@@ -608,8 +614,14 @@ class TaskHandler(JupyterHandler):
                                     return
 
                     async def _on_plan_chunk(text: str) -> None:
+                        # Strip bare trailing "null" tokens the LLM writes when
+                        # it means the JSON keyword — e.g. "\n\nnull" at the end
+                        # of a conversational response.
+                        cleaned = _re.sub(r'(\s*\bnull\b)+\s*$', '', text)
+                        if not cleaned:
+                            return
                         self.write(
-                            f"data: {json.dumps({'type': 'chunk', 'text': text})}\n\n"
+                            f"data: {json.dumps({'type': 'chunk', 'text': cleaned})}\n\n"
                         )
                         await self.flush()
                         await asyncio.sleep(0)
@@ -656,7 +668,10 @@ class TaskHandler(JupyterHandler):
                     # unconditionally when steps are empty and no clarification
                     # was requested.
                     steps_empty = not response.get("steps")
-                    clarification_needed = bool(response.get("clarificationNeeded"))
+                    # Treat the string "null" the same as JSON null — the LLM
+                    # sometimes writes the keyword literally instead of omitting it.
+                    _clarif = response.get("clarificationNeeded")
+                    clarification_needed = bool(_clarif) and _clarif != "null"
 
                     if steps_empty and not clarification_needed:
                         # Tell the frontend a retry is in progress
