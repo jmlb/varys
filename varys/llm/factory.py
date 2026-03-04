@@ -135,6 +135,7 @@ def _sync_credentials(settings: Dict[str, Any]) -> None:
         ("ds_assistant_openrouter_api_key",        "OPENROUTER_API_KEY"),
         ("ds_assistant_azure_openai_api_key",      "AZURE_OPENAI_API_KEY"),
         ("ds_assistant_aws_profile",               "AWS_PROFILE"),
+        ("ds_assistant_aws_auth_refresh",          "AWS_AUTH_REFRESH"),
         ("ds_assistant_aws_access_key_id",         "AWS_ACCESS_KEY_ID"),
         ("ds_assistant_aws_secret_access_key",     "AWS_SECRET_ACCESS_KEY"),
         ("ds_assistant_aws_session_token",         "AWS_SESSION_TOKEN"),
@@ -246,6 +247,7 @@ def _build_provider(
         from .bedrock_provider import BedrockProvider
         return BedrockProvider(
             aws_profile=settings.get("ds_assistant_aws_profile", ""),
+            aws_auth_refresh=settings.get("ds_assistant_aws_auth_refresh", ""),
             access_key_id=settings.get("ds_assistant_aws_access_key_id", ""),
             secret_access_key=settings.get("ds_assistant_aws_secret_access_key", ""),
             session_token=settings.get("ds_assistant_aws_session_token", ""),

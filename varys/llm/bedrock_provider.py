@@ -1,10 +1,14 @@
 """AWS Bedrock provider — Claude, Llama, Mistral models via Bedrock Converse API."""
 import asyncio
 import base64
+import configparser
 import json
 import logging
 import re
+import subprocess
 import uuid
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Callable, Awaitable, Dict, List, Optional
 
 from .base import BaseLLMProvider
@@ -62,6 +66,10 @@ Always call create_operation_plan with your response.
 class BedrockProvider(BaseLLMProvider):
     """Calls AWS Bedrock via the Converse API (boto3)."""
 
+    # Refresh this many minutes before the token actually expires to avoid
+    # making a real API call with a token that expires mid-flight.
+    _EXPIRY_BUFFER_MINUTES = 5
+
     def __init__(
         self,
         access_key_id: str,
@@ -71,12 +79,14 @@ class BedrockProvider(BaseLLMProvider):
         completion_model: str = "anthropic.claude-3-haiku-20240307-v1:0",
         session_token: str = "",
         aws_profile: str = "",
+        aws_auth_refresh: str = "",
     ) -> None:
         super().__init__()
         self.access_key_id = access_key_id
         self.secret_access_key = secret_access_key
         self.session_token = session_token
         self.aws_profile = aws_profile
+        self.aws_auth_refresh = aws_auth_refresh
         self.region = region
         self.chat_model = chat_model
         self.completion_model = completion_model
@@ -111,6 +121,64 @@ class BedrockProvider(BaseLLMProvider):
             kwargs["aws_session_token"] = self.session_token
         return boto3.client(**kwargs)
 
+    def _credentials_expired(self) -> bool:
+        """Return True if the profile's temporary credentials are expired (or missing).
+
+        Reads ``~/.aws/credentials`` and checks the ``aws_expiration`` field
+        written by tools like aws-azure-login.  If no expiration field is
+        present the credentials are assumed to be long-lived (IAM user keys)
+        and this method always returns False.
+        """
+        creds_path = Path.home() / ".aws" / "credentials"
+        if not creds_path.exists():
+            return True
+
+        cfg = configparser.ConfigParser()
+        cfg.read(creds_path)
+
+        profile = self.aws_profile or "default"
+        if profile not in cfg:
+            return True
+
+        # aws-azure-login writes 'aws_expiration'; some other tools write
+        # 'aws_session_expiration' — check both.
+        expiry_raw = (
+            cfg[profile].get("aws_expiration")
+            or cfg[profile].get("aws_session_expiration")
+        )
+        if not expiry_raw:
+            return False  # static / IAM-role credentials — never expire here
+
+        try:
+            expiry_dt = datetime.fromisoformat(expiry_raw.strip().replace("Z", "+00:00"))
+            cutoff = datetime.now(timezone.utc) + timedelta(minutes=self._EXPIRY_BUFFER_MINUTES)
+            return cutoff >= expiry_dt
+        except (ValueError, TypeError):
+            return True  # unparseable → assume expired to be safe
+
+    def _run_auth_refresh(self) -> None:
+        """Run the auth-refresh command synchronously and rebuild the boto3 client."""
+        log.info("Bedrock: credentials expired, running auth refresh: %s", self.aws_auth_refresh)
+        try:
+            subprocess.run(
+                self.aws_auth_refresh,
+                shell=True,
+                check=True,
+                timeout=120,
+            )
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"AWS auth refresh command failed: {e}") from e
+        except subprocess.TimeoutExpired as e:
+            raise RuntimeError("AWS auth refresh command timed out after 120 s") from e
+        # Rebuild the boto3 client so it picks up the freshly written credentials.
+        self._boto_client = self._make_client()
+        log.info("Bedrock: credentials refreshed successfully")
+
+    async def _ensure_credentials(self) -> None:
+        """Refresh credentials lazily — only when expired and a refresh command is set."""
+        if self.aws_auth_refresh and self._credentials_expired():
+            await asyncio.get_running_loop().run_in_executor(None, self._run_auth_refresh)
+
     def _build_system(self, skills: List[Dict[str, str]], memory: str) -> str:
         skills_text = "\n".join(f"### {s['name']}\n{s['content']}" for s in skills)
         system = _SYSTEM
@@ -129,6 +197,7 @@ class BedrockProvider(BaseLLMProvider):
         operation_id: Optional[str] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
+        await self._ensure_credentials()
         op_id = operation_id or f"op_{uuid.uuid4().hex[:8]}"
         system = self._build_system(skills, memory)
         user_msg = _build_context(user_message, notebook_context)
@@ -184,6 +253,7 @@ class BedrockProvider(BaseLLMProvider):
         language: str,
         previous_cells: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
+        await self._ensure_credentials()
         imports = _extract_imports(previous_cells)
         cache_key = CompletionCache.make_key(prefix, language, "bedrock-completion", imports)
         cached = self._cache.get(cache_key)
@@ -242,6 +312,7 @@ class BedrockProvider(BaseLLMProvider):
         user: str,
         chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> str:
+        await self._ensure_credentials()
         history = list(chat_history or [])
         while history and history[0].get("role") != "user":
             history = history[1:]

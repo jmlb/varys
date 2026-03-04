@@ -37,6 +37,7 @@ _ENV_KEYS = [
     "GOOGLE_COMPLETION_MODEL",
     # AWS Bedrock
     "AWS_PROFILE",
+    "AWS_AUTH_REFRESH",
     "AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY",
     "AWS_SESSION_TOKEN",
@@ -148,6 +149,7 @@ def _reload_settings(handler: JupyterHandler, env_path: Path) -> None:
     s["ds_assistant_openai_api_key"]             = os.environ.get("OPENAI_API_KEY", "")
     s["ds_assistant_google_api_key"]             = os.environ.get("GOOGLE_API_KEY", "")
     s["ds_assistant_aws_profile"]                = os.environ.get("AWS_PROFILE", "")
+    s["ds_assistant_aws_auth_refresh"]           = os.environ.get("AWS_AUTH_REFRESH", "")
     s["ds_assistant_aws_access_key_id"]          = os.environ.get("AWS_ACCESS_KEY_ID", "")
     s["ds_assistant_aws_secret_access_key"]      = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
     s["ds_assistant_aws_session_token"]          = os.environ.get("AWS_SESSION_TOKEN", "")
