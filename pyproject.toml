@@ -27,9 +27,10 @@ dependencies = [
 anthropic = ["anthropic"]
 openai    = ["openai"]
 ollama    = ["httpx"]
+bedrock   = ["boto3"]
 rag       = ["chromadb"]
 # Install all LLM providers + RAG at once
-all = ["anthropic", "openai", "httpx", "chromadb"]
+all = ["anthropic", "openai", "httpx", "boto3", "chromadb"]
 
 [project.urls]
 Homepage = "https://github.com/jmlb/varys"
