@@ -99,6 +99,7 @@ class DSAssistantExtension(ExtensionApp):
             # Google
             "ds_assistant_google_api_key":          os.environ.get("GOOGLE_API_KEY", ""),
             # AWS Bedrock
+            "ds_assistant_aws_profile":             os.environ.get("AWS_PROFILE", ""),
             "ds_assistant_aws_access_key_id":       os.environ.get("AWS_ACCESS_KEY_ID", ""),
             "ds_assistant_aws_secret_access_key":   os.environ.get("AWS_SECRET_ACCESS_KEY", ""),
             "ds_assistant_aws_session_token":       os.environ.get("AWS_SESSION_TOKEN", ""),

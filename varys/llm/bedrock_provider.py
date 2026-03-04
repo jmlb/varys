@@ -70,11 +70,13 @@ class BedrockProvider(BaseLLMProvider):
         chat_model: str = "anthropic.claude-3-5-sonnet-20241022-v2:0",
         completion_model: str = "anthropic.claude-3-haiku-20240307-v1:0",
         session_token: str = "",
+        aws_profile: str = "",
     ) -> None:
         super().__init__()
         self.access_key_id = access_key_id
         self.secret_access_key = secret_access_key
         self.session_token = session_token
+        self.aws_profile = aws_profile
         self.region = region
         self.chat_model = chat_model
         self.completion_model = completion_model
@@ -86,6 +88,19 @@ class BedrockProvider(BaseLLMProvider):
             import boto3
         except ImportError:
             raise RuntimeError("boto3 not installed. Run: pip install boto3")
+
+        # Profile-based auth: use a named profile from ~/.aws/credentials.
+        # Takes priority over explicit key/secret so the user only needs to
+        # set AWS_PROFILE (or fill in the profile field in settings).
+        if self.aws_profile:
+            session = boto3.Session(
+                profile_name=self.aws_profile,
+                region_name=self.region,
+            )
+            return session.client("bedrock-runtime")
+
+        # Explicit key auth (or fall through to boto3 default credential chain:
+        # env vars → ~/.aws/credentials default profile → IAM role).
         kwargs: Dict[str, Any] = {
             "service_name": "bedrock-runtime",
             "region_name": self.region,
@@ -205,12 +220,16 @@ class BedrockProvider(BaseLLMProvider):
         def _check():
             try:
                 import boto3
-                client = boto3.client(
-                    "bedrock",
-                    region_name=self.region,
-                    aws_access_key_id=self.access_key_id or None,
-                    aws_secret_access_key=self.secret_access_key or None,
-                )
+                if self.aws_profile:
+                    session = boto3.Session(profile_name=self.aws_profile, region_name=self.region)
+                    client = session.client("bedrock")
+                else:
+                    client = boto3.client(
+                        "bedrock",
+                        region_name=self.region,
+                        aws_access_key_id=self.access_key_id or None,
+                        aws_secret_access_key=self.secret_access_key or None,
+                    )
                 client.list_foundation_models(byOutputModality="TEXT")
                 return True
             except Exception:

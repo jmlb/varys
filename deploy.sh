@@ -44,8 +44,12 @@ PYEOF
 
 if [[ "$1" == "--full" ]]; then
     echo "==> Deploying Python backend files..."
-    cp "$SRC/varys/handlers/task.py"  "$PYRHENV/lib/python3.12/site-packages/varys/handlers/task.py"
-    cp "$SRC/varys/llm/client.py"     "$PYRHENV/lib/python3.12/site-packages/varys/llm/client.py"
+    cp "$SRC/varys/handlers/task.py"        "$PYRHENV/lib/python3.12/site-packages/varys/handlers/task.py"
+    cp "$SRC/varys/handlers/settings.py"    "$PYRHENV/lib/python3.12/site-packages/varys/handlers/settings.py"
+    cp "$SRC/varys/llm/client.py"           "$PYRHENV/lib/python3.12/site-packages/varys/llm/client.py"
+    cp "$SRC/varys/llm/factory.py"          "$PYRHENV/lib/python3.12/site-packages/varys/llm/factory.py"
+    cp "$SRC/varys/llm/bedrock_provider.py" "$PYRHENV/lib/python3.12/site-packages/varys/llm/bedrock_provider.py"
+    cp "$SRC/varys/app.py"                  "$PYRHENV/lib/python3.12/site-packages/varys/app.py"
     echo "    Backend files deployed."
     echo ""
     echo "==> Restarting JupyterLab (port 8702)..."
