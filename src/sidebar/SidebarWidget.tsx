@@ -2604,22 +2604,20 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
           clearInterval(progressTimer);
           setProgressText(text);
         },
-        // onJsonDelta — raw partial JSON from the tool call; extract cell content.
-        // We do NOT push a ✍ header here: the LLM preamble text (streamed as
-        // 'chunk' events before the tool call) already gives the user feedback.
-        // Adding ✍ here pollutes the bubble when the LLM ends up with no steps.
+        // onJsonDelta — raw partial JSON from the tool call.
+        // The LLM preamble text (streamed as 'chunk' events before the tool
+        // call) already provides live feedback to the user.  Pushing extracted
+        // json_delta content into the bubble causes artefacts ("null", garbled
+        // partial JSON) when the LLM returns empty steps.  We keep the extractor
+        // running so ensureStreamStarted fires (creating the bubble) but no
+        // longer push the extracted characters into the queue.
         (partial: string) => {
           const extractor = jsonExtractorRef.current;
           if (!extractor.headerEmitted) {
             ensureStreamStarted();
             extractor.headerEmitted = true;
           }
-          const newChars = extractor.feed(partial);
-          // Skip literal "null" — the LLM sometimes emits null for empty
-          // content fields, which would display as the word "null" in the bubble.
-          if (newChars && newChars !== 'null') {
-            pushToStreamQueue(newChars);
-          }
+          extractor.feed(partial); // keep accumulating but discard output
         },
         abortCtrl.signal,
       );
