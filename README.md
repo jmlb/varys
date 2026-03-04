@@ -1,4 +1,4 @@
-# Varys — AI Data Science Assistant for JupyterLab
+# Varys: An AI Assistant That Actually Understands Jupyter Notebooks
 
 ![Header](readme_files/header.png)
 
@@ -11,7 +11,7 @@ Chat with it, ask it to write code, run EDA, generate plots, review your noteboo
 
 No Node.js required on the user's machine. No cloud account lock-in. Works with Anthropic, OpenAI, Google, Ollama (local), AWS Bedrock, Azure OpenAI, and OpenRouter.
 
-> [GitHub](https://github.com/jmlb/varys) · [Install guide](INSTALL.md) · MIT License
+> [GitHub](https://github.com/jmlb/varys) · [Install guide](INSTALL.md) · [Medium article](https://jmlbeaujour.medium.com/varys-an-ai-assistant-that-understands-jupyter-notebooks-eb84a3705a77) · MIT License
 
 ---
 
