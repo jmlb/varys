@@ -702,7 +702,8 @@ const ModelsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSaved
       GOOGLE:      'GOOGLE_API_KEY',
       AZURE:       'AZURE_OPENAI_API_KEY',
       OPENROUTER:  'OPENROUTER_API_KEY',
-      BEDROCK:     'AWS_ACCESS_KEY_ID',
+      // BEDROCK is intentionally absent: it supports profile-based auth via
+      // AWS_PROFILE / ~/.aws/credentials with no explicit key required.
     };
     const PROVIDER_MODEL_KEYS: Record<string, Record<string, string>> = {
       ANTHROPIC:   { chat: 'ANTHROPIC_CHAT_MODEL',    completion: 'ANTHROPIC_COMPLETION_MODEL' },
