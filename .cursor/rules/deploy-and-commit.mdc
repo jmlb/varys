@@ -1,0 +1,40 @@
+---
+description: Varys build, deploy, and git commit checklist
+alwaysApply: true
+---
+
+# Varys Deploy & Commit Checklist
+
+After any frontend change (TypeScript / CSS / assets), always run `bash deploy.sh`
+then commit **all** of the following files together — never commit a subset:
+
+```
+src/                                   # TypeScript source
+style/                                 # CSS
+lib/                                   # compiled JS output (npx tsc)
+varys/labextension/static/             # webpack bundle (remoteEntry + chunks)
+varys/labextension/package.json        # ← CRITICAL: points to the active remoteEntry hash
+```
+
+## Why `varys/labextension/package.json` matters
+
+JupyterLab reads this file to discover which webpack bundle to load.
+If it is stale (points to an old `remoteEntry*.js` hash), `pip install --force-reinstall`
+on other machines will install the new bundle files but load the wrong one — the old UI.
+
+## Verification step (always do this before answering "yes, I pushed")
+
+```bash
+# Hash in repo must match the file that exists in static/
+git show HEAD:varys/labextension/package.json \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); \
+    print(d.get('jupyterlab',{}).get('_build',{}).get('load','N/A'))"
+
+ls varys/labextension/static/remoteEntry*.js
+```
+
+Both must show the **same hash**. If they differ, stage and commit `varys/labextension/package.json`.
+
+## Backend-only changes (Python)
+
+No build needed. Just commit the `.py` files and push.
