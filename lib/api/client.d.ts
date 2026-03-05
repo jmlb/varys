@@ -28,6 +28,8 @@ export interface ChatThread {
     messages: SavedMessage[];
     /** Cumulative token usage across all turns in this thread. */
     tokenUsage?: TokenUsage;
+    /** Whether to include notebook cells as context in every request (default true). */
+    notebookAware?: boolean;
 }
 /** The persisted chat file containing all threads for one notebook. */
 export interface ChatFile {
