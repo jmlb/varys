@@ -161,9 +161,9 @@ Describe exactly what you are about to do in plain English.
 Examples:
   "I'll read your notebook, then create a markdown README cell at the top that
    summarises the data loading, EDA, and modelling workflow."
-  "I'll consolidate the three duplicate import blocks into a single cell at pos:0."
+  "I'll consolidate the three duplicate import blocks into a single cell at #1."
   "I'll replace train_logistic_regression and train_logistic_regression_tuned in
-   pos:4 with MLPClassifier equivalents, keeping all other functions unchanged."
+   #5 with MLPClassifier equivalents, keeping all other functions unchanged."
 
 Rules:
 - NEVER call create_operation_plan without writing at least one sentence first.

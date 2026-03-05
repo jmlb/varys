@@ -93,12 +93,9 @@ def _format_cell(cell: Dict[str, Any], idx: int, fig_counter: List[int]) -> str:
     cell_type = cell.get("cell_type", "code")
     exec_count = cell.get("execution_count")
 
-    header_parts = [f"--- Cell {idx} ({cell_type})"]
-    if cell_type == "code":
-        if exec_count is not None:
-            header_parts.append(f"exec:[{exec_count}]")
-        else:
-            header_parts.append("exec:[not run]")
+    header_parts = [f"--- #{idx + 1} ({cell_type})"]
+    if cell_type == "code" and exec_count is None:
+        header_parts.append("[not run]")
     header = " ".join(header_parts) + " ---"
 
     source = _join_source(cell.get("source", []))

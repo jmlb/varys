@@ -20,7 +20,7 @@ Examples of *generate* intent: "generate tests for this function", "create tests
 
 ## Step 1 — Locate the function(s)
 
-1. Read the source of the referenced cell (`exec:[N]` or `cell[N]`).
+1. Read the source of the referenced cell (`#N`).
 2. Extract **every `def` or `class` definition** in the cell. If there are multiple, generate tests for all of them.
 3. Parse for each function:
    - **Signature** — parameter names, type hints, defaults
@@ -200,7 +200,7 @@ Return **one operation** — a new code cell inserted **immediately after the so
 
 ## Full example
 
-### Source cell (exec:[4])
+### Source cell (#4)
 
 ```python
 def compute_mrr(ranked_lists, relevant_items):
@@ -214,7 +214,7 @@ def compute_mrr(ranked_lists, relevant_items):
     return rr_sum / len(ranked_lists) if ranked_lists else 0.0
 ```
 
-### Generated test cell (inserted at exec:[5])
+### Generated test cell (inserted at #5)
 
 ```python
 # Tests for compute_mrr

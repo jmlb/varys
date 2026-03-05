@@ -97,7 +97,7 @@ matplotlib
 ## RULES
 
 1. **Insert at position 0** — this cell always goes at the very top of the notebook.
-2. **Replace an existing README** — if a cell at pos:0 already looks like a README (starts with `#`), use a `modify` step instead of `insert`. **Do NOT copy any text from the existing README** (not the title, not the tagline, not the table rows). Treat the existing cell as stale and infer every field fresh from the actual notebook code and outputs below it.
+2. **Replace an existing README** — if cell #1 already looks like a README (starts with `#`), use a `modify` step instead of `insert`. **Do NOT copy any text from the existing README** (not the title, not the tagline, not the table rows). Treat the existing cell as stale and infer every field fresh from the actual notebook code and outputs below it.
 3. **Never truncate** — fill every `[PLACEHOLDER]` with real content from the notebook. Do not leave placeholders in the output.
 4. **Emoji discipline** — use ONLY the emojis listed above for their assigned sections; do not add random emoji elsewhere.
 5. **Table rows** — add rows to the Data table only for data sources actually visible in the notebook. If none, replace the table with "No external data detected."

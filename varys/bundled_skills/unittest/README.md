@@ -7,8 +7,8 @@ Generate comprehensive `pytest` test cases for functions defined in your noteboo
 ## Usage
 
 ```
-/unittest          → tests for the currently active cell
-/unittest exec:[4] → tests for the cell with execution count [4]
+/unittest      → tests for the currently active cell
+/unittest #4   → tests for cell #4
 ```
 
 Or right-click any code cell → **🤖 AI Actions → 🧪 Generate tests**
@@ -47,7 +47,7 @@ For every `def` (or `class`) found in the cell, the skill produces:
 ### Text processing
 
 ```
-/unittest exec:[3]   ← cell contains clean_text(text) function
+/unittest #3   ← cell contains clean_text(text) function
 ```
 
 Generates:
@@ -68,7 +68,7 @@ def test_clean_text_empty_string():
 ### Embedding / similarity
 
 ```
-/unittest exec:[7]   ← cell contains compute_similarity(v1, v2)
+/unittest #7   ← cell contains compute_similarity(v1, v2)
 ```
 
 Generates:
@@ -127,4 +127,4 @@ Or simply **run the test cell in JupyterLab** — pytest will execute inline and
 - **Multiple functions in one cell?** — The skill generates tests for all of them in one block.
 - **Want more edge cases?** — Follow up: *"add more edge cases to those tests"*
 - **Want a separate test file?** — Ask: *"write these tests as a test_notebook.py file"*
-- **Already have partial tests?** — Ask: *"add missing edge cases to my existing tests in exec:[8]"*
+- **Already have partial tests?** — Ask: *"add missing edge cases to my existing tests in #8"*

@@ -189,18 +189,19 @@ def build_notebook_context(
 
             ## Notebook
             Notebook: <path>
-            Cells: <N>
-            Active cell: pos:<K>        (omitted when unknown)
+            Cells: <N>  (cells are numbered #1, #2, … from the top)
+            CELL INDEX RULE: '#N' = Nth cell from top → cellIndex = N-1
+            Active cell: #<K>        (omitted when unknown)
 
-            pos:0  CODE  exec:[1]
+            #1  CODE
             <source>
             OUTPUT:
             <output>
 
-            pos:1  MARKDOWN  exec:[n/a]
+            #2  MARKDOWN
             ...
 
-            ## SELECTED TEXT (lines A–B of pos:C)   (omitted when absent)
+            ## SELECTED TEXT (lines A–B of #C)   (omitted when absent)
             ...
     """
     cells: List[Dict[str, Any]] = notebook_context.get("cells", [])

@@ -58,7 +58,7 @@ The notebook context you receive is formatted as:
 SOURCE:
 [content]
 
---- Cell 1 (code) exec:[1] ---
+--- #1 (code) ---
 SOURCE:
 [code]
 
