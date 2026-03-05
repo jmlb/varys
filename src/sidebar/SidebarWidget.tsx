@@ -3814,25 +3814,6 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
             );
           })()}
           <button
-            className="ds-new-session-btn"
-            onClick={handleNewThread}
-            disabled={isLoading}
-            title="New thread"
-            aria-label="New thread"
-          >
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none"
-                 xmlns="http://www.w3.org/2000/svg">
-              <polyline points="3 6 5 6 21 6" stroke="currentColor" strokeWidth="2"
-                        strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2"
-                    strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M10 11v6M14 11v6" stroke="currentColor" strokeWidth="2"
-                    strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M9 6V4h6v2" stroke="currentColor" strokeWidth="2"
-                    strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-          <button
             className={`ds-cell-mode-btn ds-cell-mode-${notebookAware ? cellMode : 'chat'}${!notebookAware ? ' ds-cell-mode-locked' : ''}`}
             onClick={notebookAware ? cycleCellMode : undefined}
             title={notebookAware
