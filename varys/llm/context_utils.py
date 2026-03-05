@@ -224,9 +224,14 @@ def build_notebook_context(
         source: str = cell.get("source", "")
         ec = cell.get("executionCount")
         output: Optional[str] = cell.get("output")
+        cell_id: str = cell.get("cellId", "") or ""
+
+        # Use first 8 hex chars of the UUID (before the first dash) as the
+        # compact display tag.  Stable across cell moves and insertions.
+        id_tag = f"  [id:{cell_id.split('-')[0]}]" if cell_id else ""
 
         run_info = "" if ctype != "code" else ("" if ec is not None else "  [not run]")
-        lines.append(f"#{idx + 1}  {ctype.upper()}{run_info}")
+        lines.append(f"#{idx + 1}  {ctype.upper()}{run_info}{id_tag}")
         lines.append(source[:CELL_CONTENT_LIMIT] if source.strip() else "(empty)")
         if output and output.strip():
             # Do NOT re-truncate here — the frontend already applies a per-part

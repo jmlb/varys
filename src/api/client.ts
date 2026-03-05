@@ -56,6 +56,8 @@ export interface CellInfo {
   output?: string | null;
   /** Base64-encoded PNG image from the cell output (plots/figures), if present. */
   imageOutput?: string | null;
+  /** Stable nbformat cell_id UUID — survives cell moves/insertions. First 8 hex chars used as display tag. */
+  cellId?: string;
 }
 
 export interface TextSelection {

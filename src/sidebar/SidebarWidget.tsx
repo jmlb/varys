@@ -1595,6 +1595,41 @@ function makeNewThread(name: string): ChatThread {
 }
 
 // ---------------------------------------------------------------------------
+// Cell identity helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Rewrite stale `#N [id:XXXXXXXX]` references inside a history message so
+ * they always reflect the *current* notebook position for that cell.
+ *
+ * The LLM is instructed (via the system prompt) to always include `[id:X]`
+ * when citing a cell.  When cells are inserted or deleted between turns,
+ * the number N may drift.  This pass corrects N before the history is sent
+ * to the LLM so it never sees conflicting positions.
+ *
+ * @param text    The raw message content (user or assistant).
+ * @param idMap   Map from 8-char id-prefix → current 1-based cell number.
+ */
+function translateCellRefs(
+  text: string,
+  idMap: Map<string, number>
+): string {
+  // Matches "#7 [id:a3f7b2c1]" or "#7  [id:a3f7b2c1]" (one or two spaces)
+  return text.replace(/#(\d+)\s{1,2}\[id:([0-9a-f]{8})\]/g, (_m, numStr, prefix) => {
+    const oldNum = parseInt(numStr, 10);
+    if (!idMap.has(prefix)) {
+      // Cell was deleted from the notebook entirely
+      return `#${oldNum} [id:${prefix}] [cell no longer exists]`;
+    }
+    const currentNum = idMap.get(prefix)!;
+    if (currentNum !== oldNum) {
+      return `#${currentNum} [id:${prefix}] (was #${oldNum})`;
+    }
+    return `#${oldNum} [id:${prefix}]`;
+  });
+}
+
+// ---------------------------------------------------------------------------
 // ThreadBar component
 // ---------------------------------------------------------------------------
 
@@ -2474,10 +2509,27 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     // We only include user/assistant turns (not system/warning/report/code-review),
     // and cap at the last 6 turns (3 exchanges) to limit token usage.
     const MAX_HISTORY_TURNS = 6;
+
+    // Build a cellId-prefix → current 1-based position map so we can rewrite
+    // any stale "#N [id:X]" references that appear in older history turns.
+    const idPrefixToCurrentNum = new Map<string, number>();
+    const freshCtx = notebookReader.getFullContext();
+    if (freshCtx) {
+      for (const c of freshCtx.cells) {
+        if (c.cellId) {
+          const prefix = c.cellId.split('-')[0];
+          idPrefixToCurrentNum.set(prefix, c.index + 1);  // 1-based
+        }
+      }
+    }
+
     const chatHistory: ChatTurn[] = messages
       .filter(m => m.role === 'user' || m.role === 'assistant')
       .slice(-MAX_HISTORY_TURNS)
-      .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+      .map(m => ({
+        role: m.role as 'user' | 'assistant',
+        content: translateCellRefs(m.content, idPrefixToCurrentNum),
+      }));
 
     setInput('');
     // Show the raw input in the user bubble; if a short display label was

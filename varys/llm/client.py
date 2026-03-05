@@ -52,6 +52,24 @@ Every cell in the notebook context is labelled **#N** where N counts from 1 at t
 The user will always refer to cells as `#N` (e.g. "#16", "cell #16", "cell 16").
 Never look for an execution-count match — just apply N − 1 directly.
 
+## Cell Identity Tags
+
+Each cell header also carries a stable short ID: `[id:XXXXXXXX]` (first 8 hex chars of the
+cell's UUID, which never changes when cells are inserted, deleted, or moved).
+
+Example header: `#7  CODE  [id:a3f7b2c1]`
+
+**Rules:**
+- When referencing a specific cell in your response, always include its ID tag:
+    ✅  "I updated cell #7 [id:a3f7b2c1] to add error handling"
+    ❌  "I updated cell #7"
+- If the conversation history mentions a cell by a DIFFERENT number but the SAME `[id:X]`,
+  the current notebook position (`#N` in the current context) is authoritative.
+  The prior number is stale due to cells being inserted or removed.
+    Example: history says "#5 [id:a3f7b2c1]" — current context shows "[id:a3f7b2c1]" at #7
+    → treat it as #7, note "(was #5)" when relevant.
+- If a history reference contains `[cell no longer exists]`, that cell was deleted.
+
 ## Operation Types
 - "insert": Add a new cell at cellIndex (existing cells at that index and above shift down by 1)
 - "modify": Update existing cell content at cellIndex (no index shift)

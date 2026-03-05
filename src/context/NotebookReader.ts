@@ -99,6 +99,13 @@ export class NotebookReader {
 
     notebook.widgets.forEach((cell, index) => {
       const model = cell.model;
+      // model.id is the stable nbformat cell_id UUID (assigned by JupyterLab,
+      // survives cell moves and insertions — changes only on explicit cell delete+recreate).
+      const cellId: string | undefined =
+        (model as any).id ??
+        (model as any).sharedModel?.id ??
+        undefined;
+
       cells.push({
         index,
         type: model.type as 'code' | 'markdown',
@@ -108,7 +115,8 @@ export class NotebookReader {
             ? (model as any).executionCount ?? null
             : null,
         output: model.type === 'code' ? this._extractOutput(model) : null,
-        imageOutput: model.type === 'code' ? this._extractImage(model) : null
+        imageOutput: model.type === 'code' ? this._extractImage(model) : null,
+        cellId,
       });
     });
 
