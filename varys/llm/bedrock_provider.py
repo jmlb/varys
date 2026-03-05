@@ -175,6 +175,30 @@ class BedrockProvider(BaseLLMProvider):
         if self.aws_auth_refresh and self._credentials_expired():
             await asyncio.get_running_loop().run_in_executor(None, self._run_auth_refresh)
 
+    @staticmethod
+    def _is_expired_token(exc: Exception) -> bool:
+        """Return True if exc is a botocore ExpiredTokenException."""
+        try:
+            from botocore.exceptions import ClientError
+            return (
+                isinstance(exc, ClientError)
+                and exc.response.get("Error", {}).get("Code") == "ExpiredTokenException"
+            )
+        except ImportError:
+            return False
+
+    async def _call_with_auto_refresh(self, fn):
+        """Run fn() in a thread executor, refreshing credentials once on ExpiredTokenException."""
+        loop = asyncio.get_running_loop()
+        try:
+            return await loop.run_in_executor(None, fn)
+        except Exception as e:
+            if self.aws_auth_refresh and self._is_expired_token(e):
+                log.warning("Bedrock: token expired during API call — refreshing credentials and retrying")
+                await loop.run_in_executor(None, self._run_auth_refresh)
+                return await loop.run_in_executor(None, fn)
+            raise
+
     def _build_system(self, skills: List[Dict[str, str]], memory: str) -> str:
         skills_section = "\n".join(f"### {s['name']}\n{s['content']}" for s in skills)
         if not skills_section:
@@ -238,7 +262,7 @@ class BedrockProvider(BaseLLMProvider):
             raise RuntimeError("No tool use block in Bedrock response")
 
         try:
-            return await asyncio.get_running_loop().run_in_executor(None, _call)
+            return await self._call_with_auto_refresh(_call)
         except Exception as e:
             log.error("Bedrock plan_task error: %s", e)
             raise RuntimeError(f"AWS Bedrock error: {e}") from e
@@ -273,7 +297,7 @@ class BedrockProvider(BaseLLMProvider):
             return ""
 
         try:
-            raw = await asyncio.get_running_loop().run_in_executor(None, _call)
+            raw = await self._call_with_auto_refresh(_call)
             suggestion = re.sub(r"^```[a-z]*\n?", "", raw.strip(), flags=re.MULTILINE)
             suggestion = re.sub(r"\n?```$", "", suggestion, flags=re.MULTILINE).strip()
             if suggestion:
@@ -327,7 +351,11 @@ class BedrockProvider(BaseLLMProvider):
                 if "text" in block:
                     return block["text"]
             return ""
-        return await asyncio.get_running_loop().run_in_executor(None, _call)
+        try:
+            return await self._call_with_auto_refresh(_call)
+        except Exception as e:
+            log.error("Bedrock chat error: %s", e)
+            raise RuntimeError(f"AWS Bedrock error: {e}") from e
 
     def has_vision(self) -> bool:
         name = self.chat_model.lower()
