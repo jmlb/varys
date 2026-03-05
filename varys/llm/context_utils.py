@@ -229,7 +229,10 @@ def build_notebook_context(
         lines.append(f"#{idx + 1}  {ctype.upper()}{run_info}")
         lines.append(source[:CELL_CONTENT_LIMIT] if source.strip() else "(empty)")
         if output and output.strip():
-            lines.append(f"OUTPUT:\n{output[:CELL_CONTENT_LIMIT]}")
+            # Do NOT re-truncate here — the frontend already applies a per-part
+            # budget (2 000 chars each for regular output and error traceback).
+            # A secondary slice here would silently chop the [2] error block.
+            lines.append(f"OUTPUT:\n{output}")
         elif cell.get("imageOutput"):
             lines.append("OUTPUT: [Visualization — image attached]")
         lines.append("")

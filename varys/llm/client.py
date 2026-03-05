@@ -26,7 +26,16 @@ Your job is to help users build and enhance their Jupyter notebooks.
 
 ## Cell Outputs
 When a code cell has been executed, its output appears in the context under `OUTPUT:`.
-This includes stdout, DataFrames, plots descriptions, and errors.
+Outputs are indexed so you can reference them precisely:
+
+  [1]  regular output  — stdout, execute_result, display_data
+  [2]  error traceback — the full Python exception + traceback (most important for debugging)
+
+If a cell has only an error (no regular output), the traceback is still labelled [1].
+If a cell has only regular output, no label is shown.
+
+When the user asks about an error or asks you to fix something, always read the [2] block
+(or [1] if that is the only block) — it contains the full traceback needed to diagnose the issue.
 When the user says "look at the output of #N" or "using the result of #N",
 find cell #N in the context and read its OUTPUT: section.
 

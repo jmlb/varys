@@ -235,7 +235,21 @@ export class NotebookReader {
       ? errorText.slice(0, CELL_OUTPUT_MAX_CHARS) + '\n[...traceback truncated]'
       : errorText;
 
-    return [cappedRegular, cappedError].filter(s => s.trim()).join('\n') || null;
+    const hasRegular = cappedRegular.trim().length > 0;
+    const hasError   = cappedError.trim().length > 0;
+
+    // When both regular output and error exist, label them as separate indexed
+    // objects so the LLM can reference each independently:
+    //   [1] = stdout / execute_result (the short result line)
+    //   [2] = error traceback (the detailed exception, usually the most important)
+    if (hasRegular && hasError) {
+      return `[1]\n${cappedRegular.trim()}\n\n[2]\n${cappedError.trim()}`;
+    }
+    if (hasError) {
+      // Error only — still label it [1] so the LLM knows it's an indexed object
+      return `[1]\n${cappedError.trim()}`;
+    }
+    return cappedRegular.trim() || null;
   }
 
   /**
