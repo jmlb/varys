@@ -4051,7 +4051,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
           })()}
           <div className="ds-input-controls">
             <label className="ds-cell-mode-label" data-tip={notebookAware ? CELL_MODE_TITLE[cellMode] : 'Insert to cell: No — notebook context is off'}>
-              ToCell:
+              Response To Cell:
               <select
                 className={`ds-cell-mode-select ds-cell-mode-${notebookAware ? cellMode : 'chat'}`}
                 value={notebookAware ? cellMode : 'chat'}
