@@ -4359,6 +4359,11 @@ body[data-jp-theme-light="false"] .ds-cell-position-badge {
 .ds-output-child--hover .ds-output-badge {
   opacity: 1;
 }
+/* Error badges are always visible (not just on hover) */
+.ds-output-badge--error {
+  opacity: 0.85;
+  background: rgba(180, 30, 30, 0.75);
+}
 
 .ds-output-badge-num {
   font-weight: 700;

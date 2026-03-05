@@ -134,7 +134,9 @@ const MENU_CLASS  = 'ds-output-ctx-menu';
 
 function makeBadge(idx: number, label: string, mime: string): HTMLElement {
   const badge = document.createElement('div');
-  badge.className = 'ds-output-badge';
+  badge.className = mime === 'error'
+    ? 'ds-output-badge ds-output-badge--error'
+    : 'ds-output-badge';
   badge.setAttribute(BADGE_ATTR, String(idx));
 
   const typeIcon = mime.startsWith('image') ? '📊'
@@ -244,8 +246,8 @@ function setupCellOutputs(
     const rawOutput = rawOutputs[domIdx];
     const mime = rawOutput ? dominantMime(rawOutput) : 'unknown';
 
-    // Skip errors and unknown (nothing useful to send)
-    if (mime === 'error' || mime === 'unknown') return;
+    // Skip completely unknown outputs (no data to send)
+    if (mime === 'unknown') return;
 
     // Derive label
     let semanticLabel = '';
@@ -254,20 +256,44 @@ function setupCellOutputs(
       imageCount++;
     } else if (mime === 'text/html') {
       semanticLabel = 'DataFrame';
+    } else if (mime === 'error') {
+      semanticLabel = 'Error';
     }
 
-    const fullLabel = semanticLabel
+    const fullLabel = semanticLabel && semanticLabel !== 'Error'
       ? `${semanticLabel} — cell ${cellIndex + 1}, output ${domIdx + 1}`
-      : `Output ${domIdx + 1} — cell ${cellIndex + 1}`;
+      : mime === 'error'
+        ? `Error — cell #${cellIndex + 1}, output ${domIdx + 1}`
+        : `Output ${domIdx + 1} — cell ${cellIndex + 1}`;
 
     // Inject badge
-    const badge = makeBadge(domIdx, semanticLabel || (mime === 'text/html' ? 'DataFrame' : ''), mime);
+    const badge = makeBadge(domIdx, semanticLabel === 'Error' ? '' : (semanticLabel || (mime === 'text/html' ? 'DataFrame' : '')), mime);
     el.style.position = 'relative';
     el.insertBefore(badge, el.firstChild);
 
     // Build the SelectedOutput payload
     const buildPayload = (): SelectedOutput => {
-      if (mime.startsWith('image')) {
+      if (mime === 'error') {
+        // Extract error text from the raw output model
+        const raw: any = rawOutput && typeof rawOutput.toJSON === 'function'
+          ? rawOutput.toJSON() : (rawOutput ?? {});
+        const ename  = raw.ename  ?? 'Error';
+        const evalue = raw.evalue ?? '';
+        const rawTb  = raw.traceback;
+        // eslint-disable-next-line no-control-regex
+        const tbClean = Array.isArray(rawTb)
+          ? (rawTb as string[]).join('\n').replace(/\x1b\[[0-9;]*m/g, '')
+          : '';
+        const errorText = `${ename}: ${evalue}\n${tbClean}`.trim();
+        return {
+          label:    fullLabel,
+          preview:  `${ename}: ${evalue}`.slice(0, 80),
+          mimeType: mime,
+          textData: errorText,
+          cellIndex,
+          outputIndex: domIdx,
+        };
+      } else if (mime.startsWith('image')) {
         const imgData = rawOutput ? extractBase64(rawOutput) : undefined;
         return {
           label:      fullLabel,
