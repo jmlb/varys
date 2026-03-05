@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable, Awaitable, Dict, List, Optional
 
 from .base import BaseLLMProvider
+from .client import SYSTEM_PROMPT_TEMPLATE
 from .openai_provider import _build_context, _INLINE_SYSTEM
 from ..completion.cache import CompletionCache
 from ..completion.engine import _build_context_block, _extract_imports
@@ -56,11 +57,6 @@ _TOOL_CONFIG = {
     "toolChoice": {"tool": {"name": "create_operation_plan"}},
 }
 
-_SYSTEM = """You are an expert data science assistant in JupyterLab.
-pos:N = position index. exec:[N] = execution count (what user calls "cell N").
-Operations: insert / modify / delete / run_cell.
-Always call create_operation_plan with your response.
-"""
 
 
 class BedrockProvider(BaseLLMProvider):
@@ -180,13 +176,14 @@ class BedrockProvider(BaseLLMProvider):
             await asyncio.get_running_loop().run_in_executor(None, self._run_auth_refresh)
 
     def _build_system(self, skills: List[Dict[str, str]], memory: str) -> str:
-        skills_text = "\n".join(f"### {s['name']}\n{s['content']}" for s in skills)
-        system = _SYSTEM
-        if skills_text:
-            system += f"\n## Skills\n{skills_text}"
-        if memory.strip():
-            system += f"\n## Memory\n{memory}"
-        return system
+        skills_section = "\n".join(f"### {s['name']}\n{s['content']}" for s in skills)
+        if not skills_section:
+            skills_section = "No specific skills loaded."
+        memory_section = memory if memory.strip() else "No memory/preferences recorded yet."
+        return SYSTEM_PROMPT_TEMPLATE.format(
+            skills_section=skills_section,
+            memory_section=memory_section,
+        )
 
     async def plan_task(
         self,
