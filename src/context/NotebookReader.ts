@@ -198,6 +198,7 @@ export class NotebookReader {
       const raw: any = typeof output.toJSON === 'function' ? output.toJSON() : output;
       const outputType: string = raw.output_type ?? raw.type ?? output.output_type ?? output.type ?? '';
 
+
       if (outputType === 'stream') {
         const text = raw.text ?? output.text ?? '';
         const content = Array.isArray(text) ? text.join('') : String(text);
