@@ -211,6 +211,7 @@ def build_notebook_context(
     lines: List[str] = [
         f"Notebook: {nb_path}",
         f"Cells: {len(cells)}",
+        f"CELL INDEX RULE: user says 'cell N' or '#N' → cellIndex = N-1  (e.g. cell 16 → pos:15, cell 1 → pos:0)",
     ]
     if active_idx is not None:
         lines.append(f"Active cell: pos:{active_idx}")
