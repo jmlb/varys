@@ -11,7 +11,7 @@ import anthropic
 # logic still catches transient overload responses on all SDK versions.
 _AnthropicOverloadedError = getattr(anthropic, "OverloadedError", anthropic.InternalServerError)
 
-from .context_utils import CELL_CONTENT_LIMIT, format_dataframe_context
+from .context_utils import build_notebook_context
 
 
 SYSTEM_PROMPT_TEMPLATE = """You are an expert data science assistant integrated into JupyterLab.
@@ -585,77 +585,17 @@ class ClaudeClient:
     def _build_user_message(
         self,
         user_message: str,
-        notebook_context: Dict[str, Any]
+        notebook_context: Dict[str, Any],
     ) -> str:
-        """Build the user message with notebook context."""
-        cells = notebook_context.get("cells", [])
-        notebook_path = notebook_context.get("notebookPath", "unknown")
-        active_cell_index = notebook_context.get("activeCellIndex")
-        selection = notebook_context.get("selection")  # may be None
+        """Build the user message with notebook context.
 
-        context_lines = [
-            f"## Notebook: {notebook_path}",
-            f"## Total cells: {len(cells)}",
-        ]
-        if active_cell_index is not None:
-            context_lines.append(f"## Active cell: pos:{active_cell_index}")
-        context_lines += ["", "## Cell Contents:"]
-
-        for cell in cells:
-            idx = cell.get("index", 0)
-            cell_type = cell.get("type", "code")
-            source = cell.get("source", "")
-            exec_count = cell.get("executionCount")
-            output = cell.get("output")
-
-            # Format: "pos:2  CODE  exec:[4]"
-            # pos = position index to use in cellIndex field
-            # exec = execution count the user sees as "[4]" in the notebook gutter
-            parts = [f"pos:{idx}", cell_type.upper()]
-            if exec_count is not None:
-                parts.append(f"exec:[{exec_count}]")
-            else:
-                parts.append("exec:[not run]" if cell_type == "code" else "exec:[n/a]")
-
-            context_lines.append("  ".join(parts))
-            context_lines.append(source[:CELL_CONTENT_LIMIT] if source.strip() else "(empty)")
-            if output and output.strip():
-                context_lines.append(f"OUTPUT:\n{output[:CELL_CONTENT_LIMIT]}")
-            elif cell.get("imageOutput"):
-                context_lines.append("OUTPUT: [Visualization — image attached above]")
-            context_lines.append("")
-
-        context_str = "\n".join(context_lines)
-
-        # Build selection block — shown prominently so the LLM can't miss it
-        if selection and selection.get("text", "").strip():
-            sel_cell = selection["text"]
-            sel_idx = selection.get("cellIndex", "?")
-            start_line = selection.get("startLine", "?")
-            end_line = selection.get("endLine", "?")
-            selection_block = (
-                f"\n## ⚡ SELECTED TEXT (lines {start_line}–{end_line} of pos:{sel_idx})\n"
-                f"The user has highlighted the following code in the active cell.\n"
-                f"When the request refers to 'this', 'the selected code', 'it', etc., "
-                f"operate on THIS text — not the whole cell.\n"
-                f"```\n{sel_cell}\n```\n"
-            )
-        else:
-            selection_block = ""
-
-        # Append live DataFrame schemas if the frontend provided them
-        df_section = format_dataframe_context(
-            notebook_context.get("dataframes") or []
-        )
-        df_block = f"\n{df_section}" if df_section else ""
-
-        return (
-            f"## User Request\n{user_message}\n"
-            f"{selection_block}\n"
-            f"## Notebook Context\n{context_str}\n"
-            f"{df_block}"
-            "Please call the create_operation_plan tool with your response."
-        )
+        Delegates to the canonical build_notebook_context() so that all
+        providers share the same prompt format, variable-reference handling,
+        and selected-output sections.  Appends the Anthropic-specific tool-call
+        instruction at the end.
+        """
+        base = build_notebook_context(user_message, notebook_context)
+        return base + "\nPlease call the create_operation_plan tool with your response."
 
     async def stream_chat(
         self,
