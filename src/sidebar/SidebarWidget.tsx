@@ -1702,13 +1702,6 @@ const ThreadBar: React.FC<ThreadBarProps> = ({
                 onClick={e => { e.stopPropagation(); setEditingId(t.id); setEditValue(t.name); }}
                 title="Rename"
               >✎</span>
-              {threads.length > 1 && (
-                <span
-                  className="ds-thread-action-btn ds-thread-delete-btn"
-                  onClick={e => { e.stopPropagation(); onDelete(t.id); setOpen(false); }}
-                  title="Delete thread"
-                >✕</span>
-              )}
             </div>
           ))}
           <div className="ds-thread-new-item" onClick={() => { onNew(); setOpen(false); }}>
