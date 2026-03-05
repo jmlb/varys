@@ -82,7 +82,7 @@
     "outputDir": "varys/labextension",
     "schemaDir": "schema",
     "_build": {
-      "load": "static/remoteEntry.96e135bbae1de4f1d0ab.js",
+      "load": "static/remoteEntry.e51d6b4240323ed53fe0.js",
       "extension": "./extension",
       "style": "./style"
     }
