@@ -3659,6 +3659,72 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
               </div>
             ) : (
               <>
+                {/* ── Top toolbar (assistant only, hidden while streaming) ── */}
+                {(() => {
+                  if (msg.role !== 'assistant' || msg.id === activeStreamId) return null;
+                  const codeBlocks = extractCodeBlocks(msg.content);
+                  const hasCode    = codeBlocks.length > 0;
+                  const allCode    = hasCode ? codeBlocks.join('\n\n') : '';
+                  const showPush   = !msg.hadCellOps && !!(msg.content?.trim());
+                  const isLong     = (msg.content?.length ?? 0) >= COLLAPSE_THRESHOLD;
+                  return (
+                    <div className="ds-bubble-toolbar">
+                      {/* All icons on the right: push · copy · expand */}
+                      <div className="ds-bubble-toolbar-right ds-bubble-toolbar-actions">
+                        {showPush && (
+                          <button
+                            className="ds-bubble-tool-btn"
+                            title={hasCode ? 'Push code to new cell' : 'Push response to markdown cell'}
+                            onClick={() => {
+                              const nb = notebookTracker.currentWidget?.content;
+                              const insertIdx = nb
+                                ? (nb.activeCellIndex ?? nb.model!.cells.length - 1) + 1
+                                : 0;
+                              const cellType    = hasCode ? 'code' : 'markdown';
+                              const cellContent = hasCode ? allCode : msg.content;
+                              void cellEditor.insertCell(insertIdx, cellType, cellContent)
+                                .then(() => {
+                                  addMessage('system', `✓ ${hasCode ? 'Code' : 'Response'} pushed to new ${cellType} cell at #${insertIdx + 1}.`);
+                                });
+                            }}
+                          >
+                            <svg viewBox="0 0 16 16" width="13" height="13" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M8 2v8M4 7l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M2 13h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                            </svg>
+                          </button>
+                        )}
+                        <button
+                          className="ds-bubble-tool-btn"
+                          title="Copy response"
+                          onClick={() => {
+                            const text = (msg.displayContent ?? msg.content ?? '').trim();
+                            void navigator.clipboard.writeText(text);
+                          }}
+                        >
+                          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="5" y="5" width="8" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.5"/>
+                            <path d="M3 11V3a1 1 0 0 1 1-1h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                          </svg>
+                        </button>
+                        {isLong && (
+                          <button
+                            className="ds-bubble-tool-btn"
+                            title={collapsedMsgs.has(msg.id) ? 'Expand' : 'Collapse'}
+                            onClick={() => toggleCollapse(msg.id)}
+                          >
+                            <svg viewBox="0 0 16 16" width="13" height="13" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              {collapsedMsgs.has(msg.id)
+                                ? <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                                : <path d="M4 10l4-4 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                              }
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
                 {/* ── User bubble edit toolbar (hover-reveal, position:absolute) ── */}
                 {msg.role === 'user' && msg.id !== editingMsgId && !isLoading && (
                   <div className="ds-bubble-toolbar ds-bubble-toolbar-user">
@@ -3743,75 +3809,6 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                         <span className="ds-typing-cursor" aria-hidden="true"><span /></span>
                       )}
                       {collapsed && <div className="ds-msg-fade" aria-hidden="true" />}
-                    </div>
-                  );
-                })()}
-                {/* ── Bottom toolbar (assistant messages only, hidden while streaming) ── */}
-                {(() => {
-                  if (msg.role !== 'assistant' || msg.id === activeStreamId) return null;
-                  const codeBlocks = extractCodeBlocks(msg.content);
-                  const hasCode    = codeBlocks.length > 0;
-                  const allCode    = hasCode ? codeBlocks.join('\n\n') : '';
-                  const showPush   = !msg.hadCellOps && !!(msg.content?.trim());
-                  const isLong     = (msg.content?.length ?? 0) >= COLLAPSE_THRESHOLD;
-                  return (
-                    <div className="ds-bubble-toolbar">
-                      {/* Left: push + copy, with a generous gap to avoid mis-clicks */}
-                      <div className="ds-bubble-toolbar-left ds-bubble-toolbar-actions">
-                        {showPush && (
-                          <button
-                            className="ds-bubble-tool-btn"
-                            title={hasCode ? 'Push code to new cell' : 'Push response to markdown cell'}
-                            onClick={() => {
-                              const nb = notebookTracker.currentWidget?.content;
-                              const insertIdx = nb
-                                ? (nb.activeCellIndex ?? nb.model!.cells.length - 1) + 1
-                                : 0;
-                              const cellType    = hasCode ? 'code' : 'markdown';
-                              const cellContent = hasCode ? allCode : msg.content;
-                              void cellEditor.insertCell(insertIdx, cellType, cellContent)
-                                .then(() => {
-                                  addMessage('system', `✓ ${hasCode ? 'Code' : 'Response'} pushed to new ${cellType} cell at #${insertIdx + 1}.`);
-                                });
-                            }}
-                          >
-                            <svg viewBox="0 0 16 16" width="13" height="13" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M8 2v8M4 7l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                              <path d="M2 13h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                            </svg>
-                          </button>
-                        )}
-                        <button
-                          className="ds-bubble-tool-btn"
-                          title="Copy response"
-                          onClick={() => {
-                            const text = (msg.displayContent ?? msg.content ?? '').trim();
-                            void navigator.clipboard.writeText(text);
-                          }}
-                        >
-                          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <rect x="5" y="5" width="8" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.5"/>
-                            <path d="M3 11V3a1 1 0 0 1 1-1h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                          </svg>
-                        </button>
-                      </div>
-                      {/* Right: expand/collapse only */}
-                      <div className="ds-bubble-toolbar-right">
-                        {isLong && (
-                          <button
-                            className="ds-bubble-tool-btn"
-                            title={collapsedMsgs.has(msg.id) ? 'Expand' : 'Collapse'}
-                            onClick={() => toggleCollapse(msg.id)}
-                          >
-                            <svg viewBox="0 0 16 16" width="13" height="13" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              {collapsedMsgs.has(msg.id)
-                                ? <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                                : <path d="M4 10l4-4 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                              }
-                            </svg>
-                          </button>
-                        )}
-                      </div>
                     </div>
                   );
                 })()}

@@ -358,10 +358,10 @@
 .ds-bubble-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-top: 6px;
-  padding: 4px 2px 2px 2px;
-  border-top: 1px solid var(--jp-border-color2, rgba(0,0,0,0.08));
+  justify-content: flex-end;
+  padding: 2px 2px 4px 2px;
+  border-bottom: 1px solid var(--jp-border-color2, rgba(0,0,0,0.08));
+  margin-bottom: 6px;
   opacity: 0;
   transition: opacity 0.15s;
   pointer-events: none;
@@ -379,7 +379,7 @@
   width: auto;
   margin: 0;
   padding: 0;
-  border-top: none;
+  border-bottom: none;
   justify-content: flex-end;
 }
 .ds-bubble-toolbar-left,
@@ -415,7 +415,7 @@
 }
 /* Night mode */
 .ds-chat-night .ds-bubble-toolbar {
-  border-top-color: rgba(255,255,255,0.08);
+  border-bottom-color: rgba(255,255,255,0.08);
 }
 .ds-chat-night .ds-bubble-tool-btn {
   color: var(--ds-text-dim, #777);
