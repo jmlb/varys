@@ -3997,25 +3997,39 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
             )}
           </div>
         )}
-        <textarea
-          className="ds-assistant-input"
-          value={input}
-          style={{ height: inputHeight }}
-          onChange={e => {
-            const val = e.target.value;
-            setInput(val);
-            // Show autocomplete when line starts with "/"
-            if (val.match(/^\/[\w-]*/)) {
-              setShowCmdPopup(true);
-            } else {
-              setShowCmdPopup(false);
-              setActiveCommand(null);
-            }
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder={contextChip ? `Describe your edit for ${contextChip.label}…` : "Ask Varys… (/command or Enter to send)"}
-          disabled={isLoading}
-        />
+        {/* @notebook chip + textarea share a relative wrapper so the chip
+            can be pinned to the top-left corner of the input box */}
+        <div className="ds-input-body">
+          <button
+            className={`ds-nb-ctx-chip${notebookAware ? ' ds-nb-ctx-chip--on' : ' ds-nb-ctx-chip--off'}`}
+            onClick={handleToggleNotebookAware}
+            data-tip={notebookAware
+              ? 'Notebook included as context — click to exclude'
+              : 'Notebook excluded from context — click to include'}
+            aria-label={notebookAware ? 'Notebook included' : 'Notebook excluded'}
+          >
+            @notebook
+          </button>
+          <textarea
+            className="ds-assistant-input"
+            value={input}
+            style={{ height: inputHeight }}
+            onChange={e => {
+              const val = e.target.value;
+              setInput(val);
+              // Show autocomplete when line starts with "/"
+              if (val.match(/^\/[\w-]*/)) {
+                setShowCmdPopup(true);
+              } else {
+                setShowCmdPopup(false);
+                setActiveCommand(null);
+              }
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder={contextChip ? `Describe your edit for ${contextChip.label}…` : "Ask Varys… (/command or Enter to send)"}
+            disabled={isLoading}
+          />
+        </div>
         <div className="ds-assistant-input-bottom">
           <ModelSwitcher
             provider={chatProvider}
@@ -4036,17 +4050,6 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
             );
           })()}
           <div className="ds-input-controls">
-            <button
-              className={`ds-nb-ctx-chip${notebookAware ? ' ds-nb-ctx-chip--on' : ' ds-nb-ctx-chip--off'}`}
-              onClick={handleToggleNotebookAware}
-              data-tip={notebookAware
-                ? 'Notebook included as context — click to exclude'
-                : 'Notebook excluded from context — click to include'}
-              aria-label={notebookAware ? 'Notebook included' : 'Notebook excluded'}
-            >
-              @notebook
-            </button>
-            <span className="ds-controls-sep">|</span>
             <label className="ds-cell-mode-label" data-tip={notebookAware ? CELL_MODE_TITLE[cellMode] : 'Insert to cell: No — notebook context is off'}>
               ToCell:
               <select
