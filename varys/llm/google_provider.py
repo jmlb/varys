@@ -8,6 +8,7 @@ import uuid
 from typing import Any, Callable, Awaitable, Dict, List, Optional
 
 from .base import BaseLLMProvider
+from .client import SYSTEM_PROMPT_TEMPLATE
 from .openai_provider import _build_context, _INLINE_SYSTEM
 from ..completion.cache import CompletionCache
 from ..completion.engine import _build_context_block, _extract_imports
@@ -39,14 +40,6 @@ _PLAN_SCHEMA = {
     "required": ["steps", "requiresApproval", "summary"],
 }
 
-_SYSTEM = """You are an expert data science assistant in JupyterLab.
-pos:N = position index (use in cellIndex). exec:[N] = execution count.
-When user says "cell N", find exec:[N] and use its pos as cellIndex.
-Operations: insert / modify / delete / run_cell.
-Always return a valid JSON operation plan.
-"""
-
-
 class GoogleProvider(BaseLLMProvider):
     """Calls the Google Gemini API via google-generativeai."""
 
@@ -73,13 +66,9 @@ class GoogleProvider(BaseLLMProvider):
             )
 
     def _build_system(self, skills: List[Dict[str, str]], memory: str) -> str:
-        skills_text = "\n".join(f"### {s['name']}\n{s['content']}" for s in skills)
-        system = _SYSTEM
-        if skills_text:
-            system += f"\n## Skills\n{skills_text}"
-        if memory.strip():
-            system += f"\n## Memory\n{memory}"
-        return system
+        skills_section = "\n".join(f"### {s['name']}\n{s['content']}" for s in skills) or "No specific skills loaded."
+        memory_section = memory if memory.strip() else "No memory/preferences recorded yet."
+        return SYSTEM_PROMPT_TEMPLATE.format(skills_section=skills_section, memory_section=memory_section)
 
     async def plan_task(
         self,

@@ -7,6 +7,7 @@ import uuid
 from typing import Any, Callable, Awaitable, Dict, List, Optional
 
 from .base import BaseLLMProvider
+from .client import SYSTEM_PROMPT_TEMPLATE
 from .context_utils import build_notebook_context, CELL_CONTENT_LIMIT  # noqa: F401 – re-exported
 from ..completion.cache import CompletionCache
 from ..completion.engine import _build_context_block, _extract_imports
@@ -49,21 +50,6 @@ _PLAN_TOOL = {
     },
 }
 
-_SYSTEM = """You are an expert data science assistant in JupyterLab.
-
-## Cell Numbering
-pos:N = zero-based position index (use in cellIndex).
-exec:[N] = execution count shown in gutter. When user says "cell N", find exec:[N] → use its pos.
-
-## Operations
-insert / modify / delete / run_cell
-
-## Cell Outputs
-Executed cells may have OUTPUT: sections. Use them when user references cell results.
-
-## Response
-Always call create_operation_plan with your response.
-"""
 
 _INLINE_SYSTEM = (
     "Python code completion. Output ONLY the continuation text. "
@@ -113,10 +99,9 @@ class OpenAIProvider(BaseLLMProvider):
         chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
         op_id = operation_id or f"op_{uuid.uuid4().hex[:8]}"
-        skills_text = "\n".join(f"### {s['name']}\n{s['content']}" for s in skills)
-        system = _SYSTEM + (f"\n## Skills\n{skills_text}" if skills_text else "")
-        if memory.strip():
-            system += f"\n## Memory\n{memory}"
+        skills_section = "\n".join(f"### {s['name']}\n{s['content']}" for s in skills) or "No specific skills loaded."
+        memory_section = memory if memory.strip() else "No memory/preferences recorded yet."
+        system = SYSTEM_PROMPT_TEMPLATE.format(skills_section=skills_section, memory_section=memory_section)
         user_msg = _build_context(user_message, notebook_context)
 
         content: List[Any] = [{"type": "text", "text": user_msg}]
@@ -222,10 +207,9 @@ class OpenAIProvider(BaseLLMProvider):
     ) -> Dict[str, Any]:
         """Stream plan_task with tool-call JSON deltas via on_json_delta."""
         op_id = operation_id or f"op_{uuid.uuid4().hex[:8]}"
-        skills_text = "\n".join(f"### {s['name']}\n{s['content']}" for s in skills)
-        system = _SYSTEM + (f"\n## Skills\n{skills_text}" if skills_text else "")
-        if memory.strip():
-            system += f"\n## Memory\n{memory}"
+        skills_section = "\n".join(f"### {s['name']}\n{s['content']}" for s in skills) or "No specific skills loaded."
+        memory_section = memory if memory.strip() else "No memory/preferences recorded yet."
+        system = SYSTEM_PROMPT_TEMPLATE.format(skills_section=skills_section, memory_section=memory_section)
 
         content: List[Any] = [{"type": "text", "text": _build_context(user_message, notebook_context)}]
         if self.has_vision():
