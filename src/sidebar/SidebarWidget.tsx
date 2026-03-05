@@ -1939,6 +1939,8 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
   // ID of the assistant message currently being streamed — used to render a
   // typing cursor and to append step results without creating a new bubble.
   const [activeStreamId, setActiveStreamId] = useState<string>('');
+  const [editingMsgId,   setEditingMsgId]   = useState<string | null>(null);
+  const [editingText,    setEditingText]     = useState<string>('');
 
   // ── Chat thread state ──────────────────────────────────────────────────────
   const [threads, setThreads]                   = useState<ChatThread[]>([]);
@@ -3640,11 +3642,71 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                     </div>
                   );
                 })()}
+                {/* ── User bubble edit toolbar (hover-reveal) ── */}
+                {msg.role === 'user' && msg.id !== editingMsgId && !isLoading && (
+                  <div className="ds-bubble-toolbar ds-bubble-toolbar-user">
+                    <div className="ds-bubble-toolbar-left" />
+                    <div className="ds-bubble-toolbar-right">
+                      <button
+                        className="ds-bubble-tool-btn"
+                        title="Edit and resend"
+                        onClick={() => {
+                          setEditingMsgId(msg.id);
+                          setEditingText((msg.content ?? '').trim());
+                        }}
+                      >
+                        {/* Pencil icon */}
+                        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M11.5 2.5l2 2L5 13H3v-2L11.5 2.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                          <path d="M9.5 4.5l2 2" stroke="currentColor" strokeWidth="1.5"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {/* ── Bubble content ── */}
                 {(() => {
                   const isStreaming = msg.id === activeStreamId;
                   const isLong = (msg.content?.length ?? 0) >= COLLAPSE_THRESHOLD;
                   const collapsed = !isStreaming && isLong && collapsedMsgs.has(msg.id);
+
+                  // Inline editor for user messages
+                  if (msg.role === 'user' && msg.id === editingMsgId) {
+                    return (
+                      <div className="ds-msg-edit-wrap">
+                        <textarea
+                          className="ds-msg-edit-textarea"
+                          value={editingText}
+                          autoFocus
+                          onChange={e => setEditingText(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Escape') setEditingMsgId(null);
+                          }}
+                        />
+                        <div className="ds-msg-edit-actions">
+                          <button
+                            className="ds-msg-edit-send"
+                            disabled={!editingText.trim()}
+                            onClick={() => {
+                              const text = editingText.trim();
+                              setEditingMsgId(null);
+                              // Remove edited message and everything after it
+                              setMessages(prev => {
+                                const idx = prev.findIndex(m => m.id === msg.id);
+                                return idx >= 0 ? prev.slice(0, idx) : prev;
+                              });
+                              void handleSend(text);
+                            }}
+                          >Send</button>
+                          <button
+                            className="ds-msg-edit-cancel"
+                            onClick={() => setEditingMsgId(null)}
+                          >Cancel</button>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   return (
                     <div className={`ds-msg-collapsible-wrap${collapsed ? ' ds-msg-collapsed' : ''}`}>
                       {msg.role === 'user' ? (

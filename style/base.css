@@ -404,6 +404,66 @@
   color: var(--ds-text, #ddd);
 }
 
+/* ── Inline message editor (user bubble) ── */
+.ds-msg-edit-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+.ds-msg-edit-textarea {
+  width: 100%;
+  min-height: 64px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: var(--jp-ui-font-family, sans-serif);
+  line-height: 1.5;
+  background: var(--jp-layout-color0, #fff);
+  color: var(--jp-ui-font-color0, #111);
+  border: 1px solid var(--jp-brand-color1, #2196f3);
+  border-radius: 6px;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+.ds-msg-edit-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.ds-msg-edit-send,
+.ds-msg-edit-cancel {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.ds-msg-edit-send {
+  background: var(--jp-brand-color1, #2196f3);
+  color: #fff;
+}
+.ds-msg-edit-send:hover:not(:disabled) { background: var(--jp-brand-color0, #1976d2); }
+.ds-msg-edit-send:disabled { opacity: 0.4; cursor: default; }
+.ds-msg-edit-cancel {
+  background: var(--jp-layout-color2, #e8e8e8);
+  color: var(--jp-ui-font-color1, #333);
+}
+.ds-msg-edit-cancel:hover { background: var(--jp-layout-color3, #d8d8d8); }
+/* Night mode */
+.ds-chat-night .ds-msg-edit-textarea {
+  background: var(--ds-surface, #1e1e1e);
+  color: var(--ds-text, #e0e0e0);
+  border-color: var(--jp-brand-color1, #2196f3);
+}
+.ds-chat-night .ds-msg-edit-cancel {
+  background: var(--ds-surface2, #2a2a2a);
+  color: var(--ds-text, #e0e0e0);
+}
+.ds-chat-night .ds-msg-edit-cancel:hover { background: var(--ds-surface3, #333); }
+
 /* ── Equalizer-bar cursor shown at end of a streaming message ── */
 .ds-typing-cursor {
   display: inline-flex;
