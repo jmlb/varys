@@ -1124,6 +1124,37 @@
   gap: 6px;
 }
 
+/* Controls row: +nb context  |  send to cell: [dropdown] */
+.ds-input-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.ds-controls-sep {
+  color: var(--jp-border-color2, #ccc);
+  font-size: 11px;
+  line-height: 1;
+  user-select: none;
+}
+.ds-cell-mode-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--jp-ui-font-color2, #777);
+  white-space: nowrap;
+  cursor: default;
+}
+.ds-chat-night .ds-controls-sep {
+  color: var(--ds-border, rgba(255,255,255,0.15));
+}
+.ds-chat-night .ds-cell-mode-label {
+  color: var(--ds-text-dim, #888);
+}
+
 /* ── Token usage counter (input/output) in the bottom bar ── */
 .ds-token-counter {
   display: flex;

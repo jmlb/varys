@@ -3784,34 +3784,37 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
               </span>
             );
           })()}
-          <button
-            className={`ds-nb-aware-btn${notebookAware ? ' ds-nb-aware-on' : ' ds-nb-aware-off'}`}
-            onClick={handleToggleNotebookAware}
-            title={notebookAware
-              ? 'Notebook included — cell contents sent with every message. Click to exclude.'
-              : 'Notebook excluded — messages sent without cell contents. Click to include.'}
-            aria-label={notebookAware ? 'Notebook included' : 'Notebook excluded'}
-          >
-            <span className="ds-nb-aware-check">{notebookAware ? '☑' : '☐'}</span>
-            <span className="ds-nb-aware-label">+Notebook</span>
-          </button>
-          <select
-            className={`ds-cell-mode-select ds-cell-mode-${notebookAware ? cellMode : 'chat'}`}
-            value={notebookAware ? cellMode : 'chat'}
-            disabled={!notebookAware}
-            onChange={e => {
-              const next = e.target.value as CellMode;
-              setCellMode(next);
-              try { localStorage.setItem('ds-assistant-cell-mode', next); } catch { /* ignore */ }
-            }}
-            title={notebookAware ? CELL_MODE_TITLE[cellMode] : 'Insert to cell: No — notebook context is off'}
-          >
-            <optgroup label="Insert to cell">
-              <option value="chat">No</option>
-              <option value="auto">Auto</option>
-              <option value="doc">Always</option>
-            </optgroup>
-          </select>
+          <div className="ds-input-controls">
+            <button
+              className={`ds-nb-aware-btn${notebookAware ? ' ds-nb-aware-on' : ' ds-nb-aware-off'}`}
+              onClick={handleToggleNotebookAware}
+              title={notebookAware
+                ? 'Notebook included — cell contents sent with every message. Click to exclude.'
+                : 'Notebook excluded — messages sent without cell contents. Click to include.'}
+              aria-label={notebookAware ? 'Notebook included' : 'Notebook excluded'}
+            >
+              <span className="ds-nb-aware-check">{notebookAware ? '☑' : '☐'}</span>
+              <span className="ds-nb-aware-label">+nb context</span>
+            </button>
+            <span className="ds-controls-sep">|</span>
+            <label className="ds-cell-mode-label" title={notebookAware ? CELL_MODE_TITLE[cellMode] : 'Insert to cell: No — notebook context is off'}>
+              send to cell:
+              <select
+                className={`ds-cell-mode-select ds-cell-mode-${notebookAware ? cellMode : 'chat'}`}
+                value={notebookAware ? cellMode : 'chat'}
+                disabled={!notebookAware}
+                onChange={e => {
+                  const next = e.target.value as CellMode;
+                  setCellMode(next);
+                  try { localStorage.setItem('ds-assistant-cell-mode', next); } catch { /* ignore */ }
+                }}
+              >
+                <option value="chat">No</option>
+                <option value="auto">Auto</option>
+                <option value="doc">Always</option>
+              </select>
+            </label>
+          </div>
           {isLoading && (
             /* Stop button — circle with a filled square inside */
             <button
