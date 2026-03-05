@@ -2091,7 +2091,8 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
         messages: saved,
-        tokenUsage: existing?.tokenUsage,
+        tokenUsage:    existing?.tokenUsage,
+        notebookAware: existing?.notebookAware,
       });
     } catch (err) {
       console.warn('[DSAssistant] Could not save chat thread:', err);
@@ -2341,6 +2342,32 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
    *  the current value synchronously (React state is async). */
   const messagesRef = useRef<Message[]>([]);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
+
+  // ── Persist token usage immediately when it changes for the active thread ──
+  // The debounced message-save fires 1.5 s after any message change, so if the
+  // user refreshes before that timer fires the last token count would be lost.
+  // This effect listens to `threads` (which is updated every time tokenUsage
+  // accumulates) and writes the thread to disk right away so the counter
+  // survives hard reloads and notebook switches.
+  //
+  // It is placed AFTER the messagesRef sync above so messagesRef.current is
+  // already up-to-date when the save reads it (React fires effects in hook-
+  // definition order within the same render cycle).
+  const _savedTokenRef = useRef<{ input: number; output: number } | undefined>(undefined);
+  useEffect(() => {
+    const tid    = currentThreadIdRef.current;
+    const nbPath = currentNotebookPathRef.current;
+    if (!tid || !nbPath) return;
+    const usage = threads.find(t => t.id === tid)?.tokenUsage;
+    if (!usage || (usage.input === 0 && usage.output === 0)) return;
+    const prev = _savedTokenRef.current;
+    if (prev && prev.input === usage.input && prev.output === usage.output) return;
+    _savedTokenRef.current = { ...usage };
+    const tName = threadsRef.current.find(t => t.id === tid)?.name ?? 'Thread';
+    void _saveThread(tid, tName, messagesRef.current, nbPath);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threads]);
+
   /** Holds the hidden LLM context that will be prepended on the next send. */
   const contextPrefixRef = useRef<string>('');
   /** Visible chip above the textarea showing what code context is attached. */

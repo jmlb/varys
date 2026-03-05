@@ -565,6 +565,7 @@ export class APIClient {
           ? { input: (t.token_usage as Record<string,number>).input ?? 0,
               output: (t.token_usage as Record<string,number>).output ?? 0 }
           : undefined,
+        notebookAware: t.notebook_aware !== undefined ? Boolean(t.notebook_aware) : undefined,
       })) as ChatThread[],
     };
   }
@@ -584,7 +585,8 @@ export class APIClient {
           name: thread.name,
           created_at: thread.createdAt,
           messages: thread.messages,
-          ...(thread.tokenUsage ? { token_usage: thread.tokenUsage } : {}),
+          ...(thread.tokenUsage    ? { token_usage:      thread.tokenUsage }    : {}),
+          ...(thread.notebookAware !== undefined ? { notebook_aware: thread.notebookAware } : {}),
         },
       }),
     });
