@@ -183,47 +183,59 @@ export class NotebookReader {
       return null;
     }
 
-    const parts: string[] = [];
+    // Non-error outputs and error outputs are budgeted separately so a
+    // long traceback is never silently dropped when stdout fills the limit.
+    const regularParts: string[] = [];
+    const errorParts: string[] = [];
 
     for (let i = 0; i < outputs.length; i++) {
       const output = outputs.get ? outputs.get(i) : outputs[i];
       if (!output) continue;
 
-      const outputType: string = output.output_type ?? output.type ?? '';
+      // JupyterLab wraps raw nbformat dicts in IOutputModel objects.
+      // ename / evalue / traceback are NOT direct properties on the model —
+      // toJSON() returns the underlying nbformat dict with all fields intact.
+      const raw: any = typeof output.toJSON === 'function' ? output.toJSON() : output;
+      const outputType: string = raw.output_type ?? raw.type ?? output.output_type ?? output.type ?? '';
 
       if (outputType === 'stream') {
-        const text = output.text ?? '';
+        const text = raw.text ?? output.text ?? '';
         const content = Array.isArray(text) ? text.join('') : String(text);
-        if (content.trim()) parts.push(content.trim());
+        if (content.trim()) regularParts.push(content.trim());
 
       } else if (outputType === 'execute_result' || outputType === 'display_data') {
-        const data = output.data ?? {};
+        const data = raw.data ?? output.data ?? {};
         const plain = data['text/plain'] ?? '';
         const content = Array.isArray(plain) ? plain.join('') : String(plain);
-        if (content.trim()) parts.push(content.trim());
+        if (content.trim()) regularParts.push(content.trim());
 
       } else if (outputType === 'error') {
-        const ename = output.ename ?? 'Error';
-        const evalue = output.evalue ?? '';
-        const rawTb: unknown = output.traceback;
+        const ename = raw.ename ?? output.ename ?? 'Error';
+        const evalue = raw.evalue ?? output.evalue ?? '';
+        const rawTb: unknown = raw.traceback ?? output.traceback;
         if (rawTb && Array.isArray(rawTb) && rawTb.length > 0) {
-          // Strip ANSI colour codes that Jupyter injects into traceback lines
           // eslint-disable-next-line no-control-regex
-          const tbClean = (rawTb as string[])
-            .join('\n')
-            .replace(/\x1b\[[0-9;]*m/g, '');
-          parts.push(`${ename}: ${evalue}\n${tbClean}`);
+          const tbClean = (rawTb as string[]).join('\n').replace(/\x1b\[[0-9;]*m/g, '');
+          errorParts.push(`${ename}: ${evalue}\n${tbClean}`);
         } else {
-          parts.push(`${ename}: ${evalue}`);
+          errorParts.push(`${ename}: ${evalue}`);
         }
       }
     }
 
-    if (parts.length === 0) return null;
-    const full = parts.join('\n');
-    return full.length > CELL_OUTPUT_MAX_CHARS
-      ? full.slice(0, CELL_OUTPUT_MAX_CHARS) + '\n[...output truncated]'
-      : full;
+    if (regularParts.length === 0 && errorParts.length === 0) return null;
+
+    const regularText = regularParts.join('\n');
+    const errorText   = errorParts.join('\n');
+
+    const cappedRegular = regularText.length > CELL_OUTPUT_MAX_CHARS
+      ? regularText.slice(0, CELL_OUTPUT_MAX_CHARS) + '\n[...output truncated]'
+      : regularText;
+    const cappedError = errorText.length > CELL_OUTPUT_MAX_CHARS
+      ? errorText.slice(0, CELL_OUTPUT_MAX_CHARS) + '\n[...traceback truncated]'
+      : errorText;
+
+    return [cappedRegular, cappedError].filter(s => s.trim()).join('\n') || null;
   }
 
   /**
