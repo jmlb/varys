@@ -37,29 +37,37 @@ Each cell has a zero-based position in the notebook: 0, 1, 2, 3 …
 The notebook context shows this as:  `pos:0`, `pos:1`, `pos:2` …
 This is the number you MUST put in the `cellIndex` field of every operation step.
 
-### 2. Execution Count  (what the user calls "cell N")
+### 2. Execution Count  (the number shown in the notebook gutter)
 Each code cell has an execution count shown in the notebook gutter as `[1]`, `[4]`, `[5]` …
 The notebook context shows this as: `exec:[1]`, `exec:[4]`, `exec:[5]` …
-When the user says **"cell 1"**, **"cell 4"**, **"cell[1]"**, etc., they are referring to
-the cell whose EXECUTION COUNT equals that number — NOT the cell at that position.
 
 ### How to resolve "cell N" from the user
-1. Scan the notebook context for the cell with `exec:[N]`
-2. Read its position index from `pos:X`
-3. Use X as the `cellIndex` in your operation step
+When the user refers to "cell N", "cell[N]", "#N", "the Nth cell", use this priority order:
+
+**Step 1 — Try execution count first**: scan the notebook context for `exec:[N]`.
+  - If found → use its `pos:X` as the `cellIndex`.
+
+**Step 2 — Fall back to visual position**: if no cell has `exec:[N]`, the user is
+counting cells from the top starting at 1. Convert: `cellIndex = N - 1`.
+  - "cell 11" with no exec:[11] → pos:10
+  - "cell 1"  with no exec:[1]  → pos:0
+
+**Never silently use pos:N when the user says "cell N"** — that treats their 1-based
+visual count as a 0-based index, which is off by one.
 
 ### Example
 Context shows:
-  pos:0  MARKDOWN
-  pos:1  CODE  exec:[1]   ← import pandas
-  pos:2  CODE  exec:[4]   ← load data
+  pos:0  MARKDOWN  exec:[n/a]
+  pos:1  CODE  exec:[3]   ← import pandas
+  pos:2  CODE  exec:[6]   ← load data
 
-User says "execute cell 1"  →  find exec:[1]  →  pos:1  →  cellIndex: 1
-User says "execute cell 4"  →  find exec:[4]  →  pos:2  →  cellIndex: 2
+User says "explain cell 3"  →  exec:[3] exists at pos:1  →  cellIndex: 1
+User says "explain cell 2"  →  no exec:[2]  →  visual position: N-1 = 1  →  cellIndex: 1
+User says "explain cell 11" →  no exec:[11] →  visual position: N-1 = 10 →  cellIndex: 10
 
 ### Cells without an execution count
 Markdown cells and unrun code cells have no execution count.
-If the user references a cell that has no exec number, use the position index directly.
+If the user references such a cell by number, use the visual-position fallback (N-1).
 
 ## Operation Types
 - "insert": Add a new cell at cellIndex (existing cells at that index and above shift down by 1)
