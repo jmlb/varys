@@ -1612,10 +1612,24 @@ interface ThreadBarProps {
 const ThreadBar: React.FC<ThreadBarProps> = ({
   threads, currentId, notebookName, onSwitch, onNew, onRename, onDuplicate, onDelete,
 }) => {
-  const [open, setOpen]         = useState(false);
+  const [open, setOpen]           = useState(false);
   const [editingId, setEditingId] = useState('');
   const [editValue, setEditValue] = useState('');
+  const [renameError, setRenameError] = useState('');
   const popupRef = useRef<HTMLDivElement>(null);
+
+  const tryRename = (id: string, name: string): boolean => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    const collision = threads.some(t => t.id !== id && t.name === trimmed);
+    if (collision) {
+      setRenameError(`"${trimmed}" already exists`);
+      return false;
+    }
+    onRename(id, trimmed);
+    setRenameError('');
+    return true;
+  };
 
   const current = threads.find(t => t.id === currentId);
   const idx     = threads.findIndex(t => t.id === currentId);
@@ -1659,23 +1673,30 @@ const ThreadBar: React.FC<ThreadBarProps> = ({
               className={`ds-thread-item${t.id === currentId ? ' ds-thread-item-active' : ''}`}
             >
               {editingId === t.id ? (
-                <input
-                  className="ds-thread-rename-input"
-                  value={editValue}
-                  autoFocus
-                  onChange={e => setEditValue(e.target.value)}
-                  onBlur={() => {
-                    if (editValue.trim()) onRename(t.id, editValue.trim());
-                    setEditingId('');
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      if (editValue.trim()) onRename(t.id, editValue.trim());
-                      setEditingId('');
-                    }
-                    if (e.key === 'Escape') setEditingId('');
-                  }}
-                />
+                <div className="ds-thread-rename-wrap">
+                  <input
+                    className={`ds-thread-rename-input${renameError ? ' ds-thread-rename-error' : ''}`}
+                    value={editValue}
+                    autoFocus
+                    onChange={e => { setEditValue(e.target.value); setRenameError(''); }}
+                    onBlur={() => {
+                      if (!tryRename(t.id, editValue)) {
+                        if (!renameError) setEditingId('');
+                      } else {
+                        setEditingId('');
+                      }
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        if (tryRename(t.id, editValue)) setEditingId('');
+                      }
+                      if (e.key === 'Escape') { setEditingId(''); setRenameError(''); }
+                    }}
+                  />
+                  {renameError && (
+                    <span className="ds-thread-rename-msg">{renameError}</span>
+                  )}
+                </div>
               ) : (
                 <span
                   className="ds-thread-item-name"

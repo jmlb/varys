@@ -1654,8 +1654,16 @@
 }
 
 /* Inline rename input */
-.ds-thread-rename-input {
+.ds-thread-rename-wrap {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ds-thread-rename-input {
+  width: 100%;
+  box-sizing: border-box;
   font-size: 12px;
   padding: 2px 5px;
   border: 1px solid var(--jp-border-color1, #ccc);
@@ -1663,6 +1671,17 @@
   outline: none;
   background: var(--jp-layout-color0, #fff);
   color: var(--jp-ui-font-color0, #000);
+}
+.ds-thread-rename-input.ds-thread-rename-error {
+  border-color: #e53935;
+}
+.ds-thread-rename-msg {
+  font-size: 10px;
+  color: #e53935;
+  padding: 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* "New thread" row at the bottom */
