@@ -4037,15 +4037,14 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
           })()}
           <div className="ds-input-controls">
             <button
-              className={`ds-nb-aware-btn${notebookAware ? ' ds-nb-aware-on' : ' ds-nb-aware-off'}`}
+              className={`ds-nb-ctx-chip${notebookAware ? ' ds-nb-ctx-chip--on' : ' ds-nb-ctx-chip--off'}`}
               onClick={handleToggleNotebookAware}
               data-tip={notebookAware
-                ? 'Notebook included — click to exclude'
-                : 'Notebook excluded — click to include'}
+                ? 'Notebook included as context — click to exclude'
+                : 'Notebook excluded from context — click to include'}
               aria-label={notebookAware ? 'Notebook included' : 'Notebook excluded'}
             >
-              <span className="ds-nb-aware-check">{notebookAware ? '☑' : '☐'}</span>
-              <span className="ds-nb-aware-label">ctx NB</span>
+              @notebook
             </button>
             <span className="ds-controls-sep">|</span>
             <label className="ds-cell-mode-label" data-tip={notebookAware ? CELL_MODE_TITLE[cellMode] : 'Insert to cell: No — notebook context is off'}>
