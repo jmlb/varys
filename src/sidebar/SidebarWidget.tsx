@@ -1602,16 +1602,14 @@ interface ThreadBarProps {
   threads: ChatThread[];
   currentId: string;
   notebookName: string;
-  notebookAware: boolean;
   onSwitch: (id: string) => void;
   onNew: () => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
-  onToggleNotebookAware: () => void;
 }
 
 const ThreadBar: React.FC<ThreadBarProps> = ({
-  threads, currentId, notebookName, notebookAware, onSwitch, onNew, onRename, onDelete, onToggleNotebookAware,
+  threads, currentId, notebookName, onSwitch, onNew, onRename, onDelete,
 }) => {
   const [open, setOpen]         = useState(false);
   const [editingId, setEditingId] = useState('');
@@ -1644,17 +1642,6 @@ const ThreadBar: React.FC<ThreadBarProps> = ({
         <span className="ds-thread-name">{current?.name ?? 'Thread'}</span>
         <span className="ds-thread-count">({idx + 1}/{threads.length})</span>
         <span className={`ds-thread-chevron ${open ? 'ds-thread-chevron-up' : ''}`}>›</span>
-      </button>
-      <button
-        className={`ds-nb-aware-btn${notebookAware ? ' ds-nb-aware-on' : ' ds-nb-aware-off'}`}
-        onClick={e => { e.stopPropagation(); onToggleNotebookAware(); }}
-        title={notebookAware
-          ? 'Notebook included — cell contents sent with every message. Click to exclude.'
-          : 'Notebook excluded — messages sent without cell contents. Click to include.'}
-        aria-label={notebookAware ? 'Notebook included' : 'Notebook excluded'}
-      >
-        <span className="ds-nb-aware-check">{notebookAware ? '☑' : '☐'}</span>
-        <span className="ds-nb-aware-label">Notebook</span>
       </button>
       {open && (
         <div className="ds-thread-popup">
@@ -3478,12 +3465,10 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
         notebookName={currentNotebookPath
           ? currentNotebookPath.split('/').pop()?.replace(/\.ipynb$/, '') ?? ''
           : ''}
-        notebookAware={notebookAware}
         onSwitch={handleSwitchThread}
         onNew={handleNewThread}
         onRename={(id, name) => void handleRenameThread(id, name)}
         onDelete={(id) => void handleDeleteThread(id)}
-        onToggleNotebookAware={handleToggleNotebookAware}
       />
 
       {/* Message list */}
@@ -3813,6 +3798,17 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
               </span>
             );
           })()}
+          <button
+            className={`ds-nb-aware-btn${notebookAware ? ' ds-nb-aware-on' : ' ds-nb-aware-off'}`}
+            onClick={handleToggleNotebookAware}
+            title={notebookAware
+              ? 'Notebook included — cell contents sent with every message. Click to exclude.'
+              : 'Notebook excluded — messages sent without cell contents. Click to include.'}
+            aria-label={notebookAware ? 'Notebook included' : 'Notebook excluded'}
+          >
+            <span className="ds-nb-aware-check">{notebookAware ? '☑' : '☐'}</span>
+            <span className="ds-nb-aware-label">Notebook</span>
+          </button>
           <button
             className={`ds-cell-mode-btn ds-cell-mode-${notebookAware ? cellMode : 'chat'}${!notebookAware ? ' ds-cell-mode-locked' : ''}`}
             onClick={notebookAware ? cycleCellMode : undefined}
