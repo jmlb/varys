@@ -3806,7 +3806,8 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
               : 'Notebook excluded — messages sent without cell contents. Click to include.'}
             aria-label={notebookAware ? 'Notebook included' : 'Notebook excluded'}
           >
-            <span className="ds-nb-aware-label">+ Notebook</span>
+            <span className="ds-nb-aware-check">{notebookAware ? '☑' : '☐'}</span>
+            <span className="ds-nb-aware-label">+Notebook</span>
           </button>
           <button
             className={`ds-cell-mode-btn ds-cell-mode-${notebookAware ? cellMode : 'chat'}${!notebookAware ? ' ds-cell-mode-locked' : ''}`}
