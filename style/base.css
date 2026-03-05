@@ -1366,23 +1366,45 @@
 .ds-nb-aware-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 3px;
   margin-left: auto;
   background: none;
-  border: 1px solid transparent;
+  border: 1px solid var(--jp-border-color2, #d0d0d0);
   border-radius: 4px;
   cursor: pointer;
-  padding: 2px 5px;
-  font-size: 13px;
-  line-height: 1;
-  transition: border-color 0.15s, background 0.15s;
+  padding: 2px 6px;
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: nowrap;
+  transition: border-color 0.15s, background 0.15s, opacity 0.15s;
+  flex-shrink: 0;
 }
 .ds-nb-aware-btn:hover {
-  background: var(--jp-layout-color3, rgba(0,0,0,0.07));
-  border-color: var(--jp-border-color2, #ccc);
+  background: var(--jp-layout-color3, rgba(0,0,0,0.06));
 }
-.ds-nb-aware-on  { opacity: 1; }
-.ds-nb-aware-off { opacity: 0.45; }
+.ds-nb-aware-check {
+  font-size: 12px;
+  line-height: 1;
+}
+.ds-nb-aware-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+.ds-nb-aware-on {
+  border-color: #4caf50;
+  color: #2e7d32;
+}
+.ds-nb-aware-on:hover {
+  background: rgba(76, 175, 80, 0.08);
+}
+.ds-nb-aware-off {
+  border-color: var(--jp-border-color2, #ccc);
+  color: var(--jp-ui-font-color2, #888);
+}
+.ds-nb-aware-off:hover {
+  background: var(--jp-layout-color3, rgba(0,0,0,0.06));
+}
 .ds-thread-icon {
   font-size: 13px;
   opacity: 0.6;
@@ -1532,9 +1554,16 @@
 .ds-chat-night .ds-thread-toggle:hover {
   background: var(--ds-surface2, rgba(255,255,255,0.06));
 }
+.ds-chat-night .ds-nb-aware-off {
+  border-color: var(--ds-border, rgba(255,255,255,0.12));
+  color: var(--ds-text-dim, #888);
+}
+.ds-chat-night .ds-nb-aware-on {
+  border-color: #4caf50;
+  color: #81c784;
+}
 .ds-chat-night .ds-nb-aware-btn:hover {
   background: var(--ds-surface2, rgba(255,255,255,0.06));
-  border-color: var(--ds-border, rgba(255,255,255,0.1));
 }
 .ds-chat-night .ds-thread-popup {
   background: var(--ds-surface, #1e1e1e);

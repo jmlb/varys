@@ -1649,11 +1649,12 @@ const ThreadBar: React.FC<ThreadBarProps> = ({
         className={`ds-nb-aware-btn${notebookAware ? ' ds-nb-aware-on' : ' ds-nb-aware-off'}`}
         onClick={e => { e.stopPropagation(); onToggleNotebookAware(); }}
         title={notebookAware
-          ? 'Notebook context ON — full notebook sent with every message. Click to turn off.'
-          : 'Notebook context OFF — messages sent without notebook cells. Click to turn on.'}
-        aria-label={notebookAware ? 'Notebook context on' : 'Notebook context off'}
+          ? 'Notebook included — cell contents sent with every message. Click to exclude.'
+          : 'Notebook excluded — messages sent without cell contents. Click to include.'}
+        aria-label={notebookAware ? 'Notebook included' : 'Notebook excluded'}
       >
-        {notebookAware ? '📓' : '📄'}
+        <span className="ds-nb-aware-check">{notebookAware ? '☑' : '☐'}</span>
+        <span className="ds-nb-aware-label">Notebook</span>
       </button>
       {open && (
         <div className="ds-thread-popup">
