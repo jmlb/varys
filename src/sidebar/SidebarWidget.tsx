@@ -1590,6 +1590,7 @@ function makeNewThread(name: string): ChatThread {
     createdAt: now,
     updatedAt: now,
     messages: [],
+    notebookAware: true,
   };
 }
 
@@ -1601,14 +1602,16 @@ interface ThreadBarProps {
   threads: ChatThread[];
   currentId: string;
   notebookName: string;
+  notebookAware: boolean;
   onSwitch: (id: string) => void;
   onNew: () => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
+  onToggleNotebookAware: () => void;
 }
 
 const ThreadBar: React.FC<ThreadBarProps> = ({
-  threads, currentId, notebookName, onSwitch, onNew, onRename, onDelete,
+  threads, currentId, notebookName, notebookAware, onSwitch, onNew, onRename, onDelete, onToggleNotebookAware,
 }) => {
   const [open, setOpen]         = useState(false);
   const [editingId, setEditingId] = useState('');
@@ -1641,6 +1644,16 @@ const ThreadBar: React.FC<ThreadBarProps> = ({
         <span className="ds-thread-name">{current?.name ?? 'Thread'}</span>
         <span className="ds-thread-count">({idx + 1}/{threads.length})</span>
         <span className={`ds-thread-chevron ${open ? 'ds-thread-chevron-up' : ''}`}>›</span>
+      </button>
+      <button
+        className={`ds-nb-aware-btn${notebookAware ? ' ds-nb-aware-on' : ' ds-nb-aware-off'}`}
+        onClick={e => { e.stopPropagation(); onToggleNotebookAware(); }}
+        title={notebookAware
+          ? 'Notebook context ON — full notebook sent with every message. Click to turn off.'
+          : 'Notebook context OFF — messages sent without notebook cells. Click to turn on.'}
+        aria-label={notebookAware ? 'Notebook context on' : 'Notebook context off'}
+      >
+        {notebookAware ? '📓' : '📄'}
       </button>
       {open && (
         <div className="ds-thread-popup">
@@ -1948,9 +1961,9 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
   };
 
   const CELL_MODE_TITLE: Record<CellMode, string> = {
-    chat: 'Chat Only — responses stay in chat, no cells are created',
+    chat: 'Discuss — responses stay in chat, no cells are created',
     auto: 'Auto — skill/AI decides whether to create cells (default)',
-    doc:  'Document — always write results to notebook cells',
+    doc:  'Write — always write results to notebook cells',
   };
   const [pendingOps, setPendingOps] = useState<PendingOp[]>([]);
   // Tracks which fix indices have been applied per code-review message id
@@ -1963,6 +1976,18 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
   // ── Chat thread state ──────────────────────────────────────────────────────
   const [threads, setThreads]                   = useState<ChatThread[]>([]);
   const [currentThreadId, setCurrentThreadId]   = useState('');
+
+  // Derived: does the current thread have notebook context enabled?
+  // Old threads without the field default to true (preserves existing behaviour).
+  const notebookAware = threads.find(t => t.id === currentThreadId)?.notebookAware ?? true;
+
+  const handleToggleNotebookAware = () => {
+    setThreads(prev => prev.map(t =>
+      t.id === currentThreadId
+        ? { ...t, notebookAware: !(t.notebookAware ?? true) }
+        : t
+    ));
+  };
   const [currentNotebookPath, setCurrentNotebookPath] = useState('');
   // AbortController for the current streaming request — allows the user to
   // cancel mid-stream by clicking the stop button.
@@ -2457,6 +2482,14 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
         selectedOutputRef.current = null;  // consume once
       }
 
+      // ── Strip notebook cells when this thread is not notebook-aware ───
+      // Keep notebookPath so skills still know which notebook is open,
+      // but remove cell content and dataframes to save tokens.
+      if (!notebookAware) {
+        context.cells      = [];
+        context.dataframes = [];
+      }
+
       // ── Enrich context with live DataFrame schemas from kernel ───────
       setProgressText('Inspecting kernel variables…');
       const dataframes = await notebookReader.getDataFrameSchemas();
@@ -2608,7 +2641,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
           chatHistory,
           variables: resolvedVariables,
           ...(slashCommand ? { command: slashCommand } : {}),
-          cellMode,
+          cellMode: notebookAware ? cellMode : 'chat',
         },
         // onChunk — explanation text Claude emits before the tool call
         (chunk: string) => {
@@ -3451,10 +3484,12 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
         notebookName={currentNotebookPath
           ? currentNotebookPath.split('/').pop()?.replace(/\.ipynb$/, '') ?? ''
           : ''}
+        notebookAware={notebookAware}
         onSwitch={handleSwitchThread}
         onNew={handleNewThread}
         onRename={(id, name) => void handleRenameThread(id, name)}
         onDelete={(id) => void handleDeleteThread(id)}
+        onToggleNotebookAware={handleToggleNotebookAware}
       />
 
       {/* Message list */}
@@ -3804,11 +3839,14 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
             </svg>
           </button>
           <button
-            className={`ds-cell-mode-btn ds-cell-mode-${cellMode}`}
-            onClick={cycleCellMode}
-            title={CELL_MODE_TITLE[cellMode]}
-            aria-label={CELL_MODE_TITLE[cellMode]}
-          >{CELL_MODE_LABEL[cellMode]}</button>
+            className={`ds-cell-mode-btn ds-cell-mode-${notebookAware ? cellMode : 'chat'}${!notebookAware ? ' ds-cell-mode-locked' : ''}`}
+            onClick={notebookAware ? cycleCellMode : undefined}
+            title={notebookAware
+              ? CELL_MODE_TITLE[cellMode]
+              : 'Discuss — notebook context is off, responses stay in chat'}
+            aria-label={notebookAware ? CELL_MODE_TITLE[cellMode] : 'Discuss (notebook context off)'}
+            style={notebookAware ? undefined : { opacity: 0.45, cursor: 'default' }}
+          >{notebookAware ? CELL_MODE_LABEL[cellMode] : '💬'}</button>
           {isLoading ? (
             /* Stop button — circle with a filled square inside */
             <button

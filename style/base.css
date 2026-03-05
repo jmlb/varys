@@ -1361,6 +1361,28 @@
 .ds-thread-toggle:hover {
   background: var(--jp-layout-color3, rgba(0,0,0,0.07));
 }
+
+/* Notebook-aware toggle button in the thread bar */
+.ds-nb-aware-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 2px 5px;
+  font-size: 13px;
+  line-height: 1;
+  transition: border-color 0.15s, background 0.15s;
+}
+.ds-nb-aware-btn:hover {
+  background: var(--jp-layout-color3, rgba(0,0,0,0.07));
+  border-color: var(--jp-border-color2, #ccc);
+}
+.ds-nb-aware-on  { opacity: 1; }
+.ds-nb-aware-off { opacity: 0.45; }
 .ds-thread-icon {
   font-size: 13px;
   opacity: 0.6;
@@ -1509,6 +1531,10 @@
 }
 .ds-chat-night .ds-thread-toggle:hover {
   background: var(--ds-surface2, rgba(255,255,255,0.06));
+}
+.ds-chat-night .ds-nb-aware-btn:hover {
+  background: var(--ds-surface2, rgba(255,255,255,0.06));
+  border-color: var(--ds-border, rgba(255,255,255,0.1));
 }
 .ds-chat-night .ds-thread-popup {
   background: var(--ds-surface, #1e1e1e);
