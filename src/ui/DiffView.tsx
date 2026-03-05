@@ -197,7 +197,7 @@ const CellDiffSection: React.FC<{
         <span className="ds-diff-cell-toggle">{open ? '▾' : '▸'}</span>
         <span className={`ds-diff-op-badge ds-diff-op-badge--${info.opType}`}>{opLabel}</span>
         <span className="ds-diff-cell-type">{info.cellType}</span>
-        <span className="ds-diff-cell-pos">pos:{info.cellIndex}</span>
+        <span className="ds-diff-cell-pos">#{info.cellIndex + 1}</span>
         {info.description && <span className="ds-diff-cell-desc">{info.description}</span>}
         {hasChanges && <span className={`ds-diff-stats ds-diff-stats--${info.opType}`}>{statsLabel}</span>}
         {info.opType === 'modify' && totalHunks > 0 && (

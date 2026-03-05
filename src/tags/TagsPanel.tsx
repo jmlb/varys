@@ -260,7 +260,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
   ).sort((a, b) => b[1] - a[1]);            // sort by count desc
 
   const cellRef = activeCellIdx >= 0
-    ? `cell[${activeCellIdx}]`
+    ? `#${activeCellIdx + 1}`
     : '—';
 
   return (
@@ -403,9 +403,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
                     c.tags.some(t => t.includes(filterText.toLowerCase()))
                   )
                   .map(c => {
-                    const ref = c.execCount != null
-                      ? `exec:[${c.execCount}]`
-                      : `cell[${c.index}]`;
+                    const ref = `#${c.index + 1}`;
                     return (
                       <div
                         key={c.index}
