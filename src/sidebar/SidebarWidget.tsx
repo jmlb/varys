@@ -3566,6 +3566,81 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
               </div>
             ) : (
               <>
+                {/* ── Top toolbar (assistant messages only, hidden while streaming) ── */}
+                {(() => {
+                  if (msg.role !== 'assistant' || msg.id === activeStreamId) return null;
+                  const codeBlocks = extractCodeBlocks(msg.content);
+                  const hasCode    = codeBlocks.length > 0;
+                  const allCode    = hasCode ? codeBlocks.join('\n\n') : '';
+                  const showPush   = !msg.hadCellOps && !!(msg.content?.trim());
+                  const isLong     = (msg.content?.length ?? 0) >= COLLAPSE_THRESHOLD;
+                  return (
+                    <div className="ds-bubble-toolbar">
+                      {/* Left: push to cell */}
+                      <div className="ds-bubble-toolbar-left">
+                        {showPush && (
+                          <button
+                            className="ds-bubble-tool-btn"
+                            title={hasCode ? 'Push code to new cell' : 'Push response to markdown cell'}
+                            onClick={() => {
+                              const nb = notebookTracker.currentWidget?.content;
+                              const insertIdx = nb
+                                ? (nb.activeCellIndex ?? nb.model!.cells.length - 1) + 1
+                                : 0;
+                              const cellType    = hasCode ? 'code' : 'markdown';
+                              const cellContent = hasCode ? allCode : msg.content;
+                              void cellEditor.insertCell(insertIdx, cellType, cellContent)
+                                .then(() => {
+                                  addMessage('system', `✓ ${hasCode ? 'Code' : 'Response'} pushed to new ${cellType} cell at pos:${insertIdx}.`);
+                                });
+                            }}
+                          >
+                            {/* Insert-to-cell arrow icon */}
+                            <svg viewBox="0 0 16 16" width="13" height="13" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M8 2v8M4 7l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M2 13h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                      {/* Right: copy + expand/collapse */}
+                      <div className="ds-bubble-toolbar-right">
+                        <button
+                          className="ds-bubble-tool-btn"
+                          title="Copy response"
+                          onClick={() => {
+                            const text = (msg.displayContent ?? msg.content ?? '').trim();
+                            void navigator.clipboard.writeText(text).then(() => {
+                              // brief visual feedback handled by CSS :active
+                            });
+                          }}
+                        >
+                          {/* Copy icon */}
+                          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="5" y="5" width="8" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.5"/>
+                            <path d="M3 11V3a1 1 0 0 1 1-1h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                          </svg>
+                        </button>
+                        {isLong && (
+                          <button
+                            className="ds-bubble-tool-btn"
+                            title={collapsedMsgs.has(msg.id) ? 'Expand' : 'Collapse'}
+                            onClick={() => toggleCollapse(msg.id)}
+                          >
+                            {/* Chevron up/down */}
+                            <svg viewBox="0 0 16 16" width="13" height="13" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              {collapsedMsgs.has(msg.id)
+                                ? <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                                : <path d="M4 10l4-4 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                              }
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+                {/* ── Bubble content ── */}
                 {(() => {
                   const isStreaming = msg.id === activeStreamId;
                   const isLong = (msg.content?.length ?? 0) >= COLLAPSE_THRESHOLD;
@@ -3573,9 +3648,6 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                   return (
                     <div className={`ds-msg-collapsible-wrap${collapsed ? ' ds-msg-collapsed' : ''}`}>
                       {msg.role === 'user' ? (
-                        // User messages are plain text — render as-is so that
-                        // pre-wrap handles line breaks without the trailing \n
-                        // that marked.parse() appends causing a blank line.
                         <div className="ds-assistant-message-content">
                           {(msg.displayContent ?? msg.content).trim()}
                         </div>
@@ -3585,7 +3657,6 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                           dangerouslySetInnerHTML={{ __html: renderMarkdown((msg.displayContent ?? msg.content).replace(/[\r\n\s]+$/, '')) }}
                         />
                       )}
-                      {/* Context chip */}
                       {msg.role === 'user' && msg.contextChip && (
                         <ContextChipBubble chip={msg.contextChip} />
                       )}
@@ -3593,50 +3664,6 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                         <span className="ds-typing-cursor" aria-hidden="true"><span /></span>
                       )}
                       {collapsed && <div className="ds-msg-fade" aria-hidden="true" />}
-                    </div>
-                  );
-                })()}
-                {/* Action row: push-to-cell (left) + collapse toggle (right) — same flex row */}
-                {(() => {
-                  const showToggle = (!activeStreamId || msg.id !== activeStreamId)
-                    && (msg.content?.length ?? 0) >= COLLAPSE_THRESHOLD;
-                  const codeBlocks = extractCodeBlocks(msg.content);
-                  const showPush = msg.role === 'assistant'
-                    && msg.id !== activeStreamId
-                    && !msg.hadCellOps
-                    && !!(msg.content?.trim());
-                  if (!showToggle && !showPush) return null;
-                  const hasCode = codeBlocks.length > 0;
-                  const allCode = hasCode ? codeBlocks.join('\n\n') : '';
-                  return (
-                    <div className="ds-msg-actions-row">
-                      {showPush ? (
-                        <button
-                          className="ds-push-to-cell-btn"
-                          title={hasCode ? 'Push code to cell' : 'Push response to markdown cell'}
-                          onClick={() => {
-                            const nb = notebookTracker.currentWidget?.content;
-                            const insertIdx = nb
-                              ? (nb.activeCellIndex ?? nb.model!.cells.length - 1) + 1
-                              : 0;
-                            const cellType = hasCode ? 'code' : 'markdown';
-                            const cellContent = hasCode ? allCode : msg.content;
-                            void cellEditor.insertCell(insertIdx, cellType, cellContent)
-                              .then(() => {
-                                addMessage('system', `✓ ${hasCode ? 'Code' : 'Response'} pushed to new ${cellType} cell at pos:${insertIdx}.`);
-                              });
-                          }}
-                        >↵</button>
-                      ) : <span />}
-                      {showToggle ? (
-                        <button
-                          className="ds-msg-toggle-btn"
-                          title={collapsedMsgs.has(msg.id) ? 'Expand' : 'Collapse'}
-                          onClick={() => toggleCollapse(msg.id)}
-                        >
-                          {collapsedMsgs.has(msg.id) ? '⌄' : '⌃'}
-                        </button>
-                      ) : null}
                     </div>
                   );
                 })()}
