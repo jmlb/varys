@@ -1605,11 +1605,12 @@ interface ThreadBarProps {
   onSwitch: (id: string) => void;
   onNew: () => void;
   onRename: (id: string, name: string) => void;
+  onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
 }
 
 const ThreadBar: React.FC<ThreadBarProps> = ({
-  threads, currentId, notebookName, onSwitch, onNew, onRename, onDelete,
+  threads, currentId, notebookName, onSwitch, onNew, onRename, onDuplicate, onDelete,
 }) => {
   const [open, setOpen]         = useState(false);
   const [editingId, setEditingId] = useState('');
@@ -1684,11 +1685,42 @@ const ThreadBar: React.FC<ThreadBarProps> = ({
                   {t.name}
                 </span>
               )}
-              <span
-                className="ds-thread-action-btn"
-                onClick={e => { e.stopPropagation(); setEditingId(t.id); setEditValue(t.name); }}
-                title="Rename"
-              >✎</span>
+              <div className="ds-thread-actions">
+                {/* Rename */}
+                <span
+                  className="ds-thread-action-btn"
+                  onClick={e => { e.stopPropagation(); setEditingId(t.id); setEditValue(t.name); }}
+                  title="Rename"
+                >
+                  <svg viewBox="0 0 14 14" width="11" height="11" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9.5 1.5l3 3L4 13H1v-3L9.5 1.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+                  </svg>
+                </span>
+                {/* Duplicate */}
+                <span
+                  className="ds-thread-action-btn"
+                  onClick={e => { e.stopPropagation(); onDuplicate(t.id); }}
+                  title="Duplicate thread"
+                >
+                  <svg viewBox="0 0 14 14" width="11" height="11" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="4" y="4" width="8" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.4"/>
+                    <path d="M2 10V2a1 1 0 011-1h7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                  </svg>
+                </span>
+                {/* Delete — only when more than one thread exists */}
+                {threads.length > 1 && (
+                  <span
+                    className="ds-thread-action-btn ds-thread-action-delete"
+                    onClick={e => { e.stopPropagation(); onDelete(t.id); }}
+                    title="Delete thread"
+                  >
+                    <svg viewBox="0 0 14 14" width="11" height="11" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2 4h10M5 4V2.5a.5.5 0 01.5-.5h3a.5.5 0 01.5.5V4M6 7v3.5M8 7v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                      <path d="M3 4l.8 7.2a1 1 0 001 .8h4.4a1 1 0 001-.8L11 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                    </svg>
+                  </span>
+                )}
+              </div>
             </div>
           ))}
           <div className="ds-thread-new-item" onClick={() => { onNew(); setOpen(false); }}>
@@ -3165,6 +3197,42 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     void _saveThread(threadId, newName, msgs);
   };
 
+  const handleDuplicateThread = (threadId: string): void => {
+    const src = threadsRef.current.find(t => t.id === threadId);
+    if (!src) return;
+    const copy = makeNewThread(`${src.name} (copy)`);
+    copy.messages = src.messages.slice();
+    copy.notebookAware = src.notebookAware;
+    const updated = [...threadsRef.current, copy];
+    setThreads(updated);
+    threadsRef.current = updated;
+    // Switch to the new duplicate
+    const curId   = currentThreadIdRef.current;
+    const curName = threadsRef.current.find(t => t.id === curId)?.name ?? 'Thread';
+    void _saveThread(curId, curName, messages);
+    setCurrentThreadId(copy.id);
+    currentThreadIdRef.current = copy.id;
+    stopStreamQueue();
+    const restored: Message[] = copy.messages.length > 0
+      ? copy.messages.map(m => ({
+          id: m.id,
+          role: m.role as Message['role'],
+          content: m.content,
+          timestamp: new Date(m.timestamp),
+        }))
+      : [{
+          id: `welcome-${copy.id}`,
+          role: 'system' as const,
+          content: `✨ Duplicated from "${src.name}".`,
+          timestamp: new Date(),
+        }];
+    setMessages(restored);
+    setPendingOps([]);
+    setAppliedFixes(new Map());
+    setProgressText('');
+    setActiveStreamId('');
+  };
+
   const handleDeleteThread = async (threadId: string): Promise<void> => {
     if (threadsRef.current.length <= 1) return;
     const updated = threadsRef.current.filter(t => t.id !== threadId);
@@ -3457,6 +3525,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
         onSwitch={handleSwitchThread}
         onNew={handleNewThread}
         onRename={(id, name) => void handleRenameThread(id, name)}
+        onDuplicate={handleDuplicateThread}
         onDelete={(id) => void handleDeleteThread(id)}
       />
 

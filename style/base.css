@@ -1622,25 +1622,35 @@
 }
 
 /* Rename/delete icon buttons */
-.ds-thread-action-btn {
+.ds-thread-actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
   flex-shrink: 0;
   opacity: 0;
+  transition: opacity 0.1s;
+}
+.ds-thread-item:hover .ds-thread-actions {
+  opacity: 1;
+}
+.ds-thread-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   cursor: pointer;
-  font-size: 11px;
-  padding: 1px 4px;
+  padding: 2px 3px;
   border-radius: 3px;
   color: var(--jp-ui-font-color2, #666);
-  transition: opacity 0.1s, background 0.1s;
-}
-.ds-thread-item:hover .ds-thread-action-btn {
-  opacity: 0.6;
+  transition: background 0.1s, color 0.1s;
 }
 .ds-thread-action-btn:hover {
-  opacity: 1 !important;
-  background: var(--jp-layout-color3, rgba(0,0,0,0.1));
+  background: var(--jp-layout-color3, rgba(0,0,0,0.12));
+  color: var(--jp-ui-font-color0, #222);
 }
-.ds-thread-delete-btn:hover {
+.ds-thread-action-delete:hover {
   color: #e53935;
+  background: rgba(229, 57, 53, 0.10);
 }
 
 /* Inline rename input */
