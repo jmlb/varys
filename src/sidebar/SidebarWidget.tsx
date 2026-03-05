@@ -1928,9 +1928,9 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
   };
 
   const CELL_MODE_TITLE: Record<CellMode, string> = {
-    chat: 'Discuss — responses stay in chat, no cells are created',
-    auto: 'Auto — skill/AI decides whether to create cells (default)',
-    doc:  'Write — always write results to notebook cells',
+    chat: 'Insert to cell: No — responses stay in chat, no cells are created',
+    auto: 'Insert to cell: Auto — skill/AI decides whether to create cells (default)',
+    doc:  'Insert to cell: Always — always write results to notebook cells',
   };
   const [pendingOps, setPendingOps] = useState<PendingOp[]>([]);
   // Tracks which fix indices have been applied per code-review message id
@@ -3804,11 +3804,13 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
               setCellMode(next);
               try { localStorage.setItem('ds-assistant-cell-mode', next); } catch { /* ignore */ }
             }}
-            title={notebookAware ? CELL_MODE_TITLE[cellMode] : 'Discuss — notebook context is off'}
+            title={notebookAware ? CELL_MODE_TITLE[cellMode] : 'Insert to cell: No — notebook context is off'}
           >
-            <option value="chat">💬 Discuss</option>
-            <option value="auto">⚡ Auto</option>
-            <option value="doc">📝 Write</option>
+            <optgroup label="Insert to cell">
+              <option value="chat">No</option>
+              <option value="auto">Auto</option>
+              <option value="doc">Always</option>
+            </optgroup>
           </select>
           {isLoading && (
             /* Stop button — circle with a filled square inside */
