@@ -253,6 +253,8 @@ class BedrockProvider(BaseLLMProvider):
                 toolConfig=_TOOL_CONFIG,
                 inferenceConfig={"maxTokens": 4096, "temperature": 0.2},
             )
+            u = resp.get("usage", {})
+            self._set_usage(u.get("inputTokens", 0), u.get("outputTokens", 0))
             for block in resp.get("output", {}).get("message", {}).get("content", []):
                 if "toolUse" in block and block["toolUse"]["name"] == "create_operation_plan":
                     data = block["toolUse"]["input"]
@@ -291,6 +293,8 @@ class BedrockProvider(BaseLLMProvider):
                 messages=[{"role": "user", "content": [{"text": f"Complete:\n{prompt}"}]}],
                 inferenceConfig={"maxTokens": 256, "temperature": 0.1},
             )
+            u = resp.get("usage", {})
+            self._set_usage(u.get("inputTokens", 0), u.get("outputTokens", 0))
             for block in resp.get("output", {}).get("message", {}).get("content", []):
                 if "text" in block:
                     return block["text"]
@@ -347,6 +351,8 @@ class BedrockProvider(BaseLLMProvider):
                 messages=messages,
                 inferenceConfig={"maxTokens": 8192, "temperature": 0.3},
             )
+            u = resp.get("usage", {})
+            self._set_usage(u.get("inputTokens", 0), u.get("outputTokens", 0))
             for block in resp.get("output", {}).get("message", {}).get("content", []):
                 if "text" in block:
                     return block["text"]
