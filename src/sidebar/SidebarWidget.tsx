@@ -3818,7 +3818,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
             aria-label={notebookAware ? CELL_MODE_TITLE[cellMode] : 'Discuss (notebook context off)'}
             style={notebookAware ? undefined : { opacity: 0.45, cursor: 'default' }}
           >{notebookAware ? CELL_MODE_LABEL[cellMode] : '💬'}</button>
-          {isLoading ? (
+          {isLoading && (
             /* Stop button — circle with a filled square inside */
             <button
               className="ds-assistant-send-btn ds-send-stop"
@@ -3830,22 +3830,6 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                    xmlns="http://www.w3.org/2000/svg">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
                 <rect x="8" y="8" width="8" height="8" rx="1" fill="currentColor"/>
-              </svg>
-            </button>
-          ) : (
-            /* Send button — upward arrow */
-            <button
-              className="ds-assistant-send-btn"
-              onClick={() => void handleSend()}
-              disabled={!input.trim()}
-              title="Send message"
-              aria-label="Send message"
-            >
-              <svg viewBox="0 0 24 24" width="10" height="10" fill="none"
-                   xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 20V4M12 4L6 10M12 4L18 10"
-                      stroke="currentColor" strokeWidth="2.2"
-                      strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
           )}
