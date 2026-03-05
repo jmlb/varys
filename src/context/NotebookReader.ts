@@ -205,7 +205,17 @@ export class NotebookReader {
       } else if (outputType === 'error') {
         const ename = output.ename ?? 'Error';
         const evalue = output.evalue ?? '';
-        parts.push(`${ename}: ${evalue}`);
+        const rawTb: unknown = output.traceback;
+        if (rawTb && Array.isArray(rawTb) && rawTb.length > 0) {
+          // Strip ANSI colour codes that Jupyter injects into traceback lines
+          // eslint-disable-next-line no-control-regex
+          const tbClean = (rawTb as string[])
+            .join('\n')
+            .replace(/\x1b\[[0-9;]*m/g, '');
+          parts.push(`${ename}: ${evalue}\n${tbClean}`);
+        } else {
+          parts.push(`${ename}: ${evalue}`);
+        }
       }
     }
 
