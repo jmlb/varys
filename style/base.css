@@ -425,6 +425,42 @@
   color: var(--ds-text, #ddd);
 }
 
+/* ── Custom lightweight tooltips (replaces native browser title= popup) ──
+   Usage: add  data-tip="label"  to any element.
+   The tooltip appears above the element by default; add  data-tip-below
+   for elements near the top of the screen (not currently needed).       */
+[data-tip] {
+  position: relative;
+}
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(30, 30, 30, 0.88);
+  color: #f0f0f0;
+  font-size: 10px;
+  font-family: var(--jp-ui-font-family, sans-serif);
+  line-height: 1.3;
+  padding: 3px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+  z-index: 10000;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+[data-tip]:hover::after {
+  opacity: 1;
+}
+/* Variant for elements that are at the very top (tooltip goes below) */
+[data-tip][data-tip-below]::after {
+  bottom: auto;
+  top: calc(100% + 5px);
+}
+
 /* ── Inline message editor (user bubble) ── */
 .ds-msg-edit-wrap {
   display: flex;
@@ -1942,7 +1978,7 @@
 }
 
 .ds-model-switcher-model-name {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;

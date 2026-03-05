@@ -1480,7 +1480,7 @@ const ModelSwitcher: React.FC<ModelSwitcherProps> = ({
       <button
         className={`ds-model-switcher-btn${open ? ' ds-model-switcher-btn--open' : ''}${saving ? ' ds-model-switcher-btn--saving' : ''}${noProvider ? ' ds-model-switcher-btn--unconfigured' : ''}`}
         onClick={() => !saving && setOpen(o => !o)}
-        title={noProvider ? 'No provider configured — open Settings' : `${displayProvider} · ${model}\nClick to switch chat model`}
+        data-tip={noProvider ? 'No provider configured — open Settings' : `${displayProvider} · ${model}`}
         disabled={saving}
       >
         <span className="ds-model-switcher-model-name">{saving ? 'Switching…' : displayName}</span>
@@ -1711,7 +1711,7 @@ const ThreadBar: React.FC<ThreadBarProps> = ({
                 <span
                   className="ds-thread-action-btn"
                   onClick={e => { e.stopPropagation(); setEditingId(t.id); setEditValue(t.name); }}
-                  title="Rename"
+                  data-tip="Rename"
                 >
                   <svg viewBox="0 0 14 14" width="11" height="11" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M9.5 1.5l3 3L4 13H1v-3L9.5 1.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
@@ -1721,7 +1721,7 @@ const ThreadBar: React.FC<ThreadBarProps> = ({
                 <span
                   className="ds-thread-action-btn"
                   onClick={e => { e.stopPropagation(); onDuplicate(t.id); }}
-                  title="Duplicate thread"
+                  data-tip="Duplicate thread"
                 >
                   <svg viewBox="0 0 14 14" width="11" height="11" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <rect x="4" y="4" width="8" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.4"/>
@@ -1733,7 +1733,7 @@ const ThreadBar: React.FC<ThreadBarProps> = ({
                   <span
                     className="ds-thread-action-btn ds-thread-action-delete"
                     onClick={e => { e.stopPropagation(); onDelete(t.id); }}
-                    title="Delete thread"
+                    data-tip="Delete thread"
                   >
                     <svg viewBox="0 0 14 14" width="11" height="11" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M2 4h10M5 4V2.5a.5.5 0 01.5-.5h3a.5.5 0 01.5.5V4M6 7v3.5M8 7v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
@@ -3511,28 +3511,28 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
         <button
           className="ds-tags-panel-btn"
           onClick={() => setShowTags(true)}
-          title="Cell Tags & Metadata"
+          data-tip="Cell Tags & Metadata"
         >🏷️</button>
         <button
           className="ds-repro-shield-btn"
           onClick={() => setShowRepro(true)}
-          title="Reproducibility Guardian"
+          data-tip="Reproducibility Guardian"
         >🛡️</button>
         <button
           className="ds-theme-toggle-btn"
           onClick={toggleChatTheme}
-          title={chatTheme === 'day' ? 'Switch to night mode' : 'Switch to day mode'}
+          data-tip={chatTheme === 'day' ? 'Switch to night mode' : 'Switch to day mode'}
           aria-label={chatTheme === 'day' ? 'Switch to night mode' : 'Switch to day mode'}
         >{chatTheme === 'day' ? '🌙' : '☀️'}</button>
         <button
           className="ds-wiki-help-btn"
           onClick={() => window.open('https://github.com/jmlb/varys#readme', '_blank')}
-          title="Open documentation wiki"
+          data-tip="Open documentation"
         >?</button>
         <button
           className="ds-settings-gear-btn"
           onClick={() => setShowSettings(true)}
-          title="Settings"
+          data-tip="Settings"
         >⚙</button>
       </div>
 
@@ -3674,7 +3674,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                         {showPush && (
                           <button
                             className="ds-bubble-tool-btn"
-                            title={hasCode ? 'Push code to new cell' : 'Push response to markdown cell'}
+                            data-tip={hasCode ? 'Push code to new cell' : 'Push response to markdown cell'}
                             onClick={() => {
                               const nb = notebookTracker.currentWidget?.content;
                               const insertIdx = nb
@@ -3696,7 +3696,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                         )}
                         <button
                           className="ds-bubble-tool-btn"
-                          title="Copy response"
+                          data-tip="Copy response"
                           onClick={() => {
                             const text = (msg.displayContent ?? msg.content ?? '').trim();
                             void navigator.clipboard.writeText(text);
@@ -3710,7 +3710,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                         {isLong && (
                           <button
                             className="ds-bubble-tool-btn"
-                            title={collapsedMsgs.has(msg.id) ? 'Expand' : 'Collapse'}
+                            data-tip={collapsedMsgs.has(msg.id) ? 'Expand' : 'Collapse'}
                             onClick={() => toggleCollapse(msg.id)}
                           >
                             <svg viewBox="0 0 16 16" width="13" height="13" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -3732,7 +3732,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                     <div className="ds-bubble-toolbar-right">
                       <button
                         className="ds-bubble-tool-btn"
-                        title="Edit and resend"
+                        data-tip="Edit and resend"
                         onClick={() => {
                           setEditingMsgId(msg.id);
                           setEditingText((msg.content ?? '').trim());
@@ -3892,7 +3892,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                 setActiveCommand(null);
                 setInput('');
               }}
-              title="Clear command"
+              data-tip="Clear command"
             >✕</span>
           </div>
         )}
@@ -3904,13 +3904,13 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
             <button
               className="ds-ctx-chip-toggle"
               onClick={() => setChipExpanded(x => !x)}
-              title={chipExpanded ? 'Collapse' : 'Expand context'}
+              data-tip={chipExpanded ? 'Collapse' : 'Expand context'}
               aria-label={chipExpanded ? 'Collapse context' : 'Expand context'}
             >{chipExpanded ? '▲' : '▼'}</button>
             <button
               className="ds-ctx-chip-remove"
               onClick={() => { setContextChip(null); contextPrefixRef.current = ''; }}
-              title="Remove context"
+              data-tip="Remove context"
               aria-label="Remove context"
             >✕</button>
             {chipExpanded && (
@@ -3950,7 +3950,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
             if (!usage || (usage.input === 0 && usage.output === 0)) return null;
             const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
             return (
-              <span className="ds-token-counter" title={`Input: ${usage.input.toLocaleString()} tokens\nOutput: ${usage.output.toLocaleString()} tokens`}>
+              <span className="ds-token-counter" data-tip={`In: ${usage.input.toLocaleString()} · Out: ${usage.output.toLocaleString()} tokens`}>
                 <span className="ds-token-in">↑{fmt(usage.input)}</span>
                 <span className="ds-token-out">↓{fmt(usage.output)}</span>
               </span>
@@ -3960,16 +3960,16 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
             <button
               className={`ds-nb-aware-btn${notebookAware ? ' ds-nb-aware-on' : ' ds-nb-aware-off'}`}
               onClick={handleToggleNotebookAware}
-              title={notebookAware
-                ? 'Notebook included — cell contents sent with every message. Click to exclude.'
-                : 'Notebook excluded — messages sent without cell contents. Click to include.'}
+              data-tip={notebookAware
+                ? 'Notebook included — click to exclude'
+                : 'Notebook excluded — click to include'}
               aria-label={notebookAware ? 'Notebook included' : 'Notebook excluded'}
             >
               <span className="ds-nb-aware-check">{notebookAware ? '☑' : '☐'}</span>
               <span className="ds-nb-aware-label">ctx NB</span>
             </button>
             <span className="ds-controls-sep">|</span>
-            <label className="ds-cell-mode-label" title={notebookAware ? CELL_MODE_TITLE[cellMode] : 'Insert to cell: No — notebook context is off'}>
+            <label className="ds-cell-mode-label" data-tip={notebookAware ? CELL_MODE_TITLE[cellMode] : 'Insert to cell: No — notebook context is off'}>
               ToCell:
               <select
                 className={`ds-cell-mode-select ds-cell-mode-${notebookAware ? cellMode : 'chat'}`}
