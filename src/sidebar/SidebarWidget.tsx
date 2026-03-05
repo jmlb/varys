@@ -1927,20 +1927,6 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     window.addEventListener('mouseup', onUp);
   };
 
-  const cycleCellMode = () => {
-    setCellMode(prev => {
-      const next: CellMode = prev === 'chat' ? 'auto' : prev === 'auto' ? 'doc' : 'chat';
-      try { localStorage.setItem('ds-assistant-cell-mode', next); } catch { /* ignore */ }
-      return next;
-    });
-  };
-
-  const CELL_MODE_LABEL: Record<CellMode, string> = {
-    chat: '💬',
-    auto: '⚡',
-    doc:  '📝',
-  };
-
   const CELL_MODE_TITLE: Record<CellMode, string> = {
     chat: 'Discuss — responses stay in chat, no cells are created',
     auto: 'Auto — skill/AI decides whether to create cells (default)',
@@ -3809,15 +3795,21 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
             <span className="ds-nb-aware-check">{notebookAware ? '☑' : '☐'}</span>
             <span className="ds-nb-aware-label">+Notebook</span>
           </button>
-          <button
-            className={`ds-cell-mode-btn ds-cell-mode-${notebookAware ? cellMode : 'chat'}${!notebookAware ? ' ds-cell-mode-locked' : ''}`}
-            onClick={notebookAware ? cycleCellMode : undefined}
-            title={notebookAware
-              ? CELL_MODE_TITLE[cellMode]
-              : 'Discuss — notebook context is off, responses stay in chat'}
-            aria-label={notebookAware ? CELL_MODE_TITLE[cellMode] : 'Discuss (notebook context off)'}
-            style={notebookAware ? undefined : { opacity: 0.45, cursor: 'default' }}
-          >{notebookAware ? CELL_MODE_LABEL[cellMode] : '💬'}</button>
+          <select
+            className={`ds-cell-mode-select ds-cell-mode-${notebookAware ? cellMode : 'chat'}`}
+            value={notebookAware ? cellMode : 'chat'}
+            disabled={!notebookAware}
+            onChange={e => {
+              const next = e.target.value as CellMode;
+              setCellMode(next);
+              try { localStorage.setItem('ds-assistant-cell-mode', next); } catch { /* ignore */ }
+            }}
+            title={notebookAware ? CELL_MODE_TITLE[cellMode] : 'Discuss — notebook context is off'}
+          >
+            <option value="chat">💬 Discuss</option>
+            <option value="auto">⚡ Auto</option>
+            <option value="doc">📝 Write</option>
+          </select>
           {isLoading && (
             /* Stop button — circle with a filled square inside */
             <button
