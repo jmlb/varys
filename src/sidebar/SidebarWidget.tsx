@@ -3594,7 +3594,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                               const cellContent = hasCode ? allCode : msg.content;
                               void cellEditor.insertCell(insertIdx, cellType, cellContent)
                                 .then(() => {
-                                  addMessage('system', `✓ ${hasCode ? 'Code' : 'Response'} pushed to new ${cellType} cell at pos:${insertIdx}.`);
+                                  addMessage('system', `✓ ${hasCode ? 'Code' : 'Response'} pushed to new ${cellType} cell at #${insertIdx + 1}.`);
                                 });
                             }}
                           >

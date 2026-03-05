@@ -109,8 +109,8 @@ class OpenAIProvider(BaseLLMProvider):
             for cell in notebook_context.get("cells", []):
                 img = cell.get("imageOutput")
                 if img:
-                    ec = cell.get("executionCount")
-                    label = f"exec:[{ec}]" if ec is not None else f"pos:{cell.get('index', '?')}"
+                    idx = cell.get("index")
+                    label = f"#{idx + 1}" if isinstance(idx, int) else "#?"
                     content.append({"type": "text", "text": f"[Plot from cell {label}:]"})
                     content.append({
                         "type": "image_url",
@@ -216,8 +216,8 @@ class OpenAIProvider(BaseLLMProvider):
             for cell in notebook_context.get("cells", []):
                 img = cell.get("imageOutput")
                 if img:
-                    ec = cell.get("executionCount")
-                    label = f"exec:[{ec}]" if ec is not None else f"pos:{cell.get('index', '?')}"
+                    idx = cell.get("index")
+                    label = f"#{idx + 1}" if isinstance(idx, int) else "#?"
                     content.append({"type": "text", "text": f"[Plot from cell {label}:]"})
                     content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img}"}})
 

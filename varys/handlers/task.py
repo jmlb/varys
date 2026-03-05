@@ -74,7 +74,7 @@ the chat panel.
 
 Guidelines:
 - Use markdown formatting (headers, bullets, tables, code snippets where helpful).
-- Reference notebook cells by execution count (cell[N]) or position (pos:N).
+- Reference notebook cells by their label #N (e.g. #3, #16).
 - Base every claim on the actual cell outputs provided — do not invent results.
 - Be concise but thorough. Aim for quality over length.
 
@@ -438,11 +438,8 @@ class TaskHandler(JupyterHandler):
                 if image_cells:
                     labels = []
                     for c in image_cells:
-                        ec = c.get("executionCount")
-                        labels.append(
-                            f"cell[{ec}]" if ec is not None
-                            else f"pos:{c.get('index', '?')}"
-                        )
+                        idx = c.get("index")
+                        labels.append(f"#{idx + 1}" if isinstance(idx, int) else "#?")
                     provider_name = self.settings.get(
                         "ds_assistant_chat_provider", "ollama"
                     ).upper()

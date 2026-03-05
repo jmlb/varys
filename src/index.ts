@@ -139,8 +139,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
       if (!cell) return null;
       const source = cell.model.sharedModel.source.trim();
       const type   = cell.model.type;
-      const execCount = (cell.model as any).executionCount;
-      const ref = execCount != null ? `exec:[${execCount}]` : `cell[${nb.activeCellIndex}]`;
+      const ref = `#${nb.activeCellIndex + 1}`;
       const selection = getEditorSelection();
       return { ref, source, type, selection };
     };

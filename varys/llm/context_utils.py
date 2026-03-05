@@ -210,11 +210,11 @@ def build_notebook_context(
 
     lines: List[str] = [
         f"Notebook: {nb_path}",
-        f"Cells: {len(cells)}",
-        f"CELL INDEX RULE: user says 'cell N' or '#N' → cellIndex = N-1  (e.g. cell 16 → pos:15, cell 1 → pos:0)",
+        f"Cells: {len(cells)}  (cells are numbered #1, #2, … from the top)",
+        f"CELL INDEX RULE: '#N' = Nth cell from top → cellIndex = N-1  (e.g. #16 → cellIndex=15, #1 → cellIndex=0)",
     ]
     if active_idx is not None:
-        lines.append(f"Active cell: pos:{active_idx}")
+        lines.append(f"Active cell: #{active_idx + 1}")
     lines.append("")
 
     for cell in cells:
@@ -224,11 +224,8 @@ def build_notebook_context(
         ec = cell.get("executionCount")
         output: Optional[str] = cell.get("output")
 
-        ec_str = (
-            f"exec:[{ec}]" if ec is not None
-            else ("exec:[not run]" if ctype == "code" else "exec:[n/a]")
-        )
-        lines.append(f"pos:{idx}  {ctype.upper()}  {ec_str}")
+        run_info = "" if ctype != "code" else ("" if ec is not None else "  [not run]")
+        lines.append(f"#{idx + 1}  {ctype.upper()}{run_info}")
         lines.append(source[:CELL_CONTENT_LIMIT] if source.strip() else "(empty)")
         if output and output.strip():
             lines.append(f"OUTPUT:\n{output[:CELL_CONTENT_LIMIT]}")
@@ -238,10 +235,11 @@ def build_notebook_context(
 
     if selection and selection.get("text", "").strip():
         sel_idx = selection.get("cellIndex", "?")
+        cell_ref = f"#{sel_idx + 1}" if isinstance(sel_idx, int) else f"#{sel_idx}"
         start_line = selection.get("startLine", "?")
         end_line = selection.get("endLine", "?")
         lines += [
-            f"\n## SELECTED TEXT (lines {start_line}–{end_line} of pos:{sel_idx})",
+            f"\n## SELECTED TEXT (lines {start_line}–{end_line} of {cell_ref})",
             "Operate on ONLY this highlighted code:",
             "```",
             selection["text"],
