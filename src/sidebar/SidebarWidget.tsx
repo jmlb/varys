@@ -2397,10 +2397,11 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     //   - The user already chose via a disambiguation card (skipAdvisory=true)
     //   - The sidebar is locked to Chat or Document mode (intent is clear)
     //   - A context chip is attached (specific targeted action)
+    const effectiveCellMode = notebookAware ? cellMode : 'chat';
     if (
       !skipAdvisory &&
       !slashCommand &&
-      cellMode === 'auto' &&
+      effectiveCellMode === 'auto' &&
       !chip &&
       !selectedOutputRef.current &&
       looksAdvisory(typedText, advisoryPhrases)
