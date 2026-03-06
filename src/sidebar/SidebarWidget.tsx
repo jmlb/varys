@@ -4105,23 +4105,24 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
             );
           })()}
           <div className="ds-input-controls">
-            <label className="ds-cell-mode-label" data-tip={notebookAware ? CELL_MODE_TITLE[cellMode] : 'Insert to cell: No — notebook context is off'}>
-              Response To Cell:
-              <select
-                className={`ds-cell-mode-select ds-cell-mode-${notebookAware ? cellMode : 'chat'}`}
-                value={notebookAware ? cellMode : 'chat'}
-                disabled={!notebookAware}
-                onChange={e => {
-                  const next = e.target.value as CellMode;
-                  setCellMode(next);
-                  try { localStorage.setItem('ds-assistant-cell-mode', next); } catch { /* ignore */ }
-                }}
-              >
-                <option value="chat">Never</option>
-                <option value="auto">Auto</option>
-                <option value="doc">Always</option>
-              </select>
-            </label>
+            {notebookAware && (
+              <label className="ds-cell-mode-label" data-tip={CELL_MODE_TITLE[cellMode]}>
+                Response To Cell:
+                <select
+                  className={`ds-cell-mode-select ds-cell-mode-${cellMode}`}
+                  value={cellMode}
+                  onChange={e => {
+                    const next = e.target.value as CellMode;
+                    setCellMode(next);
+                    try { localStorage.setItem('ds-assistant-cell-mode', next); } catch { /* ignore */ }
+                  }}
+                >
+                  <option value="chat">Never</option>
+                  <option value="auto">Auto</option>
+                  <option value="doc">Always</option>
+                </select>
+              </label>
+            )}
           </div>
           {isLoading && (
             /* Stop button — circle with a filled square inside */
