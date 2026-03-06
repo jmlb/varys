@@ -8,7 +8,7 @@ import uuid
 from typing import Any, Callable, Awaitable, Dict, List, Optional
 
 from .base import BaseLLMProvider
-from .client import SYSTEM_PROMPT_TEMPLATE
+from .client import _build_system_prompt_shared
 from .openai_provider import _build_context, _INLINE_SYSTEM
 from ..completion.cache import CompletionCache
 from ..completion.engine import _build_context_block, _extract_imports
@@ -66,9 +66,7 @@ class GoogleProvider(BaseLLMProvider):
             )
 
     def _build_system(self, skills: List[Dict[str, str]], memory: str) -> str:
-        skills_section = "\n".join(f"### {s['name']}\n{s['content']}" for s in skills) or "No specific skills loaded."
-        memory_section = memory if memory.strip() else "No memory/preferences recorded yet."
-        return SYSTEM_PROMPT_TEMPLATE.format(skills_section=skills_section, memory_section=memory_section)
+        return _build_system_prompt_shared(skills, memory)
 
     async def plan_task(
         self,

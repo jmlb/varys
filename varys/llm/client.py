@@ -14,8 +14,7 @@ _AnthropicOverloadedError = getattr(anthropic, "OverloadedError", anthropic.Inte
 from .context_utils import build_notebook_context
 
 
-SYSTEM_PROMPT_TEMPLATE = """You are an expert data science assistant integrated into JupyterLab.
-Your job is to help users build and enhance their Jupyter notebooks.
+SYSTEM_PROMPT_TEMPLATE = """{persona_section}
 
 ## Your Capabilities
 - Read the full notebook context provided to you (cell source AND cell outputs)
@@ -198,6 +197,48 @@ Rules:
 - Do NOT include code in this preamble — just describe the plan in prose.
 - This text is streamed live to the user; it is their only feedback while waiting.
 """
+
+# Fallback persona used when the 'varys' skill is not enabled.
+_DEFAULT_PERSONA = (
+    "You are an expert data science assistant integrated into JupyterLab.\n"
+    "Your job is to help users build and enhance their Jupyter notebooks."
+)
+
+
+def _build_system_prompt_shared(
+    skills: List[Dict[str, str]],
+    memory: str,
+) -> str:
+    """Shared system-prompt builder used by all providers.
+
+    The 'varys' skill is treated as a persona override: its content replaces
+    the default intro at the top of the system prompt and is NOT repeated in
+    the skills section.  All other enabled skills are injected under
+    ## Skills Context as normal.
+    """
+    # Separate the varys persona skill from domain skills
+    persona_section = _DEFAULT_PERSONA
+    domain_skills = []
+    for skill in skills:
+        if skill.get("name", "").lower() == "varys":
+            persona_section = skill["content"].strip()
+        else:
+            domain_skills.append(skill)
+
+    skills_section = ""
+    for skill in domain_skills:
+        skills_section += f"\n### {skill['name']}\n{skill['content']}\n"
+    if not skills_section:
+        skills_section = "No specific skills loaded."
+
+    memory_section = memory.strip() or "No memory/preferences recorded yet."
+
+    return SYSTEM_PROMPT_TEMPLATE.format(
+        persona_section=persona_section,
+        skills_section=skills_section,
+        memory_section=memory_section,
+    )
+
 
 # Tool schema for structured output - Claude fills this in directly,
 # so no text-to-JSON parsing is needed.
@@ -581,20 +622,13 @@ class ClaudeClient:
         skills: List[Dict[str, str]],
         memory: str
     ) -> str:
-        """Build the system prompt with skills and memory."""
-        skills_section = ""
-        for skill in skills:
-            skills_section += f"\n### {skill['name']}\n{skill['content']}\n"
+        """Build the system prompt with skills and memory.
 
-        if not skills_section:
-            skills_section = "No specific skills loaded."
-
-        memory_section = memory if memory.strip() else "No memory/preferences recorded yet."
-
-        return SYSTEM_PROMPT_TEMPLATE.format(
-            skills_section=skills_section,
-            memory_section=memory_section
-        )
+        The 'varys' skill is treated specially: its content completely replaces
+        the default persona intro at the top of the system prompt.  All other
+        skills are injected under ## Skills Context as usual.
+        """
+        return _build_system_prompt_shared(skills, memory)
 
     def _build_user_message(
         self,

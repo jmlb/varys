@@ -10,6 +10,7 @@ import httpx
 log = logging.getLogger(__name__)
 
 from .base import BaseLLMProvider
+from .client import _build_system_prompt_shared
 from .context_utils import build_notebook_context
 from ..completion.cache import CompletionCache
 from ..completion.engine import _build_context_block, _extract_imports
@@ -379,15 +380,7 @@ class OllamaProvider(BaseLLMProvider):
     def _build_system_prompt(
         self, skills: List[Dict[str, str]], memory: str
     ) -> str:
-        skills_section = ""
-        for skill in skills:
-            skills_section += f"\n### {skill['name']}\n{skill['content']}\n"
-        if not skills_section:
-            skills_section = "No specific skills loaded."
-        memory_section = memory.strip() or "No memory/preferences recorded yet."
-        return _TASK_SYSTEM.format(
-            skills_section=skills_section, memory_section=memory_section
-        )
+        return _build_system_prompt_shared(skills, memory)
 
     def _build_user_message(
         self, user_message: str, notebook_context: Dict[str, Any]

@@ -7,7 +7,7 @@ import uuid
 from typing import Any, Callable, Awaitable, Dict, List, Optional
 
 from .base import BaseLLMProvider
-from .client import SYSTEM_PROMPT_TEMPLATE
+from .client import _build_system_prompt_shared
 from .context_utils import build_notebook_context, CELL_CONTENT_LIMIT  # noqa: F401 – re-exported
 from ..completion.cache import CompletionCache
 from ..completion.engine import _build_context_block, _extract_imports
@@ -99,9 +99,7 @@ class OpenAIProvider(BaseLLMProvider):
         chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
         op_id = operation_id or f"op_{uuid.uuid4().hex[:8]}"
-        skills_section = "\n".join(f"### {s['name']}\n{s['content']}" for s in skills) or "No specific skills loaded."
-        memory_section = memory if memory.strip() else "No memory/preferences recorded yet."
-        system = SYSTEM_PROMPT_TEMPLATE.format(skills_section=skills_section, memory_section=memory_section)
+        system = _build_system_prompt_shared(skills, memory)
         user_msg = _build_context(user_message, notebook_context)
 
         content: List[Any] = [{"type": "text", "text": user_msg}]
@@ -207,9 +205,7 @@ class OpenAIProvider(BaseLLMProvider):
     ) -> Dict[str, Any]:
         """Stream plan_task with tool-call JSON deltas via on_json_delta."""
         op_id = operation_id or f"op_{uuid.uuid4().hex[:8]}"
-        skills_section = "\n".join(f"### {s['name']}\n{s['content']}" for s in skills) or "No specific skills loaded."
-        memory_section = memory if memory.strip() else "No memory/preferences recorded yet."
-        system = SYSTEM_PROMPT_TEMPLATE.format(skills_section=skills_section, memory_section=memory_section)
+        system = _build_system_prompt_shared(skills, memory)
 
         content: List[Any] = [{"type": "text", "text": _build_context(user_message, notebook_context)}]
         if self.has_vision():
