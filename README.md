@@ -15,7 +15,7 @@ No Node.js required on the user's machine. No cloud account lock-in. Works with 
 
 ---
 
-## What's new since v0.2
+## What's new since v0.2.0
 
 > Full details in [CHANGELOG.md](CHANGELOG.md).
 
