@@ -203,6 +203,17 @@ def get_provider_info(settings: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
 # Internal
 # ---------------------------------------------------------------------------
 
+def _as_bool(value: object, default: bool = True) -> bool:
+    """Convert a settings value to bool, handling string 'false'/'true' correctly."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() not in ("false", "0", "no", "off")
+    if value is None:
+        return default
+    return bool(value)
+
+
 def _build_provider(
     provider_name: str,
     task: str,
@@ -211,12 +222,18 @@ def _build_provider(
 ) -> BaseLLMProvider:
     log.info("Varys factory: task=%s  provider=%s  model=%s", task, provider_name, model)
 
+    # Resolve the completion model independently — the incoming `model` is for
+    # the current task only (chat or completion).  When this factory is called
+    # for a chat task, `model` is the chat model; the completion engine needs
+    # the dedicated, usually cheaper, completion model.
+    _, completion_model = _resolve(settings, "completion") if task == "chat" else (provider_name, model)
+
     if provider_name == "ollama":
         from .ollama_provider import OllamaProvider
         return OllamaProvider(
             base_url=settings.get("ds_assistant_ollama_url") or "http://localhost:11434",
             chat_model=model,
-            completion_model=model,
+            completion_model=completion_model,
         )
 
     if provider_name == "anthropic":
@@ -224,7 +241,8 @@ def _build_provider(
         return AnthropicProvider(
             api_key=settings.get("ds_assistant_anthropic_api_key", ""),
             chat_model=model,
-            completion_model=model,
+            completion_model=completion_model,
+            extended_thinking=_as_bool(settings.get("ds_assistant_anthropic_extended_thinking"), default=True),
         )
 
     if provider_name == "openai":
@@ -232,7 +250,7 @@ def _build_provider(
         return OpenAIProvider(
             api_key=settings.get("ds_assistant_openai_api_key", ""),
             chat_model=model,
-            completion_model=model,
+            completion_model=completion_model,
         )
 
     if provider_name == "google":
@@ -240,7 +258,7 @@ def _build_provider(
         return GoogleProvider(
             api_key=settings.get("ds_assistant_google_api_key", ""),
             chat_model=model,
-            completion_model=model,
+            completion_model=completion_model,
         )
 
     if provider_name == "bedrock":
@@ -253,7 +271,7 @@ def _build_provider(
             session_token=settings.get("ds_assistant_aws_session_token", ""),
             region=settings.get("ds_assistant_aws_region", "us-east-1"),
             chat_model=model,
-            completion_model=model,
+            completion_model=completion_model,
         )
 
     if provider_name == "azure":
@@ -263,7 +281,7 @@ def _build_provider(
             endpoint=settings.get("ds_assistant_azure_openai_endpoint", ""),
             api_version=settings.get("ds_assistant_azure_openai_api_version", "2024-02-01"),
             chat_model=model,
-            completion_model=model,
+            completion_model=completion_model,
         )
 
     if provider_name == "openrouter":
@@ -271,7 +289,7 @@ def _build_provider(
         return OpenRouterProvider(
             api_key=settings.get("ds_assistant_openrouter_api_key", ""),
             chat_model=model,
-            completion_model=model,
+            completion_model=completion_model,
             site_url=settings.get("ds_assistant_openrouter_site_url", ""),
             site_name=settings.get("ds_assistant_openrouter_site_name", "Varys"),
         )

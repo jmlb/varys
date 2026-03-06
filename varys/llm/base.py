@@ -80,6 +80,7 @@ class BaseLLMProvider(ABC):
         system: str,
         user: str,
         on_chunk: Callable[[str], Awaitable[None]],
+        on_thought: Optional[Callable[[str], Awaitable[None]]] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> None:
         """Stream a chat response, calling on_chunk for each text token.
@@ -100,6 +101,7 @@ class BaseLLMProvider(ABC):
         operation_id: Optional[str],
         on_text_chunk: Callable[[str], Awaitable[None]],
         on_json_delta: Optional[Callable[[str], Awaitable[None]]] = None,
+        on_thought: Optional[Callable[[str], Awaitable[None]]] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
         """Like plan_task but streams pre-tool text AND tool-call JSON deltas.
@@ -128,3 +130,24 @@ class BaseLLMProvider(ABC):
         that new providers are conservative by default.
         """
         return False
+
+    def has_sequential_thinking(self) -> bool:
+        """Return True if the provider supports the MCP sequential thinking loop.
+
+        Default is False.  Override in providers that implement the loop.
+        """
+        return False
+
+    def build_system_prompt(
+        self,
+        skills: "List[Dict[str, str]]",
+        memory: str,
+    ) -> str:
+        """Return the system prompt used for cell-op planning.
+
+        Default raises NotImplementedError so callers can detect absence.
+        Override in providers that expose their internal prompt builder.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement build_system_prompt()"
+        )

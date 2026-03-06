@@ -201,6 +201,7 @@ class OpenAIProvider(BaseLLMProvider):
         operation_id: Optional[str],
         on_text_chunk: Callable[[str], Awaitable[None]],
         on_json_delta: Optional[Callable[[str], Awaitable[None]]] = None,
+        on_thought: Optional[Callable[[str], Awaitable[None]]] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
         """Stream plan_task with tool-call JSON deltas via on_json_delta."""
@@ -246,12 +247,13 @@ class OpenAIProvider(BaseLLMProvider):
                                     await on_json_delta(partial)
                                     await asyncio.sleep(0)
 
-            final_comp = await stream.get_final_completion()
-            if final_comp.usage:
-                self._set_usage(
-                    final_comp.usage.prompt_tokens,
-                    final_comp.usage.completion_tokens,
-                )
+                # get_final_completion must be called inside the async with block
+                final_comp = await stream.get_final_completion()
+                if final_comp.usage:
+                    self._set_usage(
+                        final_comp.usage.prompt_tokens,
+                        final_comp.usage.completion_tokens,
+                    )
             data = json.loads(accumulated_args) if accumulated_args else {}
             data.setdefault("operationId", op_id)
             data.setdefault("clarificationNeeded", None)
@@ -265,6 +267,7 @@ class OpenAIProvider(BaseLLMProvider):
         system: str,
         user: str,
         on_chunk: Callable[[str], Awaitable[None]],
+        on_thought: Optional[Callable[[str], Awaitable[None]]] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> None:
         messages = self._build_messages(user, chat_history)
@@ -306,4 +309,5 @@ class OpenAIProvider(BaseLLMProvider):
 
     def has_vision(self) -> bool:
         name = self.chat_model.lower()
-        return "gpt-4o" in name or "gpt-4-vision" in name or "o1" in name
+        # o1/o1-mini/o1-preview are text-only; do not include "o1" here
+        return "gpt-4o" in name or "gpt-4-vision" in name

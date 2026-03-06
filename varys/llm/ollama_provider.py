@@ -1,6 +1,7 @@
 """Ollama provider — local model inference via the Ollama HTTP API."""
 import json
 import logging
+import os
 import re
 import uuid
 from typing import Any, Callable, Awaitable, Dict, List, Optional
@@ -10,7 +11,6 @@ import httpx
 log = logging.getLogger(__name__)
 
 from .base import BaseLLMProvider
-from .client import _build_system_prompt_shared
 from .context_utils import build_notebook_context
 from ..completion.cache import CompletionCache
 from ..completion.engine import _build_context_block, _extract_imports
@@ -80,42 +80,28 @@ Replace just those lines in the cell; preserve everything else unchanged.
 ## Skills Context
 {skills_section}
 
-## Memory/Preferences
+## Memory / Preferences
 {memory_section}
 
 ## Response Format — STRICT JSON
 You MUST respond with ONLY valid JSON. No explanation. No markdown fences.
 Use this exact structure:
-{
+{{
   "steps": [
-    {
+    {{
       "type": "insert",
       "cellIndex": 0,
       "cellType": "markdown",
       "content": "# Header",
       "autoExecute": false,
       "description": "Creating header cell"
-    }
+    }}
   ],
   "requiresApproval": false,
   "clarificationNeeded": null,
   "summary": "Created header cell"
-}
+}}
 """
-
-_INLINE_SYSTEM = (
-    "You are a Python code completion assistant. "
-    "Output ONLY the code to insert at <CURSOR>. "
-    "No explanation, no markdown fences, no trailing newline. "
-    "Single line or short expression only."
-)
-
-_MULTILINE_SYSTEM = (
-    "You are a Python code completion assistant. "
-    "Output ONLY 3-5 lines of valid Python code that logically follow the <CURSOR>. "
-    "No explanation, no markdown fences. Proper indentation. Match existing style."
-)
-
 
 class OllamaProvider(BaseLLMProvider):
     """
@@ -217,9 +203,8 @@ class OllamaProvider(BaseLLMProvider):
                     "lines": cached.splitlines(), "cached": True}
 
         context_block = _build_context_block(previous_cells)
-        import os as _os
         model = self.completion_model
-        num_predict = int(_os.environ.get("COMPLETION_MAX_TOKENS") or 128)
+        num_predict = int(os.environ.get("COMPLETION_MAX_TOKENS") or 128)
         timeout = TIMEOUT_COMPLETION
         stop_tokens = ["```", "\n\n\n"]
 
@@ -320,6 +305,7 @@ class OllamaProvider(BaseLLMProvider):
         system: str,
         user: str,
         on_chunk: Callable[[str], Awaitable[None]],
+        on_thought: Optional[Callable[[str], Awaitable[None]]] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> None:
         """Stream a chat response token by token."""
@@ -380,7 +366,18 @@ class OllamaProvider(BaseLLMProvider):
     def _build_system_prompt(
         self, skills: List[Dict[str, str]], memory: str
     ) -> str:
-        return _build_system_prompt_shared(skills, memory)
+        """Build Ollama-specific system prompt using strict-JSON instructions."""
+        domain_skills = [s for s in skills if s.get("name", "").lower() != "varys"]
+        skills_section = ""
+        for skill in domain_skills:
+            skills_section += f"\n### {skill['name']}\n{skill['content']}\n"
+        if not skills_section:
+            skills_section = "No specific skills loaded."
+        memory_section = memory.strip() or "No memory/preferences recorded yet."
+        return _TASK_SYSTEM.format(
+            skills_section=skills_section,
+            memory_section=memory_section,
+        )
 
     def _build_user_message(
         self, user_message: str, notebook_context: Dict[str, Any]

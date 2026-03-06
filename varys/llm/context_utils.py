@@ -87,7 +87,9 @@ def format_variable_context(variables: List[Dict[str, Any]]) -> str:
                 lines.append(f"\n{s['head_str']}")
 
         elif vtype == "series":
-            lines.append(f"pandas Series — {s.get('name', expr)}, dtype={s.get('dtype')}, length={s.get('length', '?'):,}")
+            _len = s.get('length')
+            _len_str = f"{_len:,}" if isinstance(_len, int) else "?"
+            lines.append(f"pandas Series — {s.get('name', expr)}, dtype={s.get('dtype')}, length={_len_str}")
             if s.get("stats"):
                 lines.append(f"\n{s['stats']}")
 
@@ -213,6 +215,7 @@ def build_notebook_context(
         f"Notebook: {nb_path}",
         f"Cells: {len(cells)}  (cells are numbered #1, #2, … from the top)",
         f"CELL INDEX RULE: '#N' = Nth cell from top → cellIndex = N-1  (e.g. #16 → cellIndex=15, #1 → cellIndex=0)",
+        f"CELL REFERENCE FORMAT: In ALL your output always use #N — NEVER write cell[N], [N], pos:N, position N, or any other variant.",
     ]
     if active_idx is not None:
         lines.append(f"Active cell: #{active_idx + 1}")

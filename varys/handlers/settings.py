@@ -27,6 +27,7 @@ _ENV_KEYS = [
     "ANTHROPIC_API_KEY",
     "ANTHROPIC_CHAT_MODEL",
     "ANTHROPIC_COMPLETION_MODEL",
+    "ANTHROPIC_EXTENDED_THINKING",
     # OpenAI
     "OPENAI_API_KEY",
     "OPENAI_CHAT_MODEL",
@@ -143,6 +144,11 @@ def _reload_settings(handler: JupyterHandler, env_path: Path) -> None:
     s["ds_assistant_chat_provider"]         = os.environ.get("DS_CHAT_PROVIDER", "").lower()
     s["ds_assistant_completion_provider"]   = os.environ.get("DS_COMPLETION_PROVIDER", "").lower()
     s["ds_assistant_completion_max_tokens"] = int(os.environ.get("COMPLETION_MAX_TOKENS", "") or "128")
+
+    # Anthropic feature flags (default true — "false" string turns them off)
+    s["ds_assistant_anthropic_extended_thinking"] = (
+        os.environ.get("ANTHROPIC_EXTENDED_THINKING", "true").lower() != "false"
+    )
 
     # Credentials
     s["ds_assistant_anthropic_api_key"]          = os.environ.get("ANTHROPIC_API_KEY", "")

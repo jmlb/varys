@@ -27,6 +27,7 @@ from .modules.reproducibility_guardian.handler import (
     ReproDismissHandler,
     ReproIssuesHandler,
 )
+from .handlers.mcp_handler import MCPStatusHandler, MCPReloadHandler, MCPServersHandler
 
 
 class DSAssistantExtension(ExtensionApp):
@@ -150,6 +151,29 @@ class DSAssistantExtension(ExtensionApp):
         except Exception as exc:
             self.log.warning("Varys: could not pre-load skills — %s", exc)
 
+        # ----------------------------------------------------------------
+        # Anthropic feature flags
+        # ----------------------------------------------------------------
+        self.settings["ds_assistant_anthropic_extended_thinking"] = (
+            os.environ.get("ANTHROPIC_EXTENDED_THINKING", "true").lower() != "false"
+        )
+
+        # ----------------------------------------------------------------
+        # MCP server manager — start all configured servers in background.
+        # Failures are non-fatal: Varys works fine with zero MCP servers.
+        # ----------------------------------------------------------------
+        try:
+            import asyncio
+            from .mcp.manager import MCPManager
+            mcp_manager = MCPManager()
+            self.settings["ds_mcp_manager"] = mcp_manager
+            # Schedule startup on the running event loop without blocking init
+            loop = asyncio.get_event_loop()
+            loop.create_task(mcp_manager.start_all())
+            self.log.info("Varys MCP: manager registered; servers starting in background")
+        except Exception as exc:
+            self.log.warning("Varys MCP: could not initialise manager — %s", exc)
+
     def initialize_handlers(self):
         """Register URL handlers."""
         self.log.info("Varys: Registering handlers")
@@ -187,4 +211,8 @@ class DSAssistantExtension(ExtensionApp):
             (url_path_join(base, "rag", "status"), RAGStatusHandler),
             (url_path_join(base, "rag", "forget"), RAGForgetHandler),
             (url_path_join(base, "rag", "ask"),    RAGAskHandler),
+            # MCP server management
+            (url_path_join(base, "mcp"),           MCPStatusHandler),
+            (url_path_join(base, "mcp", "reload"), MCPReloadHandler),
+            (url_path_join(base, "mcp", "servers"), MCPServersHandler),
         ])

@@ -51,6 +51,10 @@ Every cell in the notebook context is labelled **#N** where N counts from 1 at t
 The user will always refer to cells as `#N` (e.g. "#16", "cell #16", "cell 16").
 Never look for an execution-count match — just apply N − 1 directly.
 
+**In ALL your text output — summaries, preambles, explanations — you MUST use
+#N to refer to cells. The formats "pos:N", "position N", "cell at index N",
+"cell N" (bare), "idx N", or any other variant are FORBIDDEN.**
+
 ## Cell Identity Tags
 
 Each cell header also carries a stable short ID: `[id:XXXXXXXX]` (first 8 hex chars of the
@@ -196,6 +200,9 @@ Rules:
 - Keep the explanation concise (1–3 sentences maximum).
 - Do NOT include code in this preamble — just describe the plan in prose.
 - This text is streamed live to the user; it is their only feedback while waiting.
+- ALWAYS refer to cells as #N in your preamble (e.g. "#6", "#7", "#12").
+  NEVER use "pos:N", "cell index N", "position N", "cell at index N", or any
+  other variant — #N is the one and only format for cell references.
 """
 
 # Fallback persona used when the 'varys' skill is not enabled.
@@ -315,9 +322,17 @@ OPERATION_PLAN_TOOL = {
 class ClaudeClient:
     """Client for the Anthropic Claude API."""
 
-    def __init__(self, api_key: str, model: str = "claude-sonnet-4-6"):
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "claude-sonnet-4-6",
+        extended_thinking: bool = True,
+    ):
         self.api_key = api_key
         self.model = model
+        # When False, extended thinking is disabled even for supported models.
+        # Controlled by the Settings → Anthropic → "Extended thinking" toggle.
+        self._extended_thinking_enabled = extended_thinking
         # Single AsyncAnthropic instance — reused across requests to share
         # the underlying connection pool and avoid per-call setup overhead.
         self._aclient: Optional[anthropic.AsyncAnthropic] = (
@@ -496,6 +511,28 @@ class ClaudeClient:
             except Exception as e:
                 raise RuntimeError(f"Claude API error: {e}") from e
 
+    # Models that support Anthropic extended thinking (API-level, not prompt-based).
+    # Older claude-3-5-* models do NOT support it and will return an API error.
+    _EXTENDED_THINKING_MODELS = (
+        "claude-3-7",
+        "claude-sonnet-4",
+        "claude-opus-4",
+        "claude-haiku-4",
+    )
+
+    def _supports_extended_thinking(self) -> bool:
+        """Return True if extended thinking should be used for this request.
+
+        Both conditions must hold:
+          1. The user has enabled extended thinking (Settings → Anthropic tab).
+          2. The configured model actually supports the API-level thinking param
+             (claude-3-7+ / claude-4 family).
+        """
+        if not self._extended_thinking_enabled:
+            return False
+        m = self.model.lower()
+        return any(pat in m for pat in self._EXTENDED_THINKING_MODELS)
+
     async def stream_plan_task(
         self,
         user_message: str,
@@ -505,14 +542,18 @@ class ClaudeClient:
         operation_id: Optional[str],
         on_text_chunk: Callable[[str], Awaitable[None]],
         on_json_delta: Optional[Callable[[str], Awaitable[None]]] = None,
+        on_thought: Optional[Callable[[str], Awaitable[None]]] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
         """Stream pre-tool explanation text AND tool-call JSON deltas.
 
         Uses raw event iteration so we capture both:
-          - text_delta  → on_text_chunk (Claude's explanation before the tool call)
+          - text_delta      → on_text_chunk (Claude's explanation before the tool call)
           - input_json_delta → on_json_delta (the operation plan JSON being written)
-        This eliminates the silent gap while Claude writes the JSON payload.
+          - thinking_delta  → on_thought   (extended thinking, always-on for supported models)
+
+        Extended thinking is always active when the configured model supports the
+        API-level thinking parameter (claude-3-7+, claude-4 family).
         """
         if not self.api_key or not self._aclient:
             return self._fallback_response(user_message, operation_id)
@@ -521,22 +562,36 @@ class ClaudeClient:
         content_blocks = self._build_content_blocks(user_message, notebook_context)
         messages = self._prepend_history(chat_history, content_blocks)
 
+        # Extended thinking is always-on for supported models.
+        use_thinking = self._supports_extended_thinking()
+        # budget_tokens must be < max_tokens; reserve ~8 k for the tool-call JSON.
+        _THINKING_BUDGET = 8_000
+        _MAX_TOKENS_THINKING = 16_000
+        _MAX_TOKENS_DEFAULT = 8_192
+
         max_retries = 3
         base_delay = 2.0
 
         for attempt in range(max_retries):
             try:
-                async with self._aclient.messages.stream(
+                api_kwargs: Dict[str, Any] = dict(
                     model=self.model,
-                    max_tokens=8192,
+                    max_tokens=_MAX_TOKENS_THINKING if use_thinking else _MAX_TOKENS_DEFAULT,
                     system=system_prompt,
                     tools=[OPERATION_PLAN_TOOL],
                     # "auto" lets Claude emit explanation text before the tool call.
-                    # With "any" Claude skips the preamble — nothing to stream.
+                    # "any"/"tool" would conflict with extended thinking.
                     tool_choice={"type": "auto"},
                     messages=messages,
-                ) as stream:
-                    # Iterate raw events to capture both text and tool-JSON deltas
+                )
+                if use_thinking:
+                    api_kwargs["thinking"] = {
+                        "type": "enabled",
+                        "budget_tokens": _THINKING_BUDGET,
+                    }
+
+                async with self._aclient.messages.stream(**api_kwargs) as stream:
+                    # Iterate raw events to capture text, tool-JSON, and thinking deltas
                     async for event in stream:
                         if event.type != "content_block_delta":
                             continue
@@ -546,6 +601,9 @@ class ClaudeClient:
                             await asyncio.sleep(0)
                         elif delta.type == "input_json_delta" and on_json_delta:
                             await on_json_delta(delta.partial_json)
+                            await asyncio.sleep(0)
+                        elif delta.type == "thinking_delta" and on_thought:
+                            await on_thought(delta.thinking)
                             await asyncio.sleep(0)
 
                     final_msg = await stream.get_final_message()
@@ -650,21 +708,54 @@ class ClaudeClient:
         system: str,
         user: str,
         on_chunk: Callable[[str], Awaitable[None]],
+        on_thought: Optional[Callable[[str], Awaitable[None]]] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> None:
-        """Stream a free-form chat response, calling on_chunk for each token."""
+        """Stream a free-form chat response, calling on_chunk for each token.
+
+        Extended thinking is always active for supported models (claude-3-7+,
+        claude-4 family). thinking_delta events are routed to on_thought when
+        a callback is provided.
+        """
         if not self._aclient:
             await on_chunk("No API key configured.")
             return
         messages = self._prepend_history(chat_history, user)
-        async with self._aclient.messages.stream(
+
+        use_thinking = self._supports_extended_thinking()
+        _THINKING_BUDGET = 8_000
+        _MAX_TOKENS_THINKING = 16_000
+        _MAX_TOKENS_DEFAULT  = 8_192
+
+        api_kwargs: Dict[str, Any] = dict(
             model=self.model,
-            max_tokens=8192,
+            max_tokens=_MAX_TOKENS_THINKING if use_thinking else _MAX_TOKENS_DEFAULT,
             system=system,
             messages=messages,
-        ) as stream:
-            async for text in stream.text_stream:
-                await on_chunk(text)
+        )
+        if use_thinking:
+            api_kwargs["thinking"] = {
+                "type": "enabled",
+                "budget_tokens": _THINKING_BUDGET,
+            }
+
+        async with self._aclient.messages.stream(**api_kwargs) as stream:
+            if use_thinking:
+                # Raw event iteration to capture both thinking and text deltas.
+                async for event in stream:
+                    if event.type != "content_block_delta":
+                        continue
+                    delta = event.delta
+                    if delta.type == "thinking_delta" and on_thought:
+                        await on_thought(delta.thinking)
+                        await asyncio.sleep(0)
+                    elif delta.type == "text_delta":
+                        await on_chunk(delta.text)
+                        await asyncio.sleep(0)
+            else:
+                async for text in stream.text_stream:
+                    await on_chunk(text)
+
             final_chat = await stream.get_final_message()
             if hasattr(final_chat, "usage") and final_chat.usage:
                 self._set_usage(
