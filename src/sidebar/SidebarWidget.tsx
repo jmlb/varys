@@ -4058,7 +4058,10 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
               : 'Notebook excluded from context — click to include'}
             aria-label={notebookAware ? 'Notebook included' : 'Notebook excluded'}
           >
-            @notebook
+            <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+              <path d="M6.354 9.646a.5.5 0 0 1 0 .708l-1.5 1.5a2.5 2.5 0 1 1-3.536-3.536l1.5-1.5a.5.5 0 1 1 .707.707l-1.5 1.5a1.5 1.5 0 1 0 2.121 2.121l1.5-1.5a.5.5 0 0 1 .708 0zm3.536-5.636a2.5 2.5 0 0 0-3.536 0l-1.5 1.5a.5.5 0 0 0 .707.707l1.5-1.5a1.5 1.5 0 1 1 2.121 2.121l-1.5 1.5a.5.5 0 1 1-.707-.707l1.5-1.5a.5.5 0 0 0 0-.707zM5.5 10.5a.5.5 0 0 1 .708 0l.5.5a.5.5 0 0 1-.707.707l-.5-.5a.5.5 0 0 1 0-.707zm4.5-5a.5.5 0 0 1 0 .707l-.5.5a.5.5 0 0 1-.707-.707l.5-.5a.5.5 0 0 1 .707 0z"/>
+            </svg>
+            notebook
           </button>
           <textarea
             className="ds-assistant-input"
