@@ -11,7 +11,26 @@ Chat with it, ask it to write code, run EDA, generate plots, review your noteboo
 
 No Node.js required on the user's machine. No cloud account lock-in. Works with Anthropic, OpenAI, Google, Ollama (local), AWS Bedrock, Azure OpenAI, and OpenRouter.
 
-> [GitHub](https://github.com/jmlb/varys) · [Install guide](INSTALL.md) · [Medium article](https://jmlbeaujour.medium.com/varys-an-ai-assistant-that-understands-jupyter-notebooks-eb84a3705a77) · MIT License
+> [GitHub](https://github.com/jmlb/varys) · [Install guide](INSTALL.md) · [What's new](CHANGELOG.md) · [Medium article](https://jmlbeaujour.medium.com/varys-an-ai-assistant-that-understands-jupyter-notebooks-eb84a3705a77) · MIT License
+
+---
+
+## What's new since v0.2
+
+> Full details in [CHANGELOG.md](CHANGELOG.md).
+
+| Area | What changed |
+|---|---|
+| **MCP support** | Connect any MCP-compatible server (filesystem, DBs, custom APIs) via Settings → MCP tab |
+| **Sequential Thinking** | Python-native reasoning loop — no Node.js; LLM thinks step-by-step before answering |
+| **Stable cell IDs** | Cells carry persistent UUIDs; references survive insertion/deletion |
+| **Tags panel** | Group cells by tag; built-in presets for EDA, modelling, data cleaning |
+| **Click-to-edit bubbles** | Click any sent message to edit and re-send in place (Cursor-style) |
+| **Smooth streaming** | Character-based adaptive drip + auto-scroll (chat + thinking panel) |
+| **Thread management** | Duplicate, delete, and rename-with-collision-guard |
+| **AWS Bedrock auth** | Profile-based auth (`AWS_PROFILE`) + lazy credential refresh |
+| **Design token system** | All colours migrated to `--ds-*` tokens; day/night themes consistent everywhere |
+| **Cell output overlay** | Outputs numbered `[1]`, `[2]`…; errors show a red `🔴` badge |
 
 ---
 
