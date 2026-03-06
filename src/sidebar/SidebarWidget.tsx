@@ -3808,7 +3808,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                   // Always (i.e. they want output in cells). Also show for /chat
                   // responses (isChatOnly) so the user can still save those manually.
                   const effectivePushMode = notebookAware ? cellMode : 'chat';
-                  const showPush   = !msg.hadCellOps && !!(msg.content?.trim()) &&
+                  const showPush   = !!(msg.content?.trim()) &&
                                      (effectivePushMode === 'auto' || effectivePushMode === 'doc' || !!msg.isChatOnly);
                   const isLong     = (msg.content?.length ?? 0) >= COLLAPSE_THRESHOLD;
                   return (
