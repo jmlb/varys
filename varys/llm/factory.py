@@ -226,7 +226,15 @@ def _build_provider(
     # the current task only (chat or completion).  When this factory is called
     # for a chat task, `model` is the chat model; the completion engine needs
     # the dedicated, usually cheaper, completion model.
-    _, completion_model = _resolve(settings, "completion") if task == "chat" else (provider_name, model)
+    # Completion is optional: if no completion provider is configured we fall
+    # back to the chat model so that chat/plan requests are never blocked.
+    if task == "chat":
+        try:
+            _, completion_model = _resolve(settings, "completion")
+        except ValueError:
+            completion_model = model
+    else:
+        completion_model = model
 
     if provider_name == "ollama":
         from .ollama_provider import OllamaProvider
