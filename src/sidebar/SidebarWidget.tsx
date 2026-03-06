@@ -3840,7 +3840,19 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                           className="ds-msg-edit-textarea"
                           value={editingText}
                           autoFocus
-                          onChange={e => setEditingText(e.target.value)}
+                          ref={el => {
+                            if (el) {
+                              // Size to content on mount so it matches the original bubble height
+                              el.style.height = 'auto';
+                              el.style.height = el.scrollHeight + 'px';
+                            }
+                          }}
+                          onChange={e => {
+                            setEditingText(e.target.value);
+                            // Auto-grow/shrink with content
+                            e.target.style.height = 'auto';
+                            e.target.style.height = e.target.scrollHeight + 'px';
+                          }}
                           onKeyDown={e => {
                             if (e.key === 'Escape') setEditingMsgId(null);
                           }}

@@ -470,7 +470,7 @@
 }
 .ds-msg-edit-textarea {
   width: 100%;
-  min-height: 64px;
+  min-height: 40px;    /* floor — JS auto-sizes to content on mount */
   padding: 6px 8px;
   font-size: 12px;
   font-family: var(--jp-ui-font-family, sans-serif);
