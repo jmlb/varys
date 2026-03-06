@@ -2345,18 +2345,8 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
 
   // Auto-collapse long messages once they finish streaming
   useEffect(() => {
-    setCollapsedMsgs(prev => {
-      const next = new Set(prev);
-      messages.forEach(m => {
-        const collapsible = ['user', 'assistant', 'code-review'].includes(m.role);
-        const isLong = (m.content?.length ?? 0) >= COLLAPSE_THRESHOLD;
-        const isStreaming = m.id === activeStreamId;
-        if (collapsible && isLong && !isStreaming && !next.has(m.id)) {
-          next.add(m.id);
-        }
-      });
-      return next;
-    });
+    // Assistant bubbles are never auto-collapsed; the expand/collapse button
+    // in the toolbar lets the user collapse manually if desired.
   }, [messages, activeStreamId]);
 
   const addMessage = (
