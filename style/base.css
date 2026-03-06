@@ -4340,6 +4340,91 @@
   margin: 0;
 }
 
+/* ── Built-in tag presets ───────────────────────────────────────────────── */
+.ds-tags-presets {
+  margin-top: 8px;
+}
+.ds-tags-presets-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 10px;
+  color: var(--jp-ui-font-color2, #666);
+  padding: 2px 0;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  opacity: 0.75;
+  transition: opacity 0.12s;
+}
+.ds-tags-presets-toggle:hover { opacity: 1; }
+.ds-tags-presets-toggle:disabled { cursor: default; opacity: 0.35; }
+.ds-tags-presets-body {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px;
+  background: var(--jp-layout-color2, #f5f5f8);
+  border-radius: 5px;
+  border: 1px solid var(--jp-border-color2, #e0e0e0);
+}
+.ds-tags-preset-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.ds-tags-preset-category {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--jp-ui-font-color3, #999);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  padding-top: 3px;
+  min-width: 88px;
+}
+.ds-tags-preset-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.ds-tags-preset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--tag-color, #999);
+  background: transparent;
+  color: var(--tag-color, #555);
+  font-size: 10px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  line-height: 1.5;
+}
+.ds-tags-preset-chip:hover:not(:disabled) {
+  background: var(--tag-color, #999);
+  color: #fff;
+}
+.ds-tags-preset-chip--on {
+  background: color-mix(in srgb, var(--tag-color, #999) 15%, transparent);
+  cursor: default;
+  opacity: 0.7;
+}
+.ds-tags-preset-check {
+  font-size: 9px;
+}
+
+/* Night mode */
+.ds-chat-night .ds-tags-presets-body {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.1);
+}
+.ds-chat-night .ds-tags-preset-chip--on {
+  background: color-mix(in srgb, var(--tag-color, #999) 25%, transparent);
+}
+
 /* ── Cell tag overlay (pills injected into cell DOM) ─────────────────────── */
 
 /* Thin bar inserted above every cell — holds tags (left) + position (right) */

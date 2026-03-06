@@ -36,6 +36,27 @@ function tagColor(tag: string): string {
   return TAG_PALETTE[h % TAG_PALETTE.length];
 }
 
+// ── Built-in tag presets ──────────────────────────────────────────────────────
+
+const BUILT_IN_PRESETS: { category: string; tags: string[] }[] = [
+  {
+    category: 'ML Pipeline',
+    tags: ['data-loading', 'preprocessing', 'feature-engineering', 'training', 'evaluation', 'inference'],
+  },
+  {
+    category: 'Quality',
+    tags: ['todo', 'reviewed', 'needs-refactor', 'slow', 'broken', 'tested'],
+  },
+  {
+    category: 'Report',
+    tags: ['report', 'figure', 'table', 'key-finding', 'report-exclude'],
+  },
+  {
+    category: 'Status',
+    tags: ['draft', 'stable', 'deprecated', 'sensitive'],
+  },
+];
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 interface TagChipProps {
@@ -90,6 +111,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
   const [activeCellIdx, setActiveCellIdx]     = useState<number>(-1);
   const [filterText, setFilterText]           = useState('');
   const [section, setSection]                 = useState<'cell' | 'notebook'>('cell');
+  const [showPresets, setShowPresets]         = useState(false);
   const activeCellRef = useRef<Cell | null>(null);
 
   // ── Read notebook ───────────────────────────────────────────────────────────
@@ -319,6 +341,46 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
             >+ Add</button>
           </div>
           {tagError && <p className="ds-tags-error">{tagError}</p>}
+
+          {/* ── Built-in tag presets ──────────────────────────────────────── */}
+          <div className="ds-tags-presets">
+            <button
+              className="ds-tags-presets-toggle"
+              onClick={() => setShowPresets(p => !p)}
+              disabled={!activeCellRef.current}
+            >
+              <span>{showPresets ? '▾' : '▸'} Suggested tags</span>
+            </button>
+            {showPresets && (
+              <div className="ds-tags-presets-body">
+                {BUILT_IN_PRESETS.map(preset => (
+                  <div key={preset.category} className="ds-tags-preset-row">
+                    <span className="ds-tags-preset-category">{preset.category}</span>
+                    <div className="ds-tags-preset-chips">
+                      {preset.tags.map(t => {
+                        const applied = activeTags.includes(t);
+                        return (
+                          <button
+                            key={t}
+                            className={`ds-tags-preset-chip${applied ? ' ds-tags-preset-chip--on' : ''}`}
+                            style={{ '--tag-color': tagColor(t) } as React.CSSProperties}
+                            onClick={() => {
+                              if (!applied) applyTags([...activeTags, t]);
+                            }}
+                            title={applied ? `Already applied` : `Add "${t}"`}
+                            disabled={applied}
+                          >
+                            {applied && <span className="ds-tags-preset-check">✓</span>}
+                            {t}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Quick-pick from existing notebook tags */}
           {allTags.size > 0 && (
