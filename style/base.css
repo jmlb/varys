@@ -389,12 +389,15 @@
   padding: 0px 2px 2px 2px;
   border-bottom: 1px solid var(--jp-border-color2, rgba(0,0,0,0.08));
   margin-bottom: 4px;
+}
+/* Icon-only buttons (copy, expand) fade in on hover; the push button
+   overrides this with opacity:1 so it is always visible. */
+.ds-bubble-toolbar .ds-bubble-tool-btn {
   opacity: 0;
   transition: opacity 0.15s;
   pointer-events: none;
 }
-/* Show toolbar when the bubble is hovered */
-.ds-assistant-message:hover .ds-bubble-toolbar {
+.ds-assistant-message:hover .ds-bubble-toolbar .ds-bubble-tool-btn {
   opacity: 1;
   pointer-events: auto;
 }
@@ -440,7 +443,9 @@
 .ds-bubble-tool-btn:active {
   background: var(--jp-layout-color3, rgba(0,0,0,0.12));
 }
-/* "Push to cell" button — styled like the JupyterLab Run button */
+/* "Push to cell" button — styled like the JupyterLab Run button.
+   The parent toolbar has opacity:0 by default (hover-reveal), so we
+   force full opacity here so the button is always visible. */
 .ds-bubble-push-btn {
   display: inline-flex;
   align-items: center;
@@ -454,8 +459,10 @@
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  transition: background 0.12s, opacity 0.12s;
+  transition: background 0.12s;
   white-space: nowrap;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 .ds-bubble-push-btn:hover {
   background: #4e6378;
