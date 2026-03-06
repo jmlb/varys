@@ -35,10 +35,7 @@ export interface DiffViewProps {
     description?: string;
     diffs: DiffInfo[];
     onAccept: (operationId: string) => void;
-    onAcceptAndRun: (operationId: string) => void;
     onUndo: (operationId: string) => void;
-    onApplySelection: (operationId: string, decisions: CellDecision[]) => void;
-    hasCodeCells?: boolean;
 }
 export declare const DiffView: React.FC<DiffViewProps>;
 //# sourceMappingURL=DiffView.d.ts.map

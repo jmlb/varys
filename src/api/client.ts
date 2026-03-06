@@ -160,6 +160,12 @@ export interface TaskRequest {
    * 'doc'   — always write cells freely regardless of skill settings
    */
   cellMode?: 'chat' | 'auto' | 'doc';
+  /**
+   * When true, the backend injects sequential-thinking instructions so the LLM
+   * reasons step-by-step before answering.  Thought tokens are streamed as
+   * separate 'thought' SSE events and returned in response.thoughts.
+   */
+  thinkingEnabled?: boolean;
 }
 
 /** One step in a composite pipeline skill. */
@@ -202,6 +208,11 @@ export interface TaskResponse {
    * - "composite" : pipeline plan returned; compositePlan is populated
    */
   cellInsertionMode?: 'auto' | 'preview' | 'manual' | 'chat' | 'composite';
+  /**
+   * Complete reasoning trace produced when thinkingEnabled=true.
+   * Contains the full <thinking> block content, plain text, ready for display.
+   */
+  thoughts?: string;
   /** Populated when cellInsertionMode === "chat" or "manual". Free-form markdown. */
   chatResponse?: string;
   /** Populated when cellInsertionMode === "composite". Ordered list of pipeline steps. */
@@ -275,7 +286,8 @@ export class APIClient {
     onChunk: (text: string) => void,
     onProgress?: (text: string) => void,
     onJsonDelta?: (partial: string) => void,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    onThought?: (text: string) => void,
   ): Promise<TaskResponse> {
     const response = await fetch(`${this.baseUrl}/task`, {
       method: 'POST',
@@ -315,6 +327,11 @@ export class APIClient {
             const event = JSON.parse(part.slice(6));
             if (event.type === 'chunk' && event.text) {
               onChunk(event.text as string);
+            } else if (event.type === 'thought' && event.text) {
+              // Reasoning token from sequential thinking — surface as progress
+              // indicator so the user knows the LLM is working.
+              onThought?.(event.text as string);
+              onProgress?.('🧠 Thinking...');
             } else if (event.type === 'progress' && event.text) {
               onProgress?.(event.text as string);
             } else if (event.type === 'json_delta' && event.text) {
@@ -328,8 +345,9 @@ export class APIClient {
               const errMsg: string = (event as any).error ?? 'An API error occurred.';
               throw new Error(errMsg);
             }
-          } catch {
-            // skip malformed events
+          } catch (e) {
+            // Re-throw intentional API errors; silently drop JSON parse failures.
+            if (e instanceof Error) throw e;
           }
         }
       }
@@ -702,12 +720,70 @@ export class APIClient {
     return response.json();
   }
 
+  // ── MCP server management ──────────────────────────────────────────────
+
+  async getMCPStatus(): Promise<{
+    servers: Record<string, {
+      status: 'connected' | 'connecting' | 'disconnected' | 'error' | 'disabled';
+      error: string;
+      tools: string[];
+      config: { command: string; args: string[]; env: Record<string, string>; disabled: boolean };
+    }>;
+    totalTools: number;
+    configRaw: string;
+  }> {
+    const r = await fetch(`${this.baseUrl}/mcp`, {
+      headers: { 'X-XSRFToken': this.getXSRFToken() },
+    });
+    if (!r.ok) throw new Error(`getMCPStatus failed: ${r.status}`);
+    return r.json();
+  }
+
+  async reloadMCP(): Promise<void> {
+    const r = await fetch(`${this.baseUrl}/mcp/reload`, {
+      method: 'POST',
+      headers: { 'X-XSRFToken': this.getXSRFToken() },
+    });
+    if (!r.ok) throw new Error(`reloadMCP failed: ${r.status}`);
+  }
+
+  async addMCPServer(name: string, command: string, args: string[], env: Record<string, string> = {}): Promise<{ status: string; error: string }> {
+    const r = await fetch(`${this.baseUrl}/mcp/servers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-XSRFToken': this.getXSRFToken() },
+      body: JSON.stringify({ name, command, args, env }),
+    });
+    if (!r.ok) throw new Error(`addMCPServer failed: ${r.status}`);
+    return r.json();
+  }
+
+  async removeMCPServer(name: string): Promise<void> {
+    const r = await fetch(`${this.baseUrl}/mcp/servers`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'X-XSRFToken': this.getXSRFToken() },
+      body: JSON.stringify({ name }),
+    });
+    if (!r.ok) throw new Error(`removeMCPServer failed: ${r.status}`);
+  }
+
+  async toggleMCPServer(name: string, disabled: boolean): Promise<void> {
+    const r = await fetch(`${this.baseUrl}/mcp/servers`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-XSRFToken': this.getXSRFToken() },
+      body: JSON.stringify({ name, disabled }),
+    });
+    if (!r.ok) throw new Error(`toggleMCPServer failed: ${r.status}`);
+  }
+
   private getXSRFToken(): string {
     const cookies = document.cookie.split(';');
     for (const cookie of cookies) {
-      const [name, value] = cookie.trim().split('=');
+      const trimmed = cookie.trim();
+      const sep = trimmed.indexOf('=');
+      if (sep === -1) continue;
+      const name = trimmed.slice(0, sep);
       if (name === '_xsrf') {
-        return decodeURIComponent(value);
+        return decodeURIComponent(trimmed.slice(sep + 1));
       }
     }
     return '';

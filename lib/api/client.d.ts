@@ -143,6 +143,12 @@ export interface TaskRequest {
      * 'doc'   — always write cells freely regardless of skill settings
      */
     cellMode?: 'chat' | 'auto' | 'doc';
+    /**
+     * When true, the backend injects sequential-thinking instructions so the LLM
+     * reasons step-by-step before answering.  Thought tokens are streamed as
+     * separate 'thought' SSE events and returned in response.thoughts.
+     */
+    thinkingEnabled?: boolean;
 }
 /** One step in a composite pipeline skill. */
 export interface CompositeStep {
@@ -182,6 +188,11 @@ export interface TaskResponse {
      * - "composite" : pipeline plan returned; compositePlan is populated
      */
     cellInsertionMode?: 'auto' | 'preview' | 'manual' | 'chat' | 'composite';
+    /**
+     * Complete reasoning trace produced when thinkingEnabled=true.
+     * Contains the full <thinking> block content, plain text, ready for display.
+     */
+    thoughts?: string;
     /** Populated when cellInsertionMode === "chat" or "manual". Free-form markdown. */
     chatResponse?: string;
     /** Populated when cellInsertionMode === "composite". Ordered list of pipeline steps. */
@@ -229,7 +240,7 @@ export declare class APIClient {
      * - For all other modes the backend returns JSON; `onChunk` is never called
      *   and the resolved promise contains the complete response directly.
      */
-    executeTaskStreaming(request: TaskRequest, onChunk: (text: string) => void, onProgress?: (text: string) => void, onJsonDelta?: (partial: string) => void, signal?: AbortSignal): Promise<TaskResponse>;
+    executeTaskStreaming(request: TaskRequest, onChunk: (text: string) => void, onProgress?: (text: string) => void, onJsonDelta?: (partial: string) => void, signal?: AbortSignal, onThought?: (text: string) => void): Promise<TaskResponse>;
     fetchCompletion(request: CompletionRequest): Promise<CompletionResult>;
     getSettings(): Promise<Record<string, {
         value: string;
@@ -342,6 +353,28 @@ export declare class APIClient {
         ok: boolean;
         chunks_removed: number;
     }>;
+    getMCPStatus(): Promise<{
+        servers: Record<string, {
+            status: 'connected' | 'connecting' | 'disconnected' | 'error' | 'disabled';
+            error: string;
+            tools: string[];
+            config: {
+                command: string;
+                args: string[];
+                env: Record<string, string>;
+                disabled: boolean;
+            };
+        }>;
+        totalTools: number;
+        configRaw: string;
+    }>;
+    reloadMCP(): Promise<void>;
+    addMCPServer(name: string, command: string, args: string[], env?: Record<string, string>): Promise<{
+        status: string;
+        error: string;
+    }>;
+    removeMCPServer(name: string): Promise<void>;
+    toggleMCPServer(name: string, disabled: boolean): Promise<void>;
     private getXSRFToken;
 }
 //# sourceMappingURL=client.d.ts.map

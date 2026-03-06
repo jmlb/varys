@@ -12,7 +12,7 @@ import { APIClient, TaskResponse, OperationStep, ChatTurn, CompositeStep, Resolv
 import { NotebookReader } from '../context/NotebookReader';
 import { VariableResolver, parseVariableRefs } from '../context/VariableResolver';
 import { CellEditor } from '../editor/CellEditor';
-import { DiffView, DiffInfo, CellDecision } from '../ui/DiffView';
+import { DiffView, DiffInfo } from '../ui/DiffView';
 import { ReproPanel } from '../reproducibility/ReproPanel';
 import { TagsPanel } from '../tags/TagsPanel';
 
@@ -171,6 +171,11 @@ interface Message {
    * response as a markdown cell even when there are no code blocks.
    */
   isChatOnly?: boolean;
+  /**
+   * Step-by-step reasoning trace produced when sequential thinking is enabled.
+   * Rendered as a collapsible section above the main answer in the bubble.
+   */
+  thoughts?: string;
 }
 
 // Report generation is triggered only by the explicit /report command.
@@ -417,7 +422,7 @@ interface TabGroup {
   label: string;
   providerKey: string | null;
   zooKey: string | null;
-  fields: { key: string; label: string; type: string; placeholder?: string }[];
+  fields: { key: string; label: string; type: string; placeholder?: string; description?: string }[];
 }
 
 const TAB_GROUPS: TabGroup[] = [
@@ -442,6 +447,12 @@ const TAB_GROUPS: TabGroup[] = [
       { key: 'ANTHROPIC_CHAT_MODEL',         label: 'Chat model',       type: 'model-select' },
       { key: 'ANTHROPIC_COMPLETION_MODEL',   label: 'Completion model', type: 'model-select' },
       { key: 'ANTHROPIC_EMBED_MODEL',        label: 'Embedding model',  type: 'model-select' },
+      {
+        key: 'ANTHROPIC_EXTENDED_THINKING',
+        label: 'Extended thinking',
+        type: 'toggle',
+        description: 'Enable Anthropic native extended thinking (claude-3-7+ / claude-4+). The LLM reasons internally before answering — visible in the 🧠 panel. Higher token cost.',
+      },
     ]
   },
   {
@@ -525,13 +536,6 @@ const TAB_GROUPS: TabGroup[] = [
       { key: 'OLLAMA_EMBED_MODEL',             label: 'Embedding model',  type: 'model-select' },
     ]
   },
-  {
-    id: 'rag',
-    label: 'Knowledge',
-    providerKey: null,
-    zooKey: null,
-    fields: []   // no form fields here — just the index status widget below
-  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -613,6 +617,265 @@ const RAGStatusSection: React.FC<RAGStatusSectionProps> = ({ apiClient, notebook
       {status.indexed_files === 0 && status.available && (
         <div className="ds-rag-status-empty">
           No files indexed yet. Drop files in <code>.jupyter-assistant/knowledge/</code> then run <code>/index</code> in chat.
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// MCPPanel — MCP server management shown on the MCP settings tab
+// ---------------------------------------------------------------------------
+
+interface MCPServerInfo {
+  status: 'connected' | 'connecting' | 'disconnected' | 'error' | 'disabled';
+  error: string;
+  tools: string[];
+  config: { command: string; args: string[]; env: Record<string, string>; disabled: boolean };
+}
+
+const MCPPanel: React.FC<{ apiClient: APIClient }> = ({ apiClient }) => {
+  const [servers, setServers] = useState<Record<string, MCPServerInfo>>({});
+  const [totalTools, setTotalTools] = useState(0);
+  const [configRaw, setConfigRaw] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [toggling, setToggling] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newCmd, setNewCmd] = useState('');
+  const [newArgs, setNewArgs] = useState('');
+  const [newEnv, setNewEnv] = useState('');
+  const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
+  const [statusMsg, setStatusMsg] = useState<{type: 'ok'|'err'; text: string} | null>(null);
+
+  const refresh = async () => {
+    setLoading(true);
+    try {
+      const s = await apiClient.getMCPStatus();
+      setServers(s.servers);
+      setTotalTools(s.totalTools);
+      setConfigRaw(s.configRaw ?? '');
+    } catch (e: unknown) {
+      setStatusMsg({ type: 'err', text: `Load failed: ${e instanceof Error ? e.message : String(e)}` });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void refresh(); }, []);
+
+  const handleReload = async () => {
+    setLoading(true);
+    setStatusMsg(null);
+    try {
+      await apiClient.reloadMCP();
+      await refresh();
+      setStatusMsg({ type: 'ok', text: 'Servers reloaded from config.' });
+    } catch (e: unknown) {
+      setStatusMsg({ type: 'err', text: `Reload failed: ${e instanceof Error ? e.message : String(e)}` });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggle = async (name: string, currentlyDisabled: boolean) => {
+    setToggling(name);
+    setStatusMsg(null);
+    try {
+      await apiClient.toggleMCPServer(name, !currentlyDisabled);
+      await refresh();
+      setStatusMsg({
+        type: 'ok',
+        text: `Server "${name}" ${currentlyDisabled ? 'enabled' : 'disabled'}.`,
+      });
+    } catch (e: unknown) {
+      setStatusMsg({ type: 'err', text: `Toggle failed: ${e instanceof Error ? e.message : String(e)}` });
+    } finally {
+      setToggling(null);
+    }
+  };
+
+  /** Parse "KEY=VALUE" lines into a Record, ignoring blank lines and comments. */
+  const parseEnvLines = (raw: string): Record<string, string> => {
+    const env: Record<string, string> = {};
+    for (const line of raw.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eq = trimmed.indexOf('=');
+      if (eq < 1) continue;
+      env[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim();
+    }
+    return env;
+  };
+
+  const handleAdd = async () => {
+    const name = newName.trim();
+    const cmd  = newCmd.trim();
+    if (!name || !cmd) return;
+    const args = newArgs.trim() ? newArgs.trim().split(/\s+/) : [];
+    const env  = parseEnvLines(newEnv);
+    setAdding(true);
+    setStatusMsg(null);
+    try {
+      await apiClient.addMCPServer(name, cmd, args, env);
+      setNewName(''); setNewCmd(''); setNewArgs(''); setNewEnv('');
+      await refresh();
+      setStatusMsg({ type: 'ok', text: `Server "${name}" added.` });
+    } catch (e: unknown) {
+      setStatusMsg({ type: 'err', text: `Add failed: ${e instanceof Error ? e.message : String(e)}` });
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleRemove = async (name: string) => {
+    try {
+      await apiClient.removeMCPServer(name);
+      await refresh();
+      setStatusMsg({ type: 'ok', text: `Server "${name}" removed.` });
+    } catch (e: unknown) {
+      setStatusMsg({ type: 'err', text: `Remove failed: ${e instanceof Error ? e.message : String(e)}` });
+    }
+  };
+
+  const STATUS_DOT: Record<string, string> = {
+    connected: '🟢', connecting: '🟡', disconnected: '⚫', error: '🔴', disabled: '⬜',
+  };
+
+  return (
+    <div className="ds-mcp-panel">
+      <div className="ds-mcp-header">
+        <span className="ds-mcp-summary">
+          {Object.keys(servers).length} server(s) · {totalTools} tool(s)
+        </span>
+        <button className="ds-mcp-reload-btn" onClick={() => void handleReload()} disabled={loading}>
+          {loading ? '…' : '↺ Reload'}
+        </button>
+      </div>
+
+      {statusMsg && (
+        <div className={`ds-mcp-status ds-mcp-status--${statusMsg.type}`}>{statusMsg.text}</div>
+      )}
+
+      {/* Server list */}
+      {Object.keys(servers).length === 0 && !loading && (
+        <p className="ds-mcp-empty">
+          No servers configured. Add one below or edit{' '}
+          <code>~/.jupyter/varys-mcp.json</code> directly.
+        </p>
+      )}
+
+      {Object.entries(servers).map(([name, info]) => {
+        const isDisabled = info.config.disabled;
+        const isToggling = toggling === name;
+        return (
+          <div key={name} className={`ds-mcp-server ds-mcp-server--${info.status}${isDisabled ? ' ds-mcp-server--dim' : ''}`}>
+            <div className="ds-mcp-server-header">
+              <span className="ds-mcp-server-dot" title={info.status}>
+                {STATUS_DOT[info.status] ?? '⚫'}
+              </span>
+              <span className={`ds-mcp-server-name${isDisabled ? ' ds-mcp-server-name--disabled' : ''}`}>{name}</span>
+              <span className="ds-mcp-server-cmd" title={`${info.config.command} ${info.config.args.join(' ')}`}>
+                {info.config.command} {info.config.args.join(' ')}
+              </span>
+              {/* Enable / disable toggle */}
+              <label
+                className="ds-mcp-server-toggle"
+                title={isDisabled ? 'Enable server' : 'Disable server (keeps config)'}
+              >
+                <input
+                  type="checkbox"
+                  checked={!isDisabled}
+                  disabled={isToggling}
+                  onChange={() => void handleToggle(name, isDisabled)}
+                />
+                <span className="ds-mcp-server-toggle-slider" />
+              </label>
+              <button
+                className="ds-mcp-server-remove"
+                onClick={() => void handleRemove(name)}
+                title="Remove server"
+              >✕</button>
+            </div>
+            {info.error && (
+              <div className="ds-mcp-server-error">{info.error}</div>
+            )}
+            {info.tools.length > 0 && (
+              <div className="ds-mcp-tools">
+                <button
+                  className="ds-mcp-tools-toggle"
+                  onClick={() => setExpandedTools(p => ({ ...p, [name]: !p[name] }))}
+                >
+                  {expandedTools[name] ? '▾' : '▸'} {info.tools.length} tool(s)
+                </button>
+                {expandedTools[name] && (
+                  <ul className="ds-mcp-tools-list">
+                    {info.tools.map(t => (
+                      <li key={t} className="ds-mcp-tool-name">
+                        {t.replace(`${name}__`, '')}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Add server form */}
+      <div className="ds-mcp-add">
+        <div className="ds-mcp-add-title">Add server</div>
+        <input
+          className="ds-mcp-input"
+          placeholder="Name (e.g. filesystem)"
+          value={newName}
+          onChange={e => setNewName(e.target.value)}
+        />
+        <input
+          className="ds-mcp-input"
+          placeholder="Command (e.g. npx, uvx, python)"
+          value={newCmd}
+          onChange={e => setNewCmd(e.target.value)}
+        />
+        <input
+          className="ds-mcp-input"
+          placeholder="Args (space-separated, e.g. -y @modelcontextprotocol/server-filesystem /tmp)"
+          value={newArgs}
+          onChange={e => setNewArgs(e.target.value)}
+        />
+        <textarea
+          className="ds-mcp-input ds-mcp-env-textarea"
+          placeholder={'Env vars — one KEY=VALUE per line (optional)\ne.g.\nGOOGLE_CLIENT_ID=your-id\nGOOGLE_CLIENT_SECRET=your-secret'}
+          value={newEnv}
+          rows={6}
+          onChange={e => setNewEnv(e.target.value)}
+        />
+        <button
+          className="ds-mcp-add-btn"
+          onClick={() => void handleAdd()}
+          disabled={adding || !newName.trim() || !newCmd.trim()}
+        >
+          {adding ? 'Connecting…' : '+ Add & connect'}
+        </button>
+        <p className="ds-mcp-hint">
+          Config persisted to <code>~/.jupyter/varys-mcp.json</code> — same format as
+          Cursor / Claude Desktop. Disable servers to keep their config without running
+          the subprocess.
+        </p>
+      </div>
+
+      {/* Read-only config viewer */}
+      {configRaw && (
+        <div className="ds-mcp-config-viewer">
+          <div className="ds-mcp-config-viewer-label">~/.jupyter/varys-mcp.json</div>
+          <textarea
+            className="ds-mcp-config-textarea"
+            value={configRaw}
+            readOnly
+            rows={Math.min(configRaw.split('\n').length + 1, 20)}
+            spellCheck={false}
+          />
         </div>
       )}
     </div>
@@ -945,6 +1208,27 @@ const ModelsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSaved
                   </div>
                 );
               }
+              if (field.type === 'toggle') {
+                const isOn = (values[field.key] ?? 'true') !== 'false';
+                return (
+                  <div key={field.key} className="ds-settings-row ds-settings-row--toggle">
+                    <div className="ds-settings-toggle-label-group">
+                      <span className="ds-settings-label">{field.label}</span>
+                      {field.description && (
+                        <span className="ds-settings-toggle-desc">{field.description}</span>
+                      )}
+                    </div>
+                    <label className="ds-settings-toggle-switch" title={isOn ? 'Click to disable' : 'Click to enable'}>
+                      <input
+                        type="checkbox"
+                        checked={isOn}
+                        onChange={e => handleChange(field.key, e.target.checked ? 'true' : 'false')}
+                      />
+                      <span className="ds-settings-toggle-slider" />
+                    </label>
+                  </div>
+                );
+              }
               return (
                 <div key={field.key} className="ds-settings-row">
                   <label className="ds-settings-label">{field.label}</label>
@@ -959,48 +1243,6 @@ const ModelsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSaved
                 </div>
               );
             })}
-
-            {/* Knowledge tab: embed routing summary + index status */}
-            {currentGroup.id === 'rag' && (
-              <>
-                <div className="ds-rag-routing-summary">
-                  <div className="ds-rag-routing-row">
-                    <span className="ds-rag-routing-label">Embedding provider</span>
-                    <span className="ds-rag-routing-value">
-                      {(values['DS_EMBED_PROVIDER'] || '—').toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="ds-rag-routing-row">
-                    <span className="ds-rag-routing-label">Embedding model</span>
-                    <span className="ds-rag-routing-value">
-                      {(() => {
-                        const p = (values['DS_EMBED_PROVIDER'] ?? '').toUpperCase();
-                        return p ? (values[`${p}_EMBED_MODEL`] || '— (use model zoo)') : '—';
-                      })()}
-                    </span>
-                  </div>
-                  <p className="ds-rag-routing-hint">
-                    Configure the provider in <strong>Routing → Embedding</strong> and the model in
-                    the provider tab's <em>Embedding model</em> field.
-                  </p>
-                </div>
-                <div className="ds-rag-storage-hint">
-                  <strong>How to add knowledge</strong>
-                  <p>
-                    Drop PDFs, notebooks, or markdown files into{' '}
-                    <code>.jupyter-assistant/knowledge/</code>, then run{' '}
-                    <code>/index</code> in the chat to index them.
-                  </p>
-                  <p>
-                    Indexed content is stored as vectors in{' '}
-                    <code>.jupyter-assistant/rag/chroma/</code> — original files are
-                    never moved or copied. Only files inside the{' '}
-                    <code>knowledge/</code> folder can be indexed.
-                  </p>
-                </div>
-                <RAGStatusSection apiClient={apiClient} notebookPath={notebookPath} />
-              </>
-            )}
 
             {/* Model zoo — shown on provider tabs that have a zoo */}
             {currentGroup.zooKey && (
@@ -1068,6 +1310,29 @@ const SkillsPanel: React.FC<{ apiClient: APIClient; notebookPath?: string }> = (
   const [library, setLibrary]               = useState<BundledSkillEntry[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [importing, setImporting]           = useState<string | null>(null);
+
+  // Resizable splitter
+  const [listWidth, setListWidth] = useState(160);
+  const panelRef   = useRef<HTMLDivElement>(null);
+  const dragging   = useRef(false);
+
+  const onSplitterMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragging.current = true;
+    const onMove = (ev: MouseEvent) => {
+      if (!dragging.current || !panelRef.current) return;
+      const rect = panelRef.current.getBoundingClientRect();
+      const newW = Math.min(Math.max(ev.clientX - rect.left, 80), rect.width - 80);
+      setListWidth(newW);
+    };
+    const onUp = () => {
+      dragging.current = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
 
   useEffect(() => {
     apiClient.getSkills(notebookPath)
@@ -1162,9 +1427,9 @@ const SkillsPanel: React.FC<{ apiClient: APIClient; notebookPath?: string }> = (
   };
 
   return (
-    <div className="ds-skills-panel">
+    <div className="ds-skills-panel" ref={panelRef}>
       {/* ── Left: skill list ── */}
-      <div className="ds-skills-list">
+      <div className="ds-skills-list" style={{ width: listWidth, minWidth: 80, maxWidth: undefined, flexShrink: 0 }}>
         <div className="ds-skills-list-header">
           <span className="ds-skills-list-title">Skills</span>
           <button
@@ -1266,6 +1531,9 @@ const SkillsPanel: React.FC<{ apiClient: APIClient; notebookPath?: string }> = (
         </div>
       </div>
 
+      {/* ── Drag splitter ── */}
+      <div className="ds-skills-splitter" onMouseDown={onSplitterMouseDown} title="Drag to resize" />
+
       {/* ── Right: editor ── */}
       <div className="ds-skill-editor">
         {!selectedName ? (
@@ -1278,11 +1546,17 @@ const SkillsPanel: React.FC<{ apiClient: APIClient; notebookPath?: string }> = (
             <div className="ds-skill-editor-tabs">
               <button
                 className={`ds-skill-editor-tab${editorTab === 'skill' ? ' ds-skill-editor-tab--active' : ''}`}
-                onClick={() => { setEditorTab('skill'); setDirty(false); setSaveStatus(null); }}
+                onClick={() => {
+                  if (dirty && !window.confirm('Discard unsaved changes?')) return;
+                  setEditorTab('skill'); setDirty(false); setSaveStatus(null);
+                }}
               >SKILL.md</button>
               <button
                 className={`ds-skill-editor-tab${editorTab === 'readme' ? ' ds-skill-editor-tab--active' : ''}`}
-                onClick={() => { setEditorTab('readme'); setDirty(false); setSaveStatus(null); }}
+                onClick={() => {
+                  if (dirty && !window.confirm('Discard unsaved changes?')) return;
+                  setEditorTab('readme'); setDirty(false); setSaveStatus(null);
+                }}
               >README.md</button>
               <div className="ds-skill-editor-tabs-spacer" />
               {dirty && <span className="ds-skill-editor-dirty" title="Unsaved changes">●</span>}
@@ -1392,13 +1666,76 @@ const CommandsPanel: React.FC<{ apiClient: APIClient }> = ({ apiClient }) => {
   );
 };
 
+// ---------------------------------------------------------------------------
+// IndexingPanel — Indexing & Docs top-level tab
+// ---------------------------------------------------------------------------
+
+const IndexingPanel: React.FC<{ apiClient: APIClient; notebookPath: string }> = ({
+  apiClient, notebookPath,
+}) => {
+  const [embedProvider, setEmbedProvider] = useState('');
+  const [embedModel, setEmbedModel]       = useState('');
+
+  useEffect(() => {
+    apiClient.getSettings().then(raw => {
+      // Normalize: entries are {value, masked} objects
+      const s: Record<string, string> = {};
+      for (const [k, entry] of Object.entries(raw)) {
+        if (!k.startsWith('_')) s[k] = (entry as { value: string }).value ?? String(entry);
+      }
+      const p = (s['DS_EMBED_PROVIDER'] ?? '').toUpperCase();
+      setEmbedProvider(p);
+      setEmbedModel(p ? (s[`${p}_EMBED_MODEL`] ?? '') : '');
+    }).catch(() => { /* ignore */ });
+  }, []);
+
+  return (
+    <div className="ds-settings-tab-content ds-indexing-panel">
+      {/* Embed routing summary */}
+      <div className="ds-rag-routing-summary">
+        <div className="ds-rag-routing-row">
+          <span className="ds-rag-routing-label">Embedding provider</span>
+          <span className="ds-rag-routing-value">{embedProvider || '—'}</span>
+        </div>
+        <div className="ds-rag-routing-row">
+          <span className="ds-rag-routing-label">Embedding model</span>
+          <span className="ds-rag-routing-value">{embedModel || '— (use model zoo)'}</span>
+        </div>
+        <p className="ds-rag-routing-hint">
+          Configure the provider in <strong>Models → Routing → Embedding</strong> and
+          the model in the provider tab's <em>Embedding model</em> field.
+        </p>
+      </div>
+
+      {/* How-to */}
+      <div className="ds-rag-storage-hint">
+        <strong>How to add knowledge</strong>
+        <p>
+          Drop PDFs, notebooks, or markdown files into{' '}
+          <code>.jupyter-assistant/knowledge/</code>, then run{' '}
+          <code>/index</code> in the chat to index them.
+        </p>
+        <p>
+          Indexed content is stored as vectors in{' '}
+          <code>.jupyter-assistant/rag/chroma/</code> — original files are never
+          moved or copied. Only files inside the <code>knowledge/</code> folder
+          can be indexed.
+        </p>
+      </div>
+
+      {/* Live index status */}
+      <RAGStatusSection apiClient={apiClient} notebookPath={notebookPath} />
+    </div>
+  );
+};
+
 // SettingsPanel — top-level wrapper with [Models | Skills | Commands] tabs
 // ---------------------------------------------------------------------------
 
 const SettingsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSaved?: () => void; notebookPath?: string }> = ({
   apiClient, onClose, onSaved, notebookPath = ''
 }) => {
-  const [topTab, setTopTab] = useState<'models' | 'skills' | 'commands'>('models');
+  const [topTab, setTopTab] = useState<'models' | 'mcp' | 'skills' | 'commands' | 'indexing'>('models');
   return (
     <div className="ds-settings-outer">
       <div className="ds-settings-top-tabs">
@@ -1407,6 +1744,10 @@ const SettingsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSav
           onClick={() => setTopTab('models')}
         >⚙ Models</button>
         <button
+          className={`ds-settings-top-tab${topTab === 'mcp' ? ' ds-settings-top-tab--active' : ''}`}
+          onClick={() => setTopTab('mcp')}
+        >🔗 MCP</button>
+        <button
           className={`ds-settings-top-tab${topTab === 'skills' ? ' ds-settings-top-tab--active' : ''}`}
           onClick={() => setTopTab('skills')}
         >📚 Skills</button>
@@ -1414,13 +1755,37 @@ const SettingsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSav
           className={`ds-settings-top-tab${topTab === 'commands' ? ' ds-settings-top-tab--active' : ''}`}
           onClick={() => setTopTab('commands')}
         >/ Commands</button>
+        <button
+          className={`ds-settings-top-tab${topTab === 'indexing' ? ' ds-settings-top-tab--active' : ''}`}
+          onClick={() => setTopTab('indexing')}
+        >📂 Indexing &amp; Docs</button>
       </div>
 
       {topTab === 'models' ? (
         <ModelsPanel apiClient={apiClient} onClose={onClose} onSaved={onSaved} notebookPath={notebookPath} />
+      ) : topTab === 'mcp' ? (
+        <>
+          <div className="ds-settings-tab-content">
+            <MCPPanel apiClient={apiClient} />
+          </div>
+          <div className="ds-settings-footer">
+            <div className="ds-settings-actions">
+              <button className="ds-settings-cancel-btn" onClick={onClose}>Close</button>
+            </div>
+          </div>
+        </>
       ) : topTab === 'skills' ? (
         <>
           <SkillsPanel apiClient={apiClient} notebookPath={notebookPath} />
+          <div className="ds-settings-footer">
+            <div className="ds-settings-actions">
+              <button className="ds-settings-cancel-btn" onClick={onClose}>Close</button>
+            </div>
+          </div>
+        </>
+      ) : topTab === 'indexing' ? (
+        <>
+          <IndexingPanel apiClient={apiClient} notebookPath={notebookPath} />
           <div className="ds-settings-footer">
             <div className="ds-settings-actions">
               <button className="ds-settings-cancel-btn" onClick={onClose}>Close</button>
@@ -1615,7 +1980,7 @@ const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
           onClick={() => onSelect(cmd)}
         >
           <span className="ds-cmd-name">{cmd.command}</span>
-          <span className="ds-cmd-badge ds-cmd-badge-{cmd.type}">{cmd.type}</span>
+          <span className={`ds-cmd-badge ds-cmd-badge-${cmd.type}`}>{cmd.type}</span>
           <span className="ds-cmd-desc">{cmd.description}</span>
         </div>
       ))}
@@ -1953,11 +2318,26 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     if (streamTimerRef.current) clearInterval(streamTimerRef.current);
     streamTimerRef.current = setInterval(() => {
       if (streamQueueRef.current.length === 0) return;
-      // Drain up to 4 chunks per frame (~120 chars/sec at 30ms interval)
-      const batch = streamQueueRef.current.splice(0, 4).join('');
+
+      // Collapse all buffered tokens into one character string so we can
+      // drip by character count rather than token count.  LLM tokens range
+      // from 1 to 20+ chars; token-based draining produces irregular jumps.
+      const pending = streamQueueRef.current.splice(0).join('');
+
+      // Adaptive character drip:
+      //   ≤ 50 chars backlog  → 8  chars/tick  (~267 chars/s) — smooth typewriter
+      //   ≤ 200 chars backlog → 16 chars/tick  (~533 chars/s) — normal pace
+      //   > 200 chars backlog → 32 chars/tick  (~1066 chars/s) — catch-up mode
+      const charsPerTick = pending.length > 200 ? 32 : pending.length > 50 ? 16 : 8;
+      const toReveal     = pending.slice(0, charsPerTick);
+      const leftover     = pending.slice(charsPerTick);
+
+      // Put the unshown remainder back so the next tick continues from here.
+      if (leftover) streamQueueRef.current.unshift(leftover);
+
       setMessages(prev => prev.map(m =>
         m.id === streamMsgIdRef.current
-          ? { ...m, content: m.content + batch }
+          ? { ...m, content: m.content + toReveal }
           : m
       ));
     }, 30);
@@ -1991,6 +2371,23 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
   const [showSettings, setShowSettings]     = useState(false);
   const [showRepro,    setShowRepro]         = useState(false);
   const [showTags,     setShowTags]          = useState(false);
+
+  // Sequential thinking toggle — persisted in localStorage, default OFF.
+  const [thinkingEnabled, setThinkingEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('ds-varys-thinking') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  // Tracks which message IDs have their thinking section collapsed (true = collapsed)
+  const [thinkCollapsed, setThinkCollapsed] = useState<Map<string, boolean>>(new Map());
+  const toggleThinkCollapsed = (id: string) =>
+    setThinkCollapsed(prev => new Map(prev).set(id, !prev.get(id)));
+  // Ref mirrors state so async callbacks (handleSend) always read the live value
+  // even if captured in a stale closure.
+  const thinkingEnabledRef = useRef(thinkingEnabled);
+  useEffect(() => { thinkingEnabledRef.current = thinkingEnabled; }, [thinkingEnabled]);
 
   // Chat window theme toggle: 'day' (light) or 'night' (dark), persisted in
   // localStorage so it survives JupyterLab restarts independently of the
@@ -2288,7 +2685,11 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
   const [showCmdPopup, setShowCmdPopup] = useState(false);
   const [activeCommand, setActiveCommand] = useState<SlashCommand | null>(null);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef       = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  // Tracks each rendered .ds-thinking-body element by message id so the scroll
+  // effect can pin the active one to the bottom during thought streaming.
+  const thinkingBodyRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Load slash commands on mount (and re-load after skills refresh)
   useEffect(() => {
@@ -2338,16 +2739,19 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiClient]);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom whenever messages update or streaming is active.
+  // Uses instant scrollTop assignment so the view stays pinned during rapid
+  // 30 ms token bursts without smooth-scroll lag.
+  // Also pins the active thinking-body panel so reasoning text stays readable.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+    const el = messagesContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
 
-  // Auto-collapse long messages once they finish streaming
-  useEffect(() => {
-    // Assistant bubbles are never auto-collapsed; the expand/collapse button
-    // in the toolbar lets the user collapse manually if desired.
-  }, [messages, activeStreamId]);
+    if (activeStreamId) {
+      const thinkEl = thinkingBodyRefs.current.get(activeStreamId);
+      if (thinkEl) thinkEl.scrollTop = thinkEl.scrollHeight;
+    }
+  }, [messages, isLoading, activeStreamId]);
 
   const addMessage = (
     role: Message['role'],
@@ -2451,6 +2855,10 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     overrideText?: string,
     displayText?: string,
     skipAdvisory = false,
+    // When re-sending an edited message the caller passes the already-truncated
+    // message list so chatHistory is built from the correct prior context rather
+    // than the stale `messages` closure (React state updates are async).
+    priorMessages?: Message[],
   ): Promise<void> => {
     const typedText = (overrideText ?? input).trim();
     if (!typedText || isLoading) return;
@@ -2596,7 +3004,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
       }
     }
 
-    const chatHistory: ChatTurn[] = messages
+    const chatHistory: ChatTurn[] = (priorMessages ?? messages)
       .filter(m => m.role === 'user' || m.role === 'assistant')
       .slice(-MAX_HISTORY_TURNS)
       .map(m => ({
@@ -2639,10 +3047,13 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
       }
 
       // ── Enrich context with live DataFrame schemas from kernel ───────
-      setProgressText('Inspecting kernel variables…');
-      const dataframes = await notebookReader.getDataFrameSchemas();
-      if (dataframes.length > 0) {
-        context.dataframes = dataframes;
+      // Only when notebook-aware; the strip above would be undone otherwise.
+      if (notebookAware) {
+        setProgressText('Inspecting kernel variables…');
+        const dataframes = await notebookReader.getDataFrameSchemas();
+        if (dataframes.length > 0) {
+          context.dataframes = dataframes;
+        }
       }
 
       // ── Resolve @variable_name references in the message ─────────────
@@ -2782,6 +3193,9 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
       const abortCtrl = new AbortController();
       abortControllerRef.current = abortCtrl;
 
+      // Accumulates sequential-thinking tokens as they stream in.
+      let thoughtsAccum = '';
+
       const response: TaskResponse = await apiClient.executeTaskStreaming(
         {
           message,
@@ -2790,6 +3204,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
           variables: resolvedVariables,
           ...(slashCommand ? { command: slashCommand } : {}),
           cellMode: notebookAware ? cellMode : 'chat',
+          thinkingEnabled: thinkingEnabledRef.current || undefined,
         },
         // onChunk — explanation text Claude emits before the tool call
         (chunk: string) => {
@@ -2820,6 +3235,15 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
           extractor.feed(partial); // keep accumulating but discard output
         },
         abortCtrl.signal,
+        // onThought — reasoning token: stream thoughts live into the bubble
+        // so the user sees the LLM reasoning as it happens, not just the answer.
+        (thoughtText: string) => {
+          ensureStreamStarted();
+          thoughtsAccum += thoughtText;
+          setMessages(prev => prev.map(m =>
+            m.id === streamMsgId ? { ...m, thoughts: thoughtsAccum } : m
+          ));
+        },
       );
       clearInterval(progressTimer);
       stopStreamQueue();
@@ -2834,6 +3258,13 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
           const cleaned = (m.content ?? '').replace(/(\s*\bnull\b)+\s*$/g, '').replace(/\s+$/, '');
           return cleaned !== m.content ? { ...m, content: cleaned } : m;
         }));
+      }
+
+      // Attach the reasoning trace to the message when sequential thinking was used.
+      if (response.thoughts && streamMsgId) {
+        setMessages(prev => prev.map(m =>
+          m.id === streamMsgId ? { ...m, thoughts: response.thoughts } : m
+        ));
       }
 
       // ── Accumulate token usage for the current thread ─────────────────
@@ -2908,12 +3339,13 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                   await cellEditor.applyOperations(stepResponse.operationId, stepResponse.steps);
 
                 const stepDiffs: DiffInfo[] = stepResponse.steps
-                  .filter(s => s.type === 'insert' || s.type === 'modify' || s.type === 'delete')
-                  .map((s, k) => ({
-                    cellIndex: sMap.get(k) ?? s.cellIndex,
+                  .map((s, originalIdx) => ({ s, originalIdx }))
+                  .filter(({ s }) => s.type === 'insert' || s.type === 'modify' || s.type === 'delete')
+                  .map(({ s, originalIdx }) => ({
+                    cellIndex: sMap.get(originalIdx) ?? s.cellIndex,
                     opType: s.type as DiffInfo['opType'],
                     cellType: (s.cellType ?? 'code') as DiffInfo['cellType'],
-                    original: sOrig.get(k) ?? '',
+                    original: sOrig.get(originalIdx) ?? '',
                     modified: s.type === 'delete' ? '' : (s.content ?? ''),
                     description: s.description,
                   }));
@@ -3096,10 +3528,11 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
 
       // ── Build per-cell diff data for the visual diff panel ────────────
       const diffs: DiffInfo[] = response.steps
-        .filter(s => s.type === 'insert' || s.type === 'modify' || s.type === 'delete')
-        .map((s, i) => {
-          const notebookIdx = stepIndexMap.get(i) ?? s.cellIndex;
-          const original = capturedOriginals.get(i) ?? '';
+        .map((s, originalIdx) => ({ s, originalIdx }))
+        .filter(({ s }) => s.type === 'insert' || s.type === 'modify' || s.type === 'delete')
+        .map(({ s, originalIdx }) => {
+          const notebookIdx = stepIndexMap.get(originalIdx) ?? s.cellIndex;
+          const original = capturedOriginals.get(originalIdx) ?? '';
           const modified = s.type === 'delete' ? '' : (s.content ?? '');
           return {
             cellIndex: notebookIdx,
@@ -3191,33 +3624,6 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     addMessage('system', 'Changes accepted.');
   };
 
-  const handleAcceptAndRun = async (operationId: string): Promise<void> => {
-    const op = pendingOps.find(o => o.operationId === operationId);
-    if (op) _acceptSingleOrComposite(op);
-    setPendingOps(prev => prev.filter(o => o.operationId !== operationId));
-    if (!op) return;
-
-    const codeIndices = op.diffs
-      .filter(d => d.cellType === 'code' && d.opType !== 'delete')
-      .map(d => d.cellIndex)
-      .filter((v, i, arr) => arr.indexOf(v) === i);
-
-    if (codeIndices.length === 0) {
-      addMessage('system', 'Changes accepted.');
-      return;
-    }
-
-    addMessage('system', `Accepted — running ${codeIndices.length} cell(s)…`);
-    for (const idx of codeIndices) {
-      try {
-        await cellEditor.executeCell(idx);
-      } catch (err) {
-        console.warn(`[DSAssistant] Accept & Run: execution of cell ${idx} failed:`, err);
-      }
-    }
-    addMessage('system', `✓ Done — executed ${codeIndices.length} cell(s).`);
-  };
-
   const handleUndo = (operationId: string): void => {
     const op = pendingOps.find(o => o.operationId === operationId);
     if (op?.compositeOpIds) {
@@ -3228,20 +3634,6 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     }
     setPendingOps(prev => prev.filter(o => o.operationId !== operationId));
     addMessage('system', 'Changes undone.');
-  };
-
-  const handleApplySelection = (operationId: string, decisions: CellDecision[]): void => {
-    cellEditor.partialAcceptOperation(operationId, decisions);
-    setPendingOps(prev => prev.filter(o => o.operationId !== operationId));
-    const accepted = decisions.filter(d => d.accept).length;
-    const rejected = decisions.filter(d => !d.accept).length;
-    const hunkNote =
-      decisions.some(d => d.finalContent !== undefined)
-        ? ' (partial hunk selection applied)'
-        : '';
-    addMessage('system',
-      `Applied: ${accepted} accepted, ${rejected} discarded${hunkNote}.`
-    );
   };
 
   // -------------------------------------------------------------------------
@@ -3573,7 +3965,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
 
   if (showSettings) {
     return (
-      <div className="ds-assistant-sidebar">
+      <div className={`ds-assistant-sidebar ds-chat-${chatTheme}`}>
         <div className="ds-assistant-header">
           <span className="ds-assistant-title"><span className="ds-varys-spider">🕷️</span> Varys — Settings</span>
           <button
@@ -3594,7 +3986,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
 
   if (showRepro) {
     return (
-      <div className="ds-assistant-sidebar">
+      <div className={`ds-assistant-sidebar ds-chat-${chatTheme}`}>
         <div className="ds-assistant-header">
           <span className="ds-assistant-title"><span className="ds-varys-spider">🕷️</span> Varys — Reproducibility</span>
           <button
@@ -3614,7 +4006,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
 
   if (showTags) {
     return (
-      <div className="ds-assistant-sidebar">
+      <div className={`ds-assistant-sidebar ds-chat-${chatTheme}`}>
         <div className="ds-assistant-header">
           <span className="ds-assistant-title"><span className="ds-varys-spider">🕷️</span> Varys — Tags</span>
           <button
@@ -3632,32 +4024,37 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     <div className={`ds-assistant-sidebar ds-chat-${chatTheme}`}>
       {/* Header */}
       <div className="ds-assistant-header">
-        <span className="ds-assistant-title"><span className="ds-varys-spider">🕷️</span> Varys</span>
+        <span className="ds-assistant-title"><span className="ds-varys-spider">🕷️</span> Varys <span className="ds-varys-version">v0.2.0</span></span>
         <button
           className="ds-tags-panel-btn"
           onClick={() => setShowTags(true)}
           data-tip="Cell Tags & Metadata"
+          data-tip-below
         >🏷️</button>
         <button
           className="ds-repro-shield-btn"
           onClick={() => setShowRepro(true)}
           data-tip="Reproducibility Guardian"
+          data-tip-below
         >🛡️</button>
         <button
           className="ds-theme-toggle-btn"
           onClick={toggleChatTheme}
           data-tip={chatTheme === 'day' ? 'Switch to night mode' : 'Switch to day mode'}
+          data-tip-below
           aria-label={chatTheme === 'day' ? 'Switch to night mode' : 'Switch to day mode'}
         >{chatTheme === 'day' ? '🌙' : '☀️'}</button>
         <button
           className="ds-wiki-help-btn"
           onClick={() => window.open('https://github.com/jmlb/varys#readme', '_blank')}
           data-tip="Open documentation"
+          data-tip-below
         >?</button>
         <button
           className="ds-settings-gear-btn"
           onClick={() => setShowSettings(true)}
           data-tip="Settings"
+          data-tip-below
         >⚙</button>
       </div>
 
@@ -3677,6 +4074,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
 
       {/* Message list */}
       <div
+        ref={messagesContainerRef}
         className="ds-assistant-messages"
         onClick={(e: React.MouseEvent<HTMLDivElement>) => {
           const btn = (e.target as Element).closest('.ds-copy-code-btn');
@@ -3831,7 +4229,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                           </button>
                         )}
                         <button
-                          className="ds-bubble-tool-btn"
+                          className="ds-bubble-tool-btn ds-bubble-copy-btn"
                           data-tip="Copy response"
                           onClick={() => {
                             const text = (msg.displayContent ?? msg.content ?? '').trim();
@@ -3874,11 +4272,15 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                       const text = editingText.trim();
                       if (!text) return;
                       setEditingMsgId(null);
-                      setMessages(prev => {
-                        const idx = prev.findIndex(m => m.id === msg.id);
-                        return idx >= 0 ? prev.slice(0, idx) : prev;
-                      });
-                      void handleSend(text);
+                      // Compute the truncated list NOW (synchronously) so we can
+                      // pass it as priorMessages to handleSend.  React state updates
+                      // are async, so reading `messages` inside handleSend after
+                      // setMessages() would still see the stale (untruncated) array,
+                      // causing all post-edit messages to leak into chatHistory.
+                      const idx = messages.findIndex(m => m.id === msg.id);
+                      const truncated = idx >= 0 ? messages.slice(0, idx) : messages;
+                      setMessages(truncated);
+                      void handleSend(text, undefined, false, truncated);
                     };
                     return (
                       <div className="ds-msg-edit-wrap">
@@ -3913,6 +4315,35 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
 
                   return (
                     <div className={`ds-msg-collapsible-wrap${collapsed ? ' ds-msg-collapsed' : ''}`}>
+                      {/* Reasoning trace — streams live, always visible above the answer */}
+                      {msg.role === 'assistant' && msg.thoughts && (
+                        <div className={`ds-thinking-section${isStreaming ? ' ds-thinking-section--active' : ''}`}>
+                          <button
+                            className="ds-thinking-header"
+                            onClick={() => toggleThinkCollapsed(msg.id)}
+                            title={thinkCollapsed.get(msg.id) ? 'Show reasoning' : 'Hide reasoning'}
+                          >
+                            <span className="ds-thinking-icon">🧠</span>
+                            <span className="ds-thinking-label">
+                              {isStreaming ? 'Reasoning…' : 'Reasoning'}
+                            </span>
+                            <span className="ds-thinking-chevron">
+                              {thinkCollapsed.get(msg.id) ? '▸' : '▾'}
+                            </span>
+                          </button>
+                          {!thinkCollapsed.get(msg.id) && (
+                            <div
+                              className="ds-thinking-body"
+                              ref={el => {
+                                if (el) thinkingBodyRefs.current.set(msg.id, el);
+                                else thinkingBodyRefs.current.delete(msg.id);
+                              }}
+                            >
+                              {msg.thoughts}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       {msg.role === 'user' ? (
                         <div
                           className={`ds-assistant-message-content ds-markdown${!isLoading ? ' ds-user-editable' : ''}`}
@@ -3970,11 +4401,8 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
               operationId={op.operationId}
               description={op.description}
               diffs={op.diffs}
-              hasCodeCells={op.diffs.some(d => d.cellType === 'code' && d.opType !== 'delete')}
               onAccept={handleAccept}
-              onAcceptAndRun={handleAcceptAndRun}
               onUndo={handleUndo}
-              onApplySelection={handleApplySelection}
             />
           ))}
         </div>
@@ -4063,6 +4491,20 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
             >
               <span className="ds-nb-ctx-sign">{notebookAware ? '×' : '+'}</span>
               notebook
+            </button>
+            <button
+              className={`ds-thinking-chip${thinkingEnabled ? ' ds-thinking-chip--on' : ' ds-thinking-chip--off'}`}
+              onClick={() => {
+                const next = !thinkingEnabled;
+                setThinkingEnabled(next);
+                try { localStorage.setItem('ds-varys-thinking', String(next)); } catch { /* ignore */ }
+              }}
+              data-tip={thinkingEnabled
+                ? 'Sequential reasoning ON — click to disable.'
+                : 'Sequential reasoning OFF — click to enable.'}
+              aria-label={thinkingEnabled ? 'Sequential reasoning enabled' : 'Sequential reasoning disabled'}
+            >
+              🧠 Reasoning: {thinkingEnabled ? 'on' : 'off'}
             </button>
           </div>
           <textarea

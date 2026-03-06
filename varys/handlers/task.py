@@ -19,6 +19,141 @@ from ..utils.config import get_config as _get_cfg
 log = logging.getLogger(__name__)
 
 
+def _strip_null(text: str) -> str:
+    """Remove trailing ' null' artefacts that some models emit.
+
+    Only trailing whitespace is stripped after the null removal so that
+    leading spaces — which LLM tokenisers encode as part of the *next* token
+    (e.g. " news", " function") — are preserved.  Stripping both sides was
+    the cause of missing inter-word spaces ("Greatnews", "thisfunction").
+    """
+    return _re.sub(r'(\s*\bnull\b)+\s*$', '', text).rstrip()
+
+
+# ---------------------------------------------------------------------------
+# MCP agentic loop helper
+# ---------------------------------------------------------------------------
+
+async def _run_mcp_tool_loop(
+    aclient,
+    system: str,
+    messages: list,
+    builtin_tools: list,
+    mcp_manager,
+    on_text_chunk,
+    on_thought=None,
+    max_rounds: int = 8,
+) -> dict:
+    """Multi-turn agentic loop: LLM → tool call → result → LLM → …
+
+    Drives the Anthropic messages API directly (not via stream_plan_task) so
+    we can handle arbitrary tool calls alongside create_operation_plan.
+
+    Returns the final create_operation_plan response dict (same shape as
+    stream_plan_task) once the LLM calls it, or a chatResponse advisory dict
+    if the LLM never calls it.
+    """
+    import anthropic as _anthropic
+
+    external_tools = mcp_manager.get_all_tools() if mcp_manager else []
+    all_tools = builtin_tools + external_tools
+    msgs = list(messages)
+
+    for _round in range(max_rounds):
+        use_thinking = getattr(aclient, "_extended_thinking_enabled", False) and \
+                       getattr(aclient, "_supports_extended_thinking", lambda: False)()
+
+        api_kwargs = dict(
+            model=aclient.model,
+            max_tokens=16_000 if use_thinking else 8_192,
+            system=system,
+            tools=all_tools,
+            tool_choice={"type": "auto"},
+            messages=msgs,
+        )
+        if use_thinking:
+            api_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 8_000}
+
+        async with aclient._aclient.messages.stream(**api_kwargs) as stream:
+            async for event in stream:
+                if event.type != "content_block_delta":
+                    continue
+                delta = event.delta
+                if delta.type == "text_delta":
+                    await on_text_chunk(delta.text)
+                    await asyncio.sleep(0)
+                elif delta.type == "thinking_delta" and on_thought:
+                    await on_thought(delta.thinking)
+                    await asyncio.sleep(0)
+            final_msg = await stream.get_final_message()
+
+        if hasattr(final_msg, "usage") and final_msg.usage:
+            aclient._set_usage(
+                getattr(final_msg.usage, "input_tokens", 0),
+                getattr(final_msg.usage, "output_tokens", 0),
+            )
+
+        msgs.append({"role": "assistant", "content": final_msg.content})
+
+        # Check for tool_use blocks
+        tool_use_blocks = [b for b in final_msg.content if b.type == "tool_use"]
+
+        if not tool_use_blocks:
+            # Pure text response — surface as advisory
+            text = next(
+                (b.text for b in final_msg.content if hasattr(b, "text")), ""
+            )
+            text = _strip_null(text)
+            return {
+                "steps": [], "requiresApproval": False,
+                "clarificationNeeded": None,
+                "chatResponse": text or "Done.",
+                "cellInsertionMode": "chat",
+                "summary": "Advisory response",
+            }
+
+        # Process tool calls — external MCP tools first, then check for plan.
+        # The LLM may call external tools and create_operation_plan in the same
+        # response.  We must execute all external tools before returning the
+        # plan so their results are available in the conversation history.
+        tool_results = []
+        final_plan = None
+
+        for block in tool_use_blocks:
+            if block.name == "create_operation_plan":
+                data = dict(block.input)
+                clarif = data.get("clarificationNeeded")
+                if not clarif or (isinstance(clarif, str) and clarif.strip().lower() == "null"):
+                    data["clarificationNeeded"] = None
+                final_plan = data
+                # Don't break — continue so any preceding external tools are executed
+            else:
+                # External MCP tool — execute and collect result
+                try:
+                    result_text = await mcp_manager.call_tool(block.name, dict(block.input))
+                except Exception as exc:
+                    result_text = f"[Tool error: {exc}]"
+
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": result_text,
+                })
+
+        if final_plan is not None:
+            return final_plan
+
+        if tool_results:
+            msgs.append({"role": "user", "content": tool_results})
+
+    # Exhausted max rounds without a plan
+    return {
+        "steps": [], "requiresApproval": False, "clarificationNeeded": None,
+        "chatResponse": "I reached the maximum number of tool-call rounds without completing a plan.",
+        "cellInsertionMode": "chat", "summary": "Max rounds exceeded",
+    }
+
+
 # ---------------------------------------------------------------------------
 # RAG augmentation helper
 # ---------------------------------------------------------------------------
@@ -44,7 +179,7 @@ async def _rag_augment(
             return "", []
         if top_k == 0:
             top_k = _get_cfg().getint("retrieval", "top_k", 5)
-        loop   = asyncio.get_event_loop()
+        loop   = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, lambda: mgr.ask(query, top_k=top_k))
         return result.get("context", ""), result.get("chunks", [])
     except Exception as exc:
@@ -75,6 +210,8 @@ the chat panel.
 Guidelines:
 - Use markdown formatting (headers, bullets, tables, code snippets where helpful).
 - Reference notebook cells by their label #N (e.g. #3, #16).
+  NEVER use "cell[N]", "pos:N", "position N", "cell index N", "idx N", or any
+  other variant — #N is the ONLY permitted format for cell references.
 - Base every claim on the actual cell outputs provided — do not invent results.
 - Be concise but thorough. Aim for quality over length.
 
@@ -328,6 +465,7 @@ class TaskHandler(JupyterHandler):
         # 'auto' = skill/heuristic decides (default)
         # 'doc'  = always write cells regardless of skill defaults
         user_cell_mode   = body.get("cellMode", "auto")  # 'chat' | 'auto' | 'doc'
+        thinking_enabled = bool(body.get("thinkingEnabled", False))
 
         if not message:
             self.set_status(400)
@@ -495,9 +633,10 @@ class TaskHandler(JupyterHandler):
                     self.set_header("X-Accel-Buffering", "no")
 
                     accumulated: list = []
+                    accumulated_thoughts: list = []
 
                     async def _on_chunk(text: str) -> None:
-                        cleaned = _re.sub(r'(\s*\bnull\b)+\s*$', '', text)
+                        cleaned = _strip_null(text)
                         if not cleaned:
                             return
                         accumulated.append(cleaned)
@@ -509,14 +648,91 @@ class TaskHandler(JupyterHandler):
                         # sent together when finish() is called.
                         await asyncio.sleep(0)
 
-                    await provider.stream_chat(
-                        system=system, user=user, on_chunk=_on_chunk,
-                        chat_history=chat_history,
-                    )
+                    async def _on_chat_thought(text: str) -> None:
+                        accumulated_thoughts.append(text)
+                        self.write(f"data: {json.dumps({'type': 'thought', 'text': text})}\n\n")
+                        await self.flush()
+                        await asyncio.sleep(0)
 
-                    chat_response_text = _re.sub(
-                        r'(\s*\bnull\b)+\s*$', '', "".join(accumulated)
-                    ).strip()
+                    # ── MCP Sequential Thinking loop (chip ON) ────────────────
+                    final_user = user
+                    if thinking_enabled and getattr(provider, "has_sequential_thinking", lambda: False)():
+                        mcp_thoughts = await provider.run_sequential_thinking_loop(
+                            user=user,
+                            system=system,
+                            on_thought=_on_chat_thought,
+                            chat_history=chat_history,
+                        )
+                        if mcp_thoughts:
+                            thought_lines = [
+                                f"Step {t.get('thoughtNumber', i + 1)}: {t.get('thought', '')}"
+                                for i, t in enumerate(mcp_thoughts)
+                            ]
+                            thought_summary = "\n".join(thought_lines)
+                            final_user = (
+                                f"{user}\n\n"
+                                f"[Sequential reasoning you completed:\n{thought_summary}\n]\n"
+                                "Based on this reasoning, provide your final response."
+                            )
+
+                    # ── External MCP tool loop (when servers are connected) ────
+                    mcp_manager = self.settings.get("ds_mcp_manager")
+                    aclient = getattr(provider, "_chat_client", None)
+
+                    if mcp_manager and mcp_manager.has_tools() and aclient is not None:
+                        # Use the full agentic loop so the LLM can call external tools
+                        from ..llm.client import ClaudeClient as _CC
+                        if isinstance(aclient, _CC):
+                            # Build a tool-aware system prompt so the LLM knows it can
+                            # call external services rather than refusing with "I can't
+                            # access the internet."
+                            external_tools = mcp_manager.get_all_tools()
+                            tool_lines = "\n".join(
+                                f"  - {t['name'].split('__', 1)[-1]} "
+                                f"(server: {t['name'].split('__', 1)[0]}): "
+                                f"{t.get('description', '')[:120]}"
+                                for t in external_tools
+                            )
+                            mcp_addon = (
+                                "\n\n## External MCP Tools — Available Now\n"
+                                "You have access to the following external tools via MCP servers.\n"
+                                "When the user asks for data or actions that require external access, "
+                                "call the appropriate tool — do NOT say you cannot access the internet.\n\n"
+                                f"{tool_lines}\n\n"
+                                "Always prefer calling a tool over apologising for lack of access."
+                            )
+                            msgs = aclient._prepend_history(chat_history, final_user)
+                            chat_result = await _run_mcp_tool_loop(
+                                aclient=aclient,
+                                system=system + mcp_addon,
+                                messages=msgs,
+                                builtin_tools=[],  # chat mode: no create_operation_plan
+                                mcp_manager=mcp_manager,
+                                on_text_chunk=_on_chunk,
+                                on_thought=_on_chat_thought,
+                            )
+                            chat_response_text = chat_result.get("chatResponse", "")
+                        else:
+                            await provider.stream_chat(
+                                system=system, user=final_user,
+                                on_chunk=_on_chunk, on_thought=_on_chat_thought,
+                                chat_history=chat_history,
+                            )
+                            chat_response_text = _re.sub(
+                                r'(\s*\bnull\b)+\s*$', '', "".join(accumulated)
+                            ).strip()
+                    else:
+                        await provider.stream_chat(
+                            system=system,
+                            user=final_user,
+                            on_chunk=_on_chunk,
+                            on_thought=_on_chat_thought,
+                            chat_history=chat_history,
+                        )
+                        chat_response_text = _re.sub(
+                            r'(\s*\bnull\b)+\s*$', '', "".join(accumulated)
+                        ).strip()
+
                     done_event: dict = {
                         "type":              "done",
                         "operationId":       op_id,
@@ -527,6 +743,9 @@ class TaskHandler(JupyterHandler):
                         "chatResponse":      chat_response_text,
                         "cellInsertionMode": "chat",
                     }
+                    thoughts_text = "".join(accumulated_thoughts).strip()
+                    if thoughts_text:
+                        done_event["thoughts"] = thoughts_text
                     usage = getattr(provider, "last_usage", None)
                     if usage:
                         done_event["tokenUsage"] = usage
@@ -611,10 +830,7 @@ class TaskHandler(JupyterHandler):
                                     return
 
                     async def _on_plan_chunk(text: str) -> None:
-                        # Strip bare trailing "null" tokens the LLM writes when
-                        # it means the JSON keyword — e.g. "\n\nnull" at the end
-                        # of a conversational response.
-                        cleaned = _re.sub(r'(\s*\bnull\b)+\s*$', '', text)
+                        cleaned = _strip_null(text)
                         if not cleaned:
                             return
                         self.write(
@@ -632,18 +848,106 @@ class TaskHandler(JupyterHandler):
                         await self.flush()
                         await asyncio.sleep(0)
 
-                    progress_task = asyncio.create_task(_progress_loop())
-                    try:
-                        response = await provider.stream_plan_task(
-                            user_message=message,
-                            notebook_context=notebook_context,
-                            skills=skills,
-                            memory=memory,
-                            operation_id=op_id,
-                            on_text_chunk=_on_plan_chunk,
-                            on_json_delta=_on_json_delta,
+                    plan_thoughts: list = []
+
+                    async def _on_plan_thought(text: str) -> None:
+                        """Stream API-level thinking blocks to the 🧠 panel."""
+                        plan_thoughts.append(text)
+                        self.write(
+                            f"data: {json.dumps({'type': 'thought', 'text': text})}\n\n"
+                        )
+                        await self.flush()
+                        await asyncio.sleep(0)
+
+                    # ── MCP Sequential Thinking loop for cell-ops (chip ON) ───
+                    # Build a text-only context for the thought loop (no images)
+                    # so the LLM reasons about what operations are needed before
+                    # the heavier full-context final call.
+                    final_message = message
+                    if thinking_enabled and getattr(provider, "has_sequential_thinking", lambda: False)():
+                        thought_user = (
+                            build_notebook_context(message, notebook_context)
+                            + "\n\nThink through step by step what notebook cell operations are needed to fulfil this request."
+                        )
+                        plan_system = (
+                            provider.build_system_prompt(skills, memory)
+                            if hasattr(provider, "build_system_prompt")
+                            else ""
+                        )
+                        mcp_plan_thoughts = await provider.run_sequential_thinking_loop(
+                            user=thought_user,
+                            system=plan_system,
+                            on_thought=_on_plan_thought,
                             chat_history=chat_history,
                         )
+                        if mcp_plan_thoughts:
+                            thought_lines = [
+                                f"Step {t.get('thoughtNumber', i + 1)}: {t.get('thought', '')}"
+                                for i, t in enumerate(mcp_plan_thoughts)
+                            ]
+                            thought_summary = "\n".join(thought_lines)
+                            final_message = (
+                                f"{message}\n\n"
+                                f"[Pre-analysis you completed:\n{thought_summary}\n]"
+                            )
+
+                    # ── External MCP tool loop for cell-ops ─────────────────
+                    mcp_manager = self.settings.get("ds_mcp_manager")
+                    aclient_for_loop = getattr(provider, "_chat_client", None)
+
+                    progress_task = asyncio.create_task(_progress_loop())
+                    try:
+                        from ..llm.client import ClaudeClient as _CC2, OPERATION_PLAN_TOOL as _OPT
+                        if (mcp_manager and mcp_manager.has_tools()
+                                and isinstance(aclient_for_loop, _CC2)):
+                            # Agentic loop: external tools + create_operation_plan
+                            from ..llm.client import _build_system_prompt_shared as _bsp
+                            plan_system_prompt = _bsp(skills, memory)
+                            # Inject MCP tool awareness so the LLM uses tools
+                            # instead of refusing to access external resources.
+                            ext_tools_plan = mcp_manager.get_all_tools()
+                            if ext_tools_plan:
+                                tool_lines_plan = "\n".join(
+                                    f"  - {t['name'].split('__', 1)[-1]} "
+                                    f"(server: {t['name'].split('__', 1)[0]}): "
+                                    f"{t.get('description', '')[:120]}"
+                                    for t in ext_tools_plan
+                                )
+                                plan_system_prompt += (
+                                    "\n\n## External MCP Tools — Available Now\n"
+                                    "You have access to the following external tools.\n"
+                                    "Call them when you need external data before generating the cell plan.\n\n"
+                                    f"{tool_lines_plan}\n\n"
+                                    "Always prefer calling a tool over apologising for lack of access."
+                                )
+                            content_blocks = aclient_for_loop._build_content_blocks(
+                                final_message, notebook_context
+                            )
+                            msgs_for_loop = aclient_for_loop._prepend_history(
+                                chat_history, content_blocks
+                            )
+                            response = await _run_mcp_tool_loop(
+                                aclient=aclient_for_loop,
+                                system=plan_system_prompt,
+                                messages=msgs_for_loop,
+                                builtin_tools=[_OPT],
+                                mcp_manager=mcp_manager,
+                                on_text_chunk=_on_plan_chunk,
+                                on_thought=_on_plan_thought,
+                            )
+                            response.setdefault("operationId", op_id)
+                        else:
+                            response = await provider.stream_plan_task(
+                                user_message=final_message,
+                                notebook_context=notebook_context,
+                                skills=skills,
+                                memory=memory,
+                                operation_id=op_id,
+                                on_text_chunk=_on_plan_chunk,
+                                on_json_delta=_on_json_delta,
+                                on_thought=_on_plan_thought,
+                                chat_history=chat_history,
+                            )
                     finally:
                         plan_done.set()
                         progress_task.cancel()
@@ -651,6 +955,11 @@ class TaskHandler(JupyterHandler):
                             await progress_task
                         except asyncio.CancelledError:
                             pass
+
+                    # Attach collected thinking to the response so the frontend
+                    # renders the 🧠 panel for cell operations too.
+                    if plan_thoughts:
+                        response["thoughts"] = "".join(plan_thoughts).strip()
 
                     # ── Retry gate ────────────────────────────────────────────
                     # stream_plan_task uses tool_choice:"auto" so the LLM can

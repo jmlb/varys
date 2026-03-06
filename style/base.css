@@ -125,7 +125,7 @@
    would make trailing \n characters appear as blank space in the bubble */
 .ds-assistant-message-user {
   align-self: flex-end;
-  width: 50%;
+  width: 70%;
   position: relative;
   border-bottom-right-radius: 2px;
   background: linear-gradient(135deg, #e4e7ef 0%, #d8dce8 100%);
@@ -139,10 +139,12 @@
   word-break: break-word;
 }
 
-/* Code blocks inside user bubbles need a darker background to stand out
-   against the blue-ish gradient */
+/* Code blocks inside user bubbles: darker background + wrap instead of scroll */
 .ds-assistant-message-user .ds-code-block-wrapper pre {
   background: rgba(0, 0, 0, 0.13);
+  overflow-x: hidden;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 .ds-chat-night .ds-assistant-message-user .ds-code-block-wrapper pre {
   background: rgba(0, 0, 0, 0.25);
@@ -150,6 +152,7 @@
 
 .ds-assistant-message-assistant {
   align-self: flex-start;
+  width: 90%;
   border-bottom-left-radius: 2px;
   background: linear-gradient(135deg, #f5f5f8 0%, #ebebf0 100%);
   border-left: 3px solid #b0b8cc;
@@ -304,11 +307,11 @@
   text-align: left;
 }
 .ds-markdown th {
-  background: var(--jp-layout-color2, #f0f0f0);
+  background: var(--ds-surface, #eeeff3);
   font-weight: 600;
 }
 .ds-markdown tr:nth-child(even) td {
-  background: var(--jp-layout-color2, #f7f7f7);
+  background: var(--ds-surface, #eeeff3);
 }
 
 /* Links */
@@ -392,6 +395,11 @@
   opacity: 0;
   transition: opacity 0.15s;
   pointer-events: none;
+}
+/* Copy button is always visible */
+.ds-bubble-toolbar .ds-bubble-copy-btn {
+  opacity: 0.45;
+  pointer-events: auto;
 }
 .ds-assistant-message:hover .ds-bubble-toolbar .ds-bubble-tool-btn {
   opacity: 1;
@@ -645,8 +653,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 5px 8px;
-  background: var(--jp-layout-color3, #f0f0f0);
-  border-bottom: 1px solid var(--jp-border-color2);
+  background: var(--ds-surface, #eeeff3);
+  border-bottom: 1px solid var(--ds-border, #d8dae0);
   gap: 6px;
 }
 
@@ -660,7 +668,7 @@
 
 .ds-diff-header-cells {
   font-weight: 600;
-  color: var(--jp-ui-font-color1);
+  color: var(--ds-text, #1e1e2e);
   white-space: nowrap;
 }
 
@@ -669,12 +677,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--jp-ui-font-color2);
+  color: var(--ds-text-dim, #5a5f72);
 }
 
 .ds-diff-header-stats {
   font-family: var(--jp-code-font-family, monospace);
-  color: var(--jp-ui-font-color2);
+  color: var(--ds-text-dim, #5a5f72);
   white-space: nowrap;
 }
 
@@ -706,7 +714,7 @@
   gap: 5px;
   padding: 3px 8px;
   border: none;
-  background: var(--jp-layout-color2, #f8f8f8);
+  background: var(--ds-surface, #eeeff3);
   cursor: pointer;
   font-size: 11px;
   text-align: left;
@@ -740,7 +748,7 @@
 .ds-diff-op-badge--delete  { background: #f8d7da; color: #721c24; }
 
 .ds-diff-cell-type {
-  color: var(--jp-ui-font-color3, #888);
+  color: var(--ds-text-dim, #5a5f72);
   font-style: italic;
 }
 
@@ -827,7 +835,7 @@
 }
 
 .ds-diff-line--ellipsis {
-  color: var(--jp-ui-font-color3, #999);
+  color: var(--ds-text-dim, #5a5f72);
   padding: 0 14px;
   font-style: italic;
   user-select: none;
@@ -835,7 +843,7 @@
 
 .ds-diff-empty {
   font-style: italic;
-  color: var(--jp-ui-font-color3, #999);
+  color: var(--ds-text-dim, #5a5f72);
 }
 
 /* Night-mode adjustments */
@@ -847,6 +855,7 @@
 .ds-chat-night .ds-diff-header {
   background: #252d42;
   border-color: #2d3550;
+  color: var(--ds-text);
 }
 
 .ds-chat-night .ds-diff-cell-header {
@@ -944,9 +953,9 @@
 
 /* Shared base */
 .ds-ctx-chip {
-  border: 1px solid var(--jp-border-color2, #ddd);
+  border: 1px solid var(--ds-chip-border, #d8dae0);
   border-radius: 6px;
-  background: var(--jp-layout-color2, #f4f4f4);
+  background: var(--ds-chip-bg, #e4e5ed);
   font-size: 11px;
   overflow: hidden;
 }
@@ -999,7 +1008,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--jp-ui-font-color1, #333);
+  color: var(--ds-chip-text, #3b3e55);
   font-weight: 500;
 }
 
@@ -1010,7 +1019,7 @@
   border: none;
   padding: 0 3px;
   cursor: pointer;
-  color: var(--jp-ui-font-color2, #888);
+  color: var(--ds-chip-off-text, #737796);
   font-size: 10px;
   line-height: 1;
 }
@@ -1028,22 +1037,12 @@
   overflow-x: auto;
   max-height: 200px;
   overflow-y: auto;
-  border-top: 1px solid var(--jp-border-color2, #ddd);
-  background: var(--jp-layout-color1, #fff);
-  color: var(--jp-ui-font-color1, #333);
+  border-top: 1px solid var(--ds-chip-border, #d8dae0);
+  background: var(--ds-input-bg, #fff);
+  color: var(--ds-chip-text, #3b3e55);
 }
 
-/* Night mode */
-.ds-chat-night .ds-ctx-chip {
-  background: #23233a;
-  border-color: #3a3a5c;
-}
-.ds-chat-night .ds-ctx-chip-label { color: #aaaabc; }
-.ds-chat-night .ds-ctx-chip-preview {
-  background: #1a1a2e;
-  color: #c8c8e0;
-  border-color: #3a3a5c;
-}
+/* Night mode — tokens (--ds-chip-bg/border/text) handle ctx-chip theming */
 
 /* ─────────────────────────────────────────────────────────────────────────── */
 
@@ -1095,9 +1094,9 @@
 
 .ds-diff-hint {
   font-size: 10px;
-  color: var(--jp-ui-font-color2, #888);
+  color: var(--ds-text-dim, #5a5f72);
   padding: 4px 10px 6px;
-  border-bottom: 1px solid var(--jp-border-color3, #eee);
+  border-bottom: 1px solid var(--ds-border, #d8dae0);
   line-height: 1.4;
 }
 
@@ -1139,13 +1138,13 @@
   align-items: center;
   gap: 6px;
   padding: 3px 8px;
-  background: var(--jp-layout-color2, #f5f5f5);
+  background: var(--ds-surface, #eeeff3);
   border-bottom: 1px solid var(--jp-border-color3, #e8e8e8);
 }
 
 .ds-hunk-bar--whole {
   border-top: 1px solid var(--jp-border-color3, #e8e8e8);
-  background: var(--jp-layout-color2, #f5f5f5);
+  background: var(--ds-surface, #eeeff3);
 }
 
 .ds-hunk-label {
@@ -1250,9 +1249,6 @@
 .ds-chat-night .ds-hunk-btn--active.ds-hunk-btn--accept { background: #1a6b2a; }
 .ds-chat-night .ds-hunk-btn--active.ds-hunk-btn--reject { background: #6b1a1a; }
 
-.ds-chat-night .ds-diff-hint {
-  color: #666;
-}
 
 /* ----------------------------------------------------------
    Input area
@@ -1502,19 +1498,19 @@
 .ds-cell-mode-select {
   flex-shrink: 0;
   appearance: auto;
-  background: var(--jp-layout-color1, #f5f5f5);
-  border: 1px solid var(--jp-border-color2, #ccc);
+  background: var(--ds-btn-bg, #e4e5ed);
+  border: 1px solid var(--ds-btn-border, #c6c8d4);
   border-radius: 4px;
   cursor: pointer;
   font-size: 10px;
   font-weight: 500;
   padding: 2px 4px;
-  color: var(--jp-ui-font-color1, #333);
+  color: var(--ds-btn-text, #3b3e55);
   outline: none;
   transition: background 0.15s;
 }
 .ds-cell-mode-select:hover:not(:disabled) {
-  background: var(--jp-layout-color2, #ebebeb);
+  background: var(--ds-surface2, #e2e3ea);
 }
 .ds-cell-mode-select:disabled {
   opacity: 0.4;
@@ -1522,8 +1518,8 @@
 }
 .ds-cell-mode-select option,
 .ds-cell-mode-select optgroup {
-  background: var(--jp-layout-color1, #f5f5f5);
-  color: var(--jp-ui-font-color1, #333);
+  background: var(--ds-input-bg, #fff);
+  color: var(--ds-text, #1e1e2e);
 }
 
 /* Night-mode */
@@ -1597,7 +1593,7 @@
 .ds-nb-ctx-label {
   font-size: 10px;
   font-family: var(--jp-ui-font-family);
-  color: var(--jp-ui-font-color3, #aaa);
+  color: var(--ds-text-dim, #5a5f72);
   opacity: 0.7;
   user-select: none;
   white-space: nowrap;
@@ -1643,13 +1639,128 @@
 /* Inactive: no background, dimmed text */
 .ds-nb-ctx-chip--off {
   background: transparent;
-  color: var(--jp-ui-font-color3, #aaa);
-  opacity: 0.6;
+  color: var(--ds-chip-off-text, #737796);
 }
 .ds-nb-ctx-chip--off:hover {
-  opacity: 1;
-  background: rgba(0,0,0,0.05);
+  background: var(--ds-surface2, rgba(0,0,0,0.05));
+  color: var(--ds-chip-text, #3b3e55);
 }
+
+/* ── Sequential Thinking chip ──────────────────────────────────────────── */
+.ds-thinking-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-family: var(--jp-ui-font-family, sans-serif);
+  padding: 2px 7px;
+  border-radius: 10px;
+  border: 1px solid currentColor;
+  cursor: pointer;
+  transition: opacity 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+.ds-thinking-chip--on {
+  background: rgba(99, 60, 180, 0.12);
+  color: #7c3aed;
+  border-color: rgba(124, 58, 237, 0.45);
+  opacity: 1;
+}
+.ds-thinking-chip--on:hover {
+  background: rgba(99, 60, 180, 0.2);
+}
+.ds-thinking-chip--off {
+  background: transparent;
+  color: var(--ds-chip-off-text, #737796);
+  border-color: var(--ds-chip-border, #c6c8d4);
+}
+.ds-thinking-chip--off:hover {
+  background: var(--ds-surface2, rgba(0,0,0,0.05));
+  color: var(--ds-chip-text, #3b3e55);
+}
+
+/* ── Reasoning / thoughts panel inside assistant bubbles ───────────────── */
+.ds-thinking-section {
+  margin: 0 0 8px 0;
+  border: 1px solid rgba(124, 58, 237, 0.28);
+  border-radius: 6px;
+  background: rgba(124, 58, 237, 0.04);
+  overflow: hidden;
+  font-size: 11px;
+}
+.ds-thinking-section--active {
+  /* Subtle pulse while reasoning is still streaming */
+  border-color: rgba(124, 58, 237, 0.5);
+  animation: ds-thinking-pulse 1.6s ease-in-out infinite;
+}
+@keyframes ds-thinking-pulse {
+  0%, 100% { border-color: rgba(124, 58, 237, 0.28); }
+  50%       { border-color: rgba(124, 58, 237, 0.6); }
+}
+.ds-thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #7c3aed;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  user-select: none;
+  border-bottom: 1px solid rgba(124, 58, 237, 0.12);
+  /* button reset so the header is keyboard-accessible */
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  width: 100%;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+.ds-thinking-header:focus-visible {
+  outline: 2px solid #7c3aed;
+  outline-offset: -2px;
+}
+.ds-thinking-icon {
+  font-size: 11px;
+}
+.ds-thinking-label {
+  flex: 1;
+}
+.ds-thinking-chevron {
+  font-size: 9px;
+  opacity: 0.7;
+}
+.ds-thinking-body {
+  padding: 7px 12px;
+  line-height: 1.55;
+  color: var(--jp-ui-font-color2, #555);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+/* Night mode overrides */
+.ds-chat-night .ds-thinking-chip--on {
+  color: #a78bfa;
+  border-color: rgba(167, 139, 250, 0.4);
+  background: rgba(167, 139, 250, 0.1);
+}
+.ds-chat-night .ds-thinking-section {
+  border-color: rgba(167, 139, 250, 0.25);
+  background: rgba(167, 139, 250, 0.05);
+}
+.ds-chat-night .ds-thinking-header {
+  color: #a78bfa;
+  border-bottom-color: rgba(167, 139, 250, 0.15);
+}
+.ds-chat-night .ds-thinking-body {
+  color: var(--ds-text-dim, #aaa);
+}
+
 .ds-thread-icon {
   font-size: 13px;
   opacity: 0.6;
@@ -1700,7 +1811,7 @@
   gap: 5px;
   padding: 5px 10px 4px;
   border-bottom: 1px solid var(--jp-border-color2, #eee);
-  background: var(--jp-layout-color2, #f7f7f7);
+  background: var(--ds-surface, #eeeff3);
   margin-bottom: 2px;
 }
 .ds-thread-popup-nb-icon { font-size: 11px; flex-shrink: 0; }
@@ -1725,7 +1836,7 @@
   color: var(--jp-ui-font-color1, #333);
 }
 .ds-thread-item:hover {
-  background: var(--jp-layout-color2, #f5f5f5);
+  background: var(--ds-surface, #eeeff3);
 }
 .ds-thread-item-active {
   font-weight: 600;
@@ -1815,7 +1926,7 @@
   margin-top: 2px;
 }
 .ds-thread-new-item:hover {
-  background: var(--jp-layout-color2, #f5f5f5);
+  background: var(--ds-surface, #eeeff3);
 }
 
 /* Night-mode overrides */
@@ -1838,12 +1949,6 @@
 }
 .ds-chat-night .ds-nb-ctx-chip--on:hover {
   background: rgba(33, 150, 243, 0.3);
-}
-.ds-chat-night .ds-nb-ctx-chip--off {
-  color: var(--ds-text-dim, #888);
-}
-.ds-chat-night .ds-nb-ctx-chip--off:hover {
-  background: rgba(255,255,255,0.06);
 }
 .ds-chat-night .ds-thread-popup {
   background: var(--ds-surface, #1e1e1e);
@@ -1906,7 +2011,7 @@
 }
 .ds-cmd-item:hover,
 .ds-cmd-item-active {
-  background: var(--jp-layout-color2, #f0f0f0);
+  background: var(--ds-surface, #eeeff3);
 }
 
 .ds-cmd-name {
@@ -1948,7 +2053,7 @@
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  background: var(--jp-layout-color2, #f5f5f5);
+  background: var(--ds-surface, #eeeff3);
   border-bottom: 1px solid var(--jp-border-color2, #e0e0e0);
   font-size: 12px;
 }
@@ -2038,17 +2143,17 @@
   border-radius: 4px;
   cursor: pointer;
   font-family: var(--jp-ui-font-family);
-  color: var(--jp-ui-font-color2, #777);
+  color: var(--ds-text-dim, #5a5f72);
   transition: color 0.12s, background 0.12s;
   max-width: 100%;
   overflow: hidden;
 }
 .ds-model-switcher-btn:hover:not(:disabled) {
-  color: var(--jp-ui-font-color0, #222);
-  background: var(--jp-layout-color2, #ebebeb);
+  color: var(--ds-text, #1e1e2e);
+  background: var(--ds-surface2, #e2e3ea);
 }
 .ds-model-switcher-btn--open {
-  color: var(--jp-ui-font-color0, #222);
+  color: var(--ds-text, #1e1e2e);
 }
 .ds-model-switcher-btn--unconfigured {
   color: #c0392b;
@@ -2128,7 +2233,7 @@
 .ds-model-switcher-popup-label {
   font-size: 9px;
   font-weight: 500;
-  color: var(--jp-ui-font-color3, #aaa);
+  color: var(--ds-text-dim, #5a5f72);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -2157,7 +2262,7 @@
   transition: background 0.1s;
 }
 .ds-model-switcher-option:hover {
-  background: var(--jp-layout-color2, #f5f5f5);
+  background: var(--ds-surface, #eeeff3);
 }
 .ds-model-switcher-option--active {
   border-left-color: currentColor;    /* color set via inline style */
@@ -2165,7 +2270,7 @@
   background: color-mix(in srgb, var(--jp-layout-color1) 60%, transparent);
 }
 .ds-model-switcher-option--active:hover {
-  background: var(--jp-layout-color2, #f0f0f0);
+  background: var(--ds-surface, #eeeff3);
 }
 
 .ds-model-switcher-option-name {
@@ -2268,6 +2373,18 @@
   --ds-input-bg:        #ffffff;
   --ds-text:            #1e1e2e;
   --ds-text-dim:        #5a5f72;
+  /* Surfaces */
+  --ds-surface:         #eeeff3;
+  --ds-surface2:        #e2e3ea;
+  /* Chips */
+  --ds-chip-bg:         #e4e5ed;
+  --ds-chip-border:     #c6c8d4;
+  --ds-chip-text:       #3b3e55;
+  --ds-chip-off-text:   #737796;
+  /* Secondary buttons */
+  --ds-btn-bg:          #e4e5ed;
+  --ds-btn-border:      #c6c8d4;
+  --ds-btn-text:        #3b3e55;
 }
 
 /* ── Night theme (gray-ish / dark) ── */
@@ -2286,6 +2403,18 @@
   --ds-input-bg:        #1a1a24;
   --ds-text:            #c5c5cc;
   --ds-text-dim:        #8890a8;
+  /* Surfaces */
+  --ds-surface:         #1e1e2a;
+  --ds-surface2:        #28283a;
+  /* Chips */
+  --ds-chip-bg:         #26263a;
+  --ds-chip-border:     #38385a;
+  --ds-chip-text:       #b2b6cc;
+  --ds-chip-off-text:   #8890a8;
+  /* Secondary buttons */
+  --ds-btn-bg:          #26263a;
+  --ds-btn-border:      #38385a;
+  --ds-btn-text:        #b2b6cc;
 }
 
 /* Apply theme vars to the concrete elements */
@@ -2466,6 +2595,16 @@
   color: var(--ds-text) !important;
 }
 
+.ds-varys-version {
+  font-size: 9px;
+  font-weight: 400;
+  opacity: 0.45;
+  letter-spacing: 0.03em;
+  margin-left: 3px;
+  align-self: flex-end;
+  margin-bottom: 1px;
+}
+
 .ds-varys-spider {
   font-size: 1.2em;
   filter: sepia(1) saturate(5) hue-rotate(-10deg) brightness(0.95);
@@ -2515,7 +2654,7 @@
   border-radius: 4px;
 }
 .ds-settings-close-btn:hover {
-  background: var(--jp-layout-color2, #e8e8e8);
+  background: var(--ds-surface2, #e2e3ea);
 }
 
 /* ----------------------------------------------------------
@@ -2560,7 +2699,7 @@
 }
 .ds-settings-tab:hover {
   color: var(--jp-ui-font-color0, #222);
-  background: var(--jp-layout-color2, #f5f5f5);
+  background: var(--ds-surface, #eeeff3);
 }
 .ds-settings-tab--active {
   color: var(--jp-brand-color1, #1976d2);
@@ -2609,17 +2748,17 @@
   align-items: center;
   gap: 4px;
   font-size: 10px;
-  color: var(--jp-ui-font-color2, #777);
+  color: var(--ds-text-dim, #777);
   white-space: nowrap;
 }
 .ds-settings-token-input {
   width: 52px;
   font-size: 11px;
   padding: 4px 4px;
-  border: 1px solid var(--jp-border-color1, #ccc);
+  border: 1px solid var(--ds-border, #ccc);
   border-radius: 3px;
-  background: var(--jp-layout-color1, #fff);
-  color: var(--jp-ui-font-color1, #333);
+  background: var(--ds-input-bg, #fff);
+  color: var(--ds-text, #333);
   text-align: center;
 }
 
@@ -2643,10 +2782,10 @@
 .ds-settings-select {
   font-size: 12px;
   padding: 5px 7px;
-  border: 1px solid var(--jp-border-color1, #ccc);
+  border: 1px solid var(--ds-border, #d8dae0);
   border-radius: 4px;
-  background: var(--jp-layout-color1, #fff);
-  color: var(--jp-ui-font-color0, #222);
+  background: var(--ds-input-bg, #fff);
+  color: var(--ds-text, #1e1e2e);
   width: 100%;
   box-sizing: border-box;
   font-family: var(--jp-code-font-family, monospace);
@@ -2667,6 +2806,83 @@
   margin-left: 2px;
 }
 
+/* Toggle row */
+.ds-settings-row--toggle {
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.ds-settings-toggle-label-group {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.ds-settings-toggle-label-group .ds-settings-label {
+  margin-bottom: 2px;
+}
+
+.ds-settings-toggle-desc {
+  font-size: 10px;
+  color: var(--ds-text-dim, #5a5f72);
+  line-height: 1.4;
+}
+
+.ds-settings-toggle-switch {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 36px;
+  height: 20px;
+  cursor: pointer;
+  margin-top: 1px;
+}
+
+.ds-settings-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.ds-settings-toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--jp-border-color1, #ccc);
+  border-radius: 20px;
+  transition: background 0.2s;
+}
+
+.ds-settings-toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  left: 3px;
+  top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
+
+.ds-settings-toggle-switch input:checked + .ds-settings-toggle-slider {
+  background: var(--jp-brand-color1, #1976d2);
+}
+
+.ds-settings-toggle-switch input:checked + .ds-settings-toggle-slider::before {
+  transform: translateX(16px);
+}
+
+.ds-settings-toggle-switch input:focus-visible + .ds-settings-toggle-slider {
+  outline: 2px solid var(--jp-brand-color1, #1976d2);
+  outline-offset: 2px;
+}
+
 /* Sticky footer */
 .ds-settings-footer {
   flex-shrink: 0;
@@ -2680,7 +2896,7 @@
 
 .ds-settings-path {
   font-size: 10px;
-  color: var(--jp-ui-font-color3, #aaa);
+  color: var(--ds-text-dim, #5a5f72);
   word-break: break-all;
 }
 
@@ -2706,7 +2922,7 @@
 .ds-rag-routing-summary {
   margin-bottom: 10px;
   padding: 10px 12px;
-  background: var(--jp-layout-color2, #f5f5f5);
+  background: var(--ds-surface, #eeeff3);
   border-radius: 6px;
   border: 1px solid var(--jp-border-color2, #ddd);
   font-size: 11px;
@@ -2735,7 +2951,7 @@
 
 .ds-rag-routing-hint {
   margin: 8px 0 0;
-  color: var(--jp-ui-font-color3, #aaa);
+  color: var(--ds-text-dim, #5a5f72);
   font-size: 10px;
   line-height: 1.4;
 }
@@ -2743,9 +2959,9 @@
 .ds-rag-storage-hint {
   margin-bottom: 10px;
   padding: 8px 12px;
-  background: var(--jp-info-color0, #e8f4fd);
+  background: #eef6ff;
   border-radius: 6px;
-  border-left: 3px solid var(--jp-info-color1, #0077cc);
+  border-left: 3px solid #90caf9;
   font-size: 10px;
   line-height: 1.5;
 }
@@ -2775,7 +2991,7 @@
 .ds-rag-status {
   margin-top: 14px;
   padding: 10px 12px;
-  background: var(--jp-layout-color2, #f5f5f5);
+  background: var(--ds-surface, #eeeff3);
   border-radius: 6px;
   border: 1px solid var(--jp-border-color2, #ddd);
   font-size: 11px;
@@ -2849,12 +3065,12 @@
 }
 
 .ds-rag-status-file--more {
-  color: var(--jp-ui-font-color3, #aaa);
+  color: var(--ds-text-dim, #5a5f72);
   border-style: dashed;
 }
 
 .ds-rag-status-empty {
-  color: var(--jp-ui-font-color3, #aaa);
+  color: var(--ds-text-dim, #5a5f72);
   font-style: italic;
 }
 .ds-rag-status-empty code {
@@ -2866,11 +3082,346 @@
 }
 
 .ds-rag-status-loading {
-  color: var(--jp-ui-font-color3, #aaa);
+  color: var(--ds-text-dim, #5a5f72);
   font-style: italic;
 }
 
-/* ── END RAG Knowledge tab ─────────────────────────────────────────────────── */
+/* ── MCP Settings tab ──────────────────────────────────────────────────────── */
+
+.ds-mcp-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.ds-mcp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.ds-mcp-summary {
+  font-size: 11px;
+  color: var(--jp-ui-font-color2, #666);
+}
+
+.ds-mcp-reload-btn {
+  background: none;
+  border: 1px solid var(--jp-border-color1, #ccc);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--jp-ui-font-color1, #333);
+}
+.ds-mcp-reload-btn:hover { border-color: var(--jp-brand-color1, #1976d2); color: var(--jp-brand-color1, #1976d2); }
+.ds-mcp-reload-btn:disabled { opacity: 0.5; cursor: default; }
+
+.ds-mcp-status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.ds-mcp-status--ok  { background: #e8f5e9; color: #2e7d32; }
+.ds-mcp-status--err { background: #ffebee; color: #c62828; }
+.ds-chat-night .ds-mcp-status--ok  { background: #1b3a1e; color: #81c784; }
+.ds-chat-night .ds-mcp-status--err { background: #3b1a1a; color: #ef9a9a; }
+
+.ds-mcp-empty {
+  color: var(--ds-text-dim, #5a5f72);
+  font-style: italic;
+  font-size: 11px;
+}
+
+.ds-mcp-server {
+  border: 1px solid var(--jp-border-color2, #ddd);
+  border-radius: 6px;
+  padding: 7px 9px;
+  background: var(--ds-surface, #eeeff3);
+}
+.ds-mcp-server--error      { border-color: #ef9a9a; }
+.ds-mcp-server--connected  { border-color: #a5d6a7; }
+.ds-mcp-server--connecting { border-color: #ffcc80; }
+.ds-chat-night .ds-mcp-summary {
+  color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-mcp-reload-btn {
+  border-color: var(--ds-border, #35354a);
+  color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-mcp-reload-btn:hover {
+  border-color: #7ec8e3;
+  color: #7ec8e3;
+}
+.ds-chat-night .ds-mcp-server {
+  background: #1a1a26;
+  border-color: var(--ds-border, #35354a);
+}
+.ds-chat-night .ds-mcp-server--error      { border-color: #c62828; }
+.ds-chat-night .ds-mcp-server--connected  { border-color: #388e3c; }
+.ds-chat-night .ds-mcp-server--connecting { border-color: #f57c00; }
+.ds-chat-night .ds-mcp-server-name        { color: var(--ds-text, #c5c5cc); }
+.ds-chat-night .ds-mcp-server-cmd         { color: var(--ds-text-dim, #8890a8); }
+.ds-chat-night .ds-mcp-server-remove      { color: #555870; }
+.ds-chat-night .ds-mcp-add {
+  border-top-color: var(--ds-border, #35354a);
+}
+.ds-chat-night .ds-mcp-add-title          { color: var(--ds-text-dim, #8890a8); }
+.ds-chat-night .ds-mcp-input {
+  background: var(--ds-input-bg, #1a1a24);
+}
+.ds-chat-night .ds-mcp-input::placeholder { color: #555870; }
+.ds-chat-night .ds-mcp-input:focus        { border-color: #7ec8e3; }
+.ds-chat-night .ds-mcp-hint {
+  color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-mcp-hint code {
+  background: rgba(255,255,255,0.07);
+}
+.ds-chat-night .ds-mcp-tools-toggle       { color: var(--ds-text-dim, #8890a8); }
+.ds-chat-night .ds-mcp-tool-name          { color: var(--ds-text, #c5c5cc); }
+.ds-chat-night .ds-mcp-empty              { color: #555870; }
+
+.ds-mcp-server-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ds-mcp-server-dot { flex-shrink: 0; font-size: 10px; }
+
+.ds-mcp-server-name {
+  font-weight: 600;
+  color: var(--jp-ui-font-color0, #111);
+  flex-shrink: 0;
+}
+
+.ds-mcp-server-cmd {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  font-family: var(--jp-code-font-family, monospace);
+  color: var(--ds-text-dim, #5a5f72);
+}
+
+.ds-mcp-server-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ds-text-dim, #5a5f72);
+  font-size: 12px;
+  padding: 0 2px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.ds-mcp-server-remove:hover { color: #c62828; }
+
+.ds-mcp-server-error {
+  margin-top: 4px;
+  font-size: 10px;
+  color: #c62828;
+  word-break: break-word;
+}
+.ds-chat-night .ds-mcp-server-error { color: #ef9a9a; }
+
+.ds-mcp-tools { margin-top: 5px; }
+
+.ds-mcp-tools-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--jp-ui-font-color2, #666);
+  padding: 0;
+}
+.ds-mcp-tools-toggle:hover { color: var(--jp-brand-color1, #1976d2); }
+
+.ds-mcp-tools-list {
+  margin: 4px 0 0 12px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ds-mcp-tool-name {
+  font-size: 10px;
+  font-family: var(--jp-code-font-family, monospace);
+  color: var(--jp-ui-font-color2, #555);
+  background: var(--jp-layout-color1, #fff);
+  border: 1px solid var(--jp-border-color2, #ddd);
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+
+.ds-mcp-add {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid var(--jp-border-color2, #ddd);
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+.ds-mcp-add-title {
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--jp-ui-font-color2, #555);
+}
+
+.ds-mcp-input {
+  font-size: 11px;
+  padding: 4px 7px;
+  border: 1px solid var(--ds-border, #d8dae0);
+  border-radius: 4px;
+  background: var(--ds-input-bg, #fff);
+  color: var(--ds-text, #1e1e2e);
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--jp-code-font-family, monospace);
+}
+.ds-mcp-input:focus {
+  outline: none;
+  border-color: var(--jp-brand-color1, #1976d2);
+}
+
+.ds-mcp-env-textarea {
+  resize: vertical;
+  min-height: 100px;
+  line-height: 1.5;
+}
+
+.ds-mcp-add-btn {
+  background: var(--jp-brand-color1, #1976d2);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.ds-mcp-add-btn:hover:not(:disabled) { background: var(--jp-brand-color0, #1565c0); }
+.ds-mcp-add-btn:disabled { opacity: 0.5; cursor: default; }
+
+.ds-mcp-hint {
+  font-size: 10px;
+  color: var(--ds-text-dim, #5a5f72);
+  line-height: 1.5;
+  margin-top: 10px;
+  margin-bottom: 0;
+}
+.ds-mcp-hint code {
+  background: rgba(0,0,0,0.06);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 9px;
+}
+
+/* ── Per-server enable/disable toggle ──────────────────────────────────────── */
+.ds-mcp-server-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 28px;
+  height: 15px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.ds-mcp-server-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.ds-mcp-server-toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: #ccc;
+  border-radius: 15px;
+  transition: background 0.2s;
+}
+.ds-mcp-server-toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  left: 2px;
+  top: 2px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+.ds-mcp-server-toggle input:checked + .ds-mcp-server-toggle-slider {
+  background: #66bb6a;
+}
+.ds-mcp-server-toggle input:checked + .ds-mcp-server-toggle-slider::before {
+  transform: translateX(13px);
+}
+.ds-mcp-server-toggle input:disabled + .ds-mcp-server-toggle-slider {
+  opacity: 0.5;
+  cursor: default;
+}
+.ds-mcp-server-toggle input:focus-visible + .ds-mcp-server-toggle-slider {
+  outline: 2px solid var(--jp-brand-color1, #1976d2);
+  outline-offset: 1px;
+}
+
+/* Dimmed appearance for disabled servers */
+.ds-mcp-server--dim {
+  opacity: 0.55;
+}
+.ds-mcp-server-name--disabled {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+/* ── Config file viewer ─────────────────────────────────────────────────────── */
+.ds-mcp-config-viewer {
+  margin-top: 16px;
+  border-top: 1px solid var(--jp-border-color2, #e0e0e0);
+  padding-top: 10px;
+}
+.ds-mcp-config-viewer-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--jp-ui-font-color2, #666);
+  margin-bottom: 6px;
+  font-family: var(--jp-code-font-family, monospace);
+}
+.ds-mcp-config-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--jp-border-color1, #ccc);
+  border-radius: 4px;
+  padding: 7px 8px;
+  font-size: 10px;
+  font-family: var(--jp-code-font-family, monospace);
+  line-height: 1.5;
+  background: var(--ds-surface, #eeeff3);
+  color: var(--jp-ui-font-color1, #333);
+  resize: vertical;
+  cursor: default;
+}
+.ds-chat-night .ds-mcp-config-textarea {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  border-color: #444;
+}
+.ds-chat-night .ds-mcp-config-viewer-label {
+  color: #999;
+}
+.ds-chat-night .ds-mcp-config-viewer {
+  border-top-color: #444;
+}
+
+/* ── END MCP Settings tab ──────────────────────────────────────────────────── */
 
 .ds-settings-actions {
   display: flex;
@@ -2898,7 +3449,7 @@
 
 .ds-settings-cancel-btn {
   padding: 7px 12px;
-  background: var(--jp-layout-color2, #eee);
+  background: var(--ds-surface2, #e2e3ea);
   border: 1px solid var(--jp-border-color1, #ccc);
   border-radius: 5px;
   cursor: pointer;
@@ -2930,7 +3481,7 @@
   display: flex;
   flex-shrink: 0;
   border-bottom: 2px solid var(--jp-border-color1, #ccc);
-  background: var(--jp-layout-color2, #f5f5f5);
+  background: var(--ds-surface, #eeeff3);
 }
 
 .ds-settings-top-tab {
@@ -2979,16 +3530,16 @@
 }
 .ds-commands-refresh-btn {
   background: none;
-  border: 1px solid var(--jp-border-color1, #ccc);
+  border: 1px solid var(--ds-border, #d8dae0);
   border-radius: 4px;
   padding: 2px 7px;
   font-size: 13px;
   cursor: pointer;
-  color: var(--jp-ui-font-color1, #333);
+  color: var(--ds-chip-text, #3b3e55);
   line-height: 1.4;
 }
 .ds-commands-refresh-btn:hover {
-  background: var(--jp-layout-color2, #f0f0f0);
+  background: var(--ds-surface, #eeeff3);
 }
 .ds-commands-section {
   display: flex;
@@ -3052,15 +3603,24 @@
 
 /* ── Left: skill list ── */
 .ds-skills-list {
-  width: 52%;
-  min-width: 120px;
-  max-width: 220px;
-  border-right: 1px solid var(--jp-border-color2, #ddd);
   overflow-y: auto;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   padding: 0;
+}
+
+.ds-skills-splitter {
+  width: 4px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: var(--ds-border, #d8dae0);
+  transition: background 0.15s;
+  user-select: none;
+}
+.ds-skills-splitter:hover,
+.ds-skills-splitter:active {
+  background: var(--jp-brand-color1, #1976d2);
 }
 
 /* Header bar with title + refresh button */
@@ -3087,14 +3647,14 @@
 
 .ds-skills-refresh-btn {
   background: none;
-  border: 1px solid var(--jp-border-color2, #ccc);
+  border: 1px solid var(--ds-border, #d8dae0);
   border-radius: 50%;
   width: 20px;
   height: 20px;
   cursor: pointer;
   font-size: 13px;
   line-height: 1;
-  color: var(--jp-ui-font-color2, #666);
+  color: var(--ds-text-dim, #5a5f72);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3122,7 +3682,7 @@
   padding: 10px 8px;
   margin-top: 4px;
   font-size: 11px;
-  color: var(--jp-ui-font-color3, #aaa);
+  color: var(--ds-text-dim, #5a5f72);
   white-space: pre-line;
   font-style: italic;
   line-height: 1.4;
@@ -3138,7 +3698,7 @@
   border-bottom: 1px solid var(--jp-border-color2, #e8e8e8);
 }
 .ds-skill-row:hover {
-  background: var(--jp-layout-color2, #f0f0f0);
+  background: var(--ds-surface, #eeeff3);
 }
 .ds-skill-row--active {
   background: var(--jp-brand-color3, #e3f0fc);
@@ -3196,10 +3756,10 @@
   padding: 4px 6px;
   font-size: 11px;
   background: none;
-  border: 1px dashed var(--jp-border-color1, #ccc);
+  border: 1px dashed var(--ds-border, #d8dae0);
   border-radius: 4px;
   cursor: pointer;
-  color: var(--jp-ui-font-color2, #888);
+  color: var(--ds-text-dim, #5a5f72);
   text-align: left;
   transition: border-color 0.1s, color 0.1s;
 }
@@ -3229,7 +3789,7 @@
   text-align: left;
 }
 .ds-skill-library-header:hover {
-  background: var(--jp-layout-color2, #f0f0f0);
+  background: var(--ds-surface, #eeeff3);
 }
 
 .ds-skill-library-chevron {
@@ -3317,24 +3877,33 @@
   cursor: default;
 }
 
-/* night-mode overrides */
-.ds-assistant--night .ds-skill-library-header {
-  color: #ccc;
+/* night-mode overrides (inline — close to the base rules for discoverability) */
+.ds-chat-night .ds-skill-library-header {
+  color: var(--ds-text, #c5c5cc);
 }
-.ds-assistant--night .ds-skill-library-header:hover {
-  background: rgba(255,255,255,0.07);
+.ds-chat-night .ds-skill-library-header:hover {
+  background: rgba(255,255,255,0.05);
 }
-.ds-assistant--night .ds-skill-library {
-  border-top-color: rgba(255,255,255,0.1);
+.ds-chat-night .ds-skill-library {
+  border-top-color: var(--ds-border, #35354a);
 }
-.ds-assistant--night .ds-skill-library-row {
-  border-bottom-color: rgba(255,255,255,0.07);
+.ds-chat-night .ds-skill-library-row {
+  border-bottom-color: var(--ds-border, #35354a);
 }
-.ds-assistant--night .ds-skill-library-name {
-  color: #ddd;
+.ds-chat-night .ds-skill-library-name {
+  color: var(--ds-text, #c5c5cc);
 }
-.ds-assistant--night .ds-skill-library-desc {
-  color: #999;
+.ds-chat-night .ds-skill-library-chevron {
+  color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-skill-library-msg {
+  color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-skill-library-desc {
+  color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-skill-library-cmd {
+  color: #7ec8e3;
 }
 
 /* ── end skill library ─────────────────────────────────────────────── */
@@ -3387,7 +3956,7 @@
   align-items: center;
   justify-content: center;
   font-size: 11px;
-  color: var(--jp-ui-font-color3, #bbb);
+  color: var(--ds-text-dim, #5a5f72);
   font-style: italic;
   padding: 16px;
   text-align: center;
@@ -3401,7 +3970,7 @@
   padding: 4px 6px 0;
   border-bottom: 1px solid var(--jp-border-color2, #ddd);
   flex-shrink: 0;
-  background: var(--jp-layout-color2, #f5f5f5);
+  background: var(--ds-surface, #eeeff3);
 }
 
 .ds-skill-editor-tab {
@@ -3438,7 +4007,7 @@
 .ds-skill-editor-filepath {
   font-size: 9px;
   font-family: var(--jp-code-font-family, monospace);
-  color: var(--jp-ui-font-color3, #aaa);
+  color: var(--ds-text-dim, #5a5f72);
   padding: 2px 8px;
   border-bottom: 1px solid var(--jp-border-color2, #eee);
   flex-shrink: 0;
@@ -3548,7 +4117,7 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  background: var(--jp-layout-color2, #f0f0f0);
+  background: var(--ds-surface, #eeeff3);
   border: 1px solid var(--jp-border-color2, #ddd);
   border-radius: 12px;
   padding: 2px 6px 2px 8px;
@@ -3572,7 +4141,7 @@
   font-size: 13px;
   line-height: 1;
   padding: 0 1px;
-  color: var(--jp-ui-font-color3, #aaa);
+  color: var(--ds-text-dim, #5a5f72);
   flex-shrink: 0;
   border-radius: 50%;
 }
@@ -3583,7 +4152,7 @@
 
 .ds-settings-zoo-empty {
   font-size: 11px;
-  color: var(--jp-ui-font-color3, #aaa);
+  color: var(--ds-text-dim, #5a5f72);
   font-style: italic;
 }
 
@@ -3597,10 +4166,10 @@
   font-size: 12px;
   font-family: var(--jp-code-font-family, monospace);
   padding: 4px 7px;
-  border: 1px solid var(--jp-border-color1, #ccc);
+  border: 1px solid var(--ds-border, #d8dae0);
   border-radius: 4px;
-  background: var(--jp-layout-color1, #fff);
-  color: var(--jp-ui-font-color0, #222);
+  background: var(--ds-input-bg, #fff);
+  color: var(--ds-text, #1e1e2e);
   min-width: 0;
 }
 .ds-settings-zoo-add-input:focus {
@@ -3613,13 +4182,13 @@
   padding: 4px 10px;
   font-size: 12px;
   font-weight: 600;
-  background: var(--jp-layout-color2, #eee);
-  border: 1px solid var(--jp-border-color1, #ccc);
+  background: var(--ds-surface2, #e2e3ea);
+  border: 1px solid var(--ds-btn-border, #c6c8d4);
   border-radius: 4px;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  color: var(--jp-ui-font-color0, #333);
+  color: var(--ds-btn-text, #3b3e55);
 }
 .ds-settings-zoo-add-btn:hover:not(:disabled) {
   background: var(--jp-brand-color1, #1976d2);
@@ -3629,6 +4198,328 @@
 .ds-settings-zoo-add-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* =============================================================
+   Night-mode overrides — RAG / Indexing & Docs tab
+   ============================================================= */
+
+/* Embed routing summary card */
+.ds-chat-night .ds-rag-routing-summary {
+  background: #1a1a26;
+  border-color: var(--ds-border, #35354a);
+}
+.ds-chat-night .ds-rag-routing-label {
+  color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-rag-routing-value {
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-chat-night .ds-rag-routing-hint {
+  color: #555870;
+}
+
+/* How-to storage hint */
+.ds-chat-night .ds-rag-storage-hint {
+  background: #1a2530;
+  border-left-color: #2a6496;
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-chat-night .ds-rag-storage-hint strong {
+  color: #7ec8e3;
+}
+.ds-chat-night .ds-rag-storage-hint p {
+  color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-rag-storage-hint code {
+  background: rgba(255,255,255,0.07);
+}
+
+/* Index status widget */
+.ds-chat-night .ds-rag-status {
+  background: #1a1a26;
+  border-color: var(--ds-border, #35354a);
+}
+.ds-chat-night .ds-rag-status--unavailable {
+  background: #2a2010;
+  border-color: #7a5c00;
+  color: #f0c060;
+}
+.ds-chat-night .ds-rag-status-title {
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-chat-night .ds-rag-status-refresh {
+  color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-rag-status-stats {
+  color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-rag-status-stats strong {
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-chat-night .ds-rag-status-file {
+  background: #13131a;
+  border-color: var(--ds-border, #35354a);
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-chat-night .ds-rag-status-empty {
+  color: #555870;
+}
+.ds-chat-night .ds-rag-status-empty code {
+  background: #13131a;
+  border-color: var(--ds-border, #35354a);
+}
+
+/* =============================================================
+   Night-mode overrides for ALL Settings panel elements
+   These are needed because the settings CSS uses var(--jp-*)
+   variables that follow JupyterLab's own theme, not Varys's
+   independent chatTheme toggle.
+   ============================================================= */
+
+/* ── Structural / chrome ── */
+.ds-chat-night .ds-settings-outer,
+.ds-chat-night .ds-settings-panel {
+  background: var(--ds-bg, #1c1c24);
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-chat-night .ds-settings-top-tabs {
+  border-bottom-color: var(--ds-border, #35354a);
+  background: var(--ds-header-bg, #22222e);
+}
+.ds-chat-night .ds-settings-top-tab {
+  color: var(--ds-text-dim, #8890a8);
+  background: transparent;
+}
+.ds-chat-night .ds-settings-top-tab:hover {
+  color: var(--ds-text, #c5c5cc);
+  background: rgba(255,255,255,0.05);
+}
+.ds-chat-night .ds-settings-top-tab--active {
+  color: #7ec8e3;
+  border-bottom-color: #7ec8e3;
+}
+.ds-chat-night .ds-settings-tabbar {
+  border-bottom-color: var(--ds-border, #35354a);
+  background: var(--ds-header-bg, #22222e);
+}
+.ds-chat-night .ds-settings-tab {
+  color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-settings-tab:hover {
+  color: var(--ds-text, #c5c5cc);
+  background: rgba(255,255,255,0.05);
+}
+.ds-chat-night .ds-settings-tab--active {
+  color: #7ec8e3;
+  border-bottom-color: #7ec8e3;
+}
+.ds-chat-night .ds-settings-tab-content {
+  background: var(--ds-bg, #1c1c24);
+}
+.ds-chat-night .ds-settings-footer {
+  border-top-color: var(--ds-border, #35354a);
+  background: var(--ds-header-bg, #22222e);
+}
+
+/* ── Labels & text ── */
+.ds-chat-night .ds-settings-label {
+  color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-settings-toggle-desc {
+  color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-settings-path {
+  color: #555870;
+}
+.ds-chat-night .ds-settings-loading {
+  color: var(--ds-text-dim, #8890a8);
+}
+
+/* ── Inputs & selects ── */
+.ds-chat-night .ds-settings-input:focus,
+.ds-chat-night .ds-settings-select:focus {
+  border-color: #7ec8e3;
+  box-shadow: 0 0 0 2px rgba(126,200,227,0.15);
+}
+.ds-chat-night .ds-settings-input::placeholder {
+  color: #555870;
+}
+
+/* ── Buttons ── */
+.ds-chat-night .ds-settings-cancel-btn {
+  background: rgba(255,255,255,0.06);
+  border-color: var(--ds-border, #35354a);
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-chat-night .ds-settings-cancel-btn:hover {
+  background: rgba(255,255,255,0.10);
+}
+.ds-chat-night .ds-settings-close-btn {
+  color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-settings-close-btn:hover {
+  color: var(--ds-text, #c5c5cc);
+  background: rgba(255,255,255,0.08);
+}
+
+/* ── Status messages ── */
+.ds-chat-night .ds-settings-status-success {
+  background: #1b3a1e;
+  color: #81c784;
+  border-left-color: #388e3c;
+}
+.ds-chat-night .ds-settings-status-error {
+  background: #3b1a1a;
+  color: #ef9a9a;
+  border-left-color: #c62828;
+}
+
+/* ── Model Zoo ── */
+.ds-chat-night .ds-settings-zoo {
+  border-top-color: var(--ds-border, #35354a);
+}
+.ds-chat-night .ds-settings-zoo-title {
+  color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-settings-zoo-count {
+  background: #1f4468;
+  color: #7ec8e3;
+}
+.ds-chat-night .ds-settings-zoo-chip {
+  background: rgba(255,255,255,0.06);
+  border-color: var(--ds-border, #35354a);
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-chat-night .ds-settings-zoo-chip-name {
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-chat-night .ds-settings-zoo-chip-remove {
+  color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-settings-zoo-empty {
+  color: #555870;
+}
+.ds-chat-night .ds-settings-zoo-add-input::placeholder {
+  color: #555870;
+}
+.ds-chat-night .ds-settings-zoo-add-input:focus {
+  border-color: #7ec8e3;
+  box-shadow: 0 0 0 2px rgba(126,200,227,0.15);
+}
+.ds-chat-night .ds-settings-zoo-add-btn {
+  background: rgba(255,255,255,0.07);
+  border-color: var(--ds-border, #35354a);
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-chat-night .ds-settings-zoo-add-btn:hover:not(:disabled) {
+  background: #7ec8e3;
+  border-color: #7ec8e3;
+  color: #111;
+}
+
+/* ── Skills panel ── */
+.ds-chat-night .ds-skills-splitter {
+  background: var(--ds-border, #35354a);
+}
+.ds-chat-night .ds-skills-splitter:hover,
+.ds-chat-night .ds-skills-splitter:active {
+  background: #7ec8e3;
+}
+.ds-chat-night .ds-skills-list-header {
+  background: var(--ds-header-bg, #22222e);
+  border-bottom-color: var(--ds-border, #35354a);
+}
+.ds-chat-night .ds-skills-list-title {
+  color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-skills-refresh-btn:hover:not(:disabled) {
+  color: #7ec8e3;
+  border-color: #7ec8e3;
+  background: rgba(126,200,227,0.08);
+}
+.ds-chat-night .ds-skill-row {
+  border-bottom-color: var(--ds-border, #35354a);
+}
+.ds-chat-night .ds-skill-row:hover {
+  background: rgba(255,255,255,0.05);
+}
+.ds-chat-night .ds-skill-row--active {
+  background: rgba(126,200,227,0.12);
+}
+.ds-chat-night .ds-skill-name {
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-chat-night .ds-skills-empty {
+  color: #555870;
+}
+.ds-chat-night .ds-skill-add-btn:hover {
+  border-color: #7ec8e3;
+  color: #7ec8e3;
+}
+.ds-chat-night .ds-skill-new-input {
+  background: var(--ds-input-bg, #1a1a24);
+  border-color: var(--ds-border, #35354a);
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-chat-night .ds-skill-new-input::placeholder {
+  color: #555870;
+}
+
+
+/* ── Skill editor ── */
+.ds-chat-night .ds-skill-editor-tabs {
+  border-bottom-color: var(--ds-border, #35354a);
+  background: var(--ds-header-bg, #22222e);
+}
+.ds-chat-night .ds-skill-editor-tab {
+  color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-skill-editor-tab:hover {
+  color: var(--ds-text, #c5c5cc);
+  background: var(--ds-bg, #1c1c24);
+}
+.ds-chat-night .ds-skill-editor-tab--active {
+  color: #7ec8e3;
+  background: var(--ds-bg, #1c1c24);
+  border-color: var(--ds-border, #35354a);
+}
+.ds-chat-night .ds-skill-editor-filepath {
+  color: #555870;
+  border-bottom-color: var(--ds-border, #35354a);
+  background: var(--ds-header-bg, #22222e);
+}
+.ds-chat-night .ds-skill-editor-textarea {
+  background: #13131a;
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-chat-night .ds-skill-editor-placeholder {
+  color: #555870;
+}
+
+/* ── Commands panel ── */
+.ds-chat-night .ds-commands-count {
+  color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-commands-refresh-btn:hover {
+  background: rgba(255,255,255,0.06);
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-chat-night .ds-commands-section-title {
+  color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-commands-name {
+  color: #7ec8e3;
+}
+.ds-chat-night .ds-commands-desc {
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-chat-night .ds-commands-skill-badge {
+  background: rgba(126,200,227,0.15);
+  color: #7ec8e3;
+}
+.ds-chat-night .ds-commands-empty {
+  color: #555870;
 }
 
 /* ----------------------------------------------------------
@@ -3643,7 +4534,7 @@
 
 /* ── Report card ── */
 .ds-report-card {
-  background: var(--jp-layout-color2, #f5f5f5);
+  background: var(--ds-surface, #eeeff3);
   border: 1px solid var(--jp-border-color2, #ddd);
   border-left: 4px solid #28a745;
   border-radius: 6px;
@@ -3723,7 +4614,7 @@
 }
 
 .ds-fix-panel-header {
-  background: var(--jp-layout-color2);
+  background: var(--ds-surface, #f0f0f0);
   padding: 5px 10px;
   font-size: 11px;
   font-weight: 600;
@@ -3888,7 +4779,7 @@
 }
 .ds-repro-timestamp {
   font-size: 10px;
-  color: var(--jp-ui-font-color3);
+  color: var(--ds-text-dim, #5a5f72);
   margin-top: 4px;
 }
 
@@ -3900,8 +4791,8 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  background: var(--jp-layout-color2);
-  border-top: 1px solid var(--jp-border-color2);
+  background: var(--ds-surface, #f0f0f0);
+  border-top: 1px solid var(--ds-border, #d8dae0);
 }
 .ds-repro-section--critical .ds-repro-section-title { color: #d32f2f; }
 .ds-repro-section--warning  .ds-repro-section-title { color: #f57c00; }
@@ -3936,7 +4827,7 @@
 }
 .ds-repro-card-loc {
   font-size: 10px;
-  color: var(--jp-ui-font-color3);
+  color: var(--ds-text-dim, #5a5f72);
   white-space: nowrap;
 }
 .ds-repro-card-message {
@@ -4035,7 +4926,7 @@
 }
 .ds-repro-footer .ds-repro-timestamp {
   font-size: 9px;
-  color: var(--jp-ui-font-color3);
+  color: var(--ds-text-dim, #5a5f72);
   margin-left: auto;
 }
 
@@ -4083,7 +4974,7 @@
 .ds-tags-section-btn {
   flex: 1;
   padding: 5px 8px;
-  background: var(--jp-layout-color2, #f5f5f5);
+  background: var(--ds-surface, #eeeff3);
   border: 1px solid var(--jp-border-color2, #ddd);
   border-radius: 6px;
   font-size: 11px;
@@ -4105,7 +4996,7 @@
   cursor: pointer;
   color: var(--jp-ui-font-color2, #555);
 }
-.ds-tags-refresh-btn:hover { background: var(--jp-layout-color2, #f5f5f5); }
+.ds-tags-refresh-btn:hover { background: var(--ds-surface2, #e2e3ea); }
 
 /* Tag chip (shared between panel and overlay) */
 .ds-tag-chip {
@@ -4162,7 +5053,7 @@
 .ds-tags-cell-ref-hint {
   font-size: 10px;
   font-weight: 400;
-  color: var(--jp-ui-font-color3, #aaa);
+  color: var(--ds-text-dim, #5a5f72);
   font-family: var(--jp-ui-font-family);
 }
 
@@ -4205,7 +5096,7 @@
   gap: 4px;
   font-size: 10px;
 }
-.ds-tags-quickpick-label { color: var(--jp-ui-font-color3, #aaa); flex-shrink: 0; }
+.ds-tags-quickpick-label { color: var(--ds-text-dim, #5a5f72); flex-shrink: 0; }
 .ds-tags-quickpick-btn {
   padding: 2px 7px;
   border-radius: 20px;
@@ -4231,7 +5122,7 @@
 }
 .ds-tags-meta-save-btn {
   padding: 3px 10px;
-  background: var(--jp-layout-color2, #f5f5f5);
+  background: var(--ds-surface, #eeeff3);
   border: 1px solid var(--jp-border-color1, #ccc);
   border-radius: 6px;
   font-size: 10px;
@@ -4254,7 +5145,7 @@
 .ds-tags-meta-editor.ds-tags-meta-error { border-color: #ef4444; }
 .ds-tags-meta-hint {
   font-size: 10px;
-  color: var(--jp-ui-font-color3, #aaa);
+  color: var(--ds-text-dim, #5a5f72);
   margin: 0;
   line-height: 1.4;
 }
@@ -4305,7 +5196,7 @@
   flex-direction: column;
   gap: 4px;
 }
-.ds-tags-cell-row:hover { background: var(--jp-layout-color2, #f5f5f5); }
+.ds-tags-cell-row:hover { background: var(--ds-surface, #f0f0f0); }
 .ds-tags-cell-row-header {
   display: flex;
   justify-content: space-between;
@@ -4319,7 +5210,7 @@
 }
 .ds-tags-cell-row-type {
   font-size: 9px;
-  color: var(--jp-ui-font-color3, #aaa);
+  color: var(--ds-text-dim, #5a5f72);
   text-transform: uppercase;
 }
 .ds-tags-cell-row-preview {
@@ -4334,7 +5225,7 @@
 
 .ds-tags-empty {
   font-size: 11px;
-  color: var(--jp-ui-font-color3, #aaa);
+  color: var(--ds-text-dim, #5a5f72);
   text-align: center;
   padding: 20px 0;
   margin: 0;
@@ -4365,7 +5256,7 @@
   flex-direction: column;
   gap: 5px;
   padding: 8px;
-  background: var(--jp-layout-color2, #f5f5f8);
+  background: var(--ds-surface, #eeeff3);
   border-radius: 5px;
   border: 1px solid var(--jp-border-color2, #e0e0e0);
 }
@@ -4377,7 +5268,7 @@
 .ds-tags-preset-category {
   font-size: 9px;
   font-weight: 600;
-  color: var(--jp-ui-font-color3, #999);
+  color: var(--ds-text-dim, #5a5f72);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   white-space: nowrap;
@@ -4434,7 +5325,7 @@
   justify-content: space-between;  /* tags left, position right */
   gap: 3px;
   padding: 2px 6px;
-  background: color-mix(in srgb, var(--jp-layout-color2, #f5f5f5) 70%, transparent);
+  background: var(--ds-surface, #f0f0f0);
   border-bottom: 1px solid var(--jp-border-color3, #eee);
   pointer-events: none;       /* don't interfere with cell selection */
   min-height: 18px;
@@ -4468,7 +5359,7 @@
   font-size: 9px;
   font-family: var(--jp-code-font-family, monospace);
   font-weight: 600;
-  color: var(--jp-ui-font-color3, #aaa);
+  color: var(--ds-text-dim, #5a5f72);
   letter-spacing: 0.02em;
   opacity: 0.75;
   user-select: none;
@@ -4662,7 +5553,7 @@ body[data-jp-theme-light="false"] .ds-cell-position-badge {
   cursor: pointer;
   text-align: left;
   transition: background 0.12s, border-color 0.12s;
-  background: var(--jp-layout-color2, #f7f7f7);
+  background: var(--ds-surface, #eeeff3);
 }
 
 .ds-disambig-btn--chat {

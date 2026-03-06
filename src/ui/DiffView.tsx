@@ -51,11 +51,8 @@ export interface DiffViewProps {
   operationId: string;
   description?: string;
   diffs: DiffInfo[];
-  onAccept:          (operationId: string) => void;
-  onAcceptAndRun:    (operationId: string) => void;
-  onUndo:            (operationId: string) => void;
-  onApplySelection:  (operationId: string, decisions: CellDecision[]) => void;
-  hasCodeCells?: boolean;
+  onAccept: (operationId: string) => void;
+  onUndo:   (operationId: string) => void;
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -274,47 +271,12 @@ export const DiffView: React.FC<DiffViewProps> = ({
   description,
   diffs,
   onAccept,
-  onAcceptAndRun,
   onUndo,
-  onApplySelection,
-  hasCodeCells,
 }) => {
-  // Parent-level aggregation of per-cell decisions from child sections.
-  // Key: cellIndex, Value: {finalContent, accept}
-  const [cellDecisions, setCellDecisions] = useState<
-    Map<number, { finalContent?: string; accept: boolean }>
-  >(new Map());
-
-  const handleCellDecision = (
-    cellIndex: number,
-    finalContent: string | undefined,
-    accept: boolean,
-  ) => {
-    setCellDecisions(prev => {
-      const next = new Map(prev);
-      next.set(cellIndex, { finalContent, accept });
-      return next;
-    });
-  };
-
-  const decidedCount = cellDecisions.size;
-  const hasAnyDecision = decidedCount > 0;
-
-  const handleApply = () => {
-    const decisions: CellDecision[] = diffs.map(d => {
-      const cd = cellDecisions.get(d.cellIndex);
-      return {
-        cellIndex:    d.cellIndex,
-        opType:       d.opType,
-        finalContent: cd?.finalContent,
-        accept:       cd?.accept ?? true, // default: accept
-      };
-    });
-    onApplySelection(operationId, decisions);
-  };
-
   const totalCells   = diffs.length;
-  const cellLabel    = `${totalCells} cell${totalCells !== 1 ? 's' : ''}`;
+  const cellLabel    = totalCells > 0
+    ? `${totalCells} cell${totalCells !== 1 ? 's' : ''}`
+    : null;
   const defaultOpen  = diffs.length === 1;
 
   const totalInsertions = diffs.reduce(
@@ -334,7 +296,9 @@ export const DiffView: React.FC<DiffViewProps> = ({
       {/* ── Header ── */}
       <div className="ds-diff-header">
         <div className="ds-diff-header-info">
-          <span className="ds-diff-header-cells">{cellLabel}</span>
+          {cellLabel && (
+            <span className="ds-diff-header-cells">{cellLabel}</span>
+          )}
           {description && (
             <span className="ds-diff-header-desc" title={description}>{description}</span>
           )}
@@ -342,45 +306,25 @@ export const DiffView: React.FC<DiffViewProps> = ({
         </div>
 
         <div className="ds-diff-header-actions">
-          {/* Accept All — existing shortcut, skips per-hunk decisions */}
           <button
             className="ds-assistant-btn ds-assistant-btn-accept"
             onClick={() => onAccept(operationId)}
             title="Accept all changes in all cells"
-          >✓ All</button>
-
-          {hasCodeCells && (
-            <button
-              className="ds-assistant-btn ds-assistant-btn-accept-run"
-              onClick={() => onAcceptAndRun(operationId)}
-              title="Accept all changes and run code cells"
-            >▶ All &amp; Run</button>
-          )}
-
-          {/* Apply Selection — only enabled when user made at least one decision */}
-          <button
-            className="ds-assistant-btn ds-assistant-btn-apply"
-            onClick={handleApply}
-            disabled={!hasAnyDecision}
-            title={hasAnyDecision
-              ? `Apply your ${decidedCount} cell decision(s)`
-              : 'Make at least one Accept/Reject choice below'}
-          >✦ Apply</button>
+          >✓ Accept</button>
 
           <button
             className="ds-assistant-btn ds-assistant-btn-undo"
             onClick={() => onUndo(operationId)}
-            title="Undo all changes"
-          >✕ Undo</button>
+            title="Reject all changes"
+          >✕ Reject</button>
         </div>
       </div>
 
-      {/* Hint shown when no per-hunk decisions have been made yet */}
-      {!hasAnyDecision && (
+      {/* Hint — only shown when there are actual diff cells to review */}
+      {totalCells > 0 && (
         <div className="ds-diff-hint">
-          Use ✓ / ✕ buttons on each change block to pick what to keep,
-          then click <strong>✦ Apply</strong>.
-          Or use <strong>✓ All</strong> to accept everything at once.
+          Use ✓ / ✕ buttons on each change block to review individual hunks,
+          or use <strong>✓ Accept</strong> / <strong>✕ Reject</strong> to act on all changes at once.
         </div>
       )}
 
@@ -391,7 +335,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
             key={i}
             info={d}
             defaultOpen={defaultOpen}
-            onCellDecisions={handleCellDecision}
+            onCellDecisions={() => {}}
           />
         ))}
       </div>
