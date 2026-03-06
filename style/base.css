@@ -469,10 +469,24 @@
 .ds-msg-edit-wrap {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
   /* Thin bottom highlight so the user knows this bubble is being edited */
   border-bottom: 2px solid var(--jp-brand-color1, #2196f3);
+}
+
+/* Keyboard hint shown below the editing textarea */
+.ds-msg-edit-hint {
+  font-size: 9px;
+  opacity: 0.5;
+  text-align: right;
+  user-select: none;
+  letter-spacing: 0.01em;
+}
+
+/* User bubble text is clickable to enter edit mode */
+.ds-user-editable {
+  cursor: pointer;
 }
 .ds-msg-edit-textarea {
   width: 100%;
@@ -492,42 +506,11 @@
   overflow: hidden;      /* let JS height control scrolling */
   caret-color: var(--jp-brand-color1, #2196f3);
 }
-.ds-msg-edit-actions {
-  display: flex;
-  gap: 6px;
-  justify-content: flex-end;
-}
-.ds-msg-edit-send,
-.ds-msg-edit-cancel {
-  padding: 3px 10px;
-  font-size: 11px;
-  font-weight: 500;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  transition: background 0.12s;
-}
-.ds-msg-edit-send {
-  background: var(--jp-brand-color1, #2196f3);
-  color: #fff;
-}
-.ds-msg-edit-send:hover:not(:disabled) { background: var(--jp-brand-color0, #1976d2); }
-.ds-msg-edit-send:disabled { opacity: 0.4; cursor: default; }
-.ds-msg-edit-cancel {
-  background: var(--jp-layout-color2, #e8e8e8);
-  color: var(--jp-ui-font-color1, #333);
-}
-.ds-msg-edit-cancel:hover { background: var(--jp-layout-color3, #d8d8d8); }
 /* Night mode — transparent so bubble gradient shows through */
 .ds-chat-night .ds-msg-edit-textarea {
   background: transparent;
   color: inherit;
 }
-.ds-chat-night .ds-msg-edit-cancel {
-  background: var(--ds-surface2, #2a2a2a);
-  color: var(--ds-text, #e0e0e0);
-}
-.ds-chat-night .ds-msg-edit-cancel:hover { background: var(--ds-surface3, #333); }
 
 /* ── Equalizer-bar cursor shown at end of a streaming message ── */
 .ds-typing-cursor {

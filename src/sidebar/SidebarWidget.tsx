@@ -2030,6 +2030,17 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
   const [editingMsgId,   setEditingMsgId]   = useState<string | null>(null);
   const [editingText,    setEditingText]     = useState<string>('');
 
+  // Cancel edit when the user clicks outside the editing bubble
+  useEffect(() => {
+    if (!editingMsgId) return;
+    const handler = (e: MouseEvent) => {
+      const el = document.querySelector('.ds-assistant-message-user--editing');
+      if (el && !el.contains(e.target as Node)) setEditingMsgId(null);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [editingMsgId]);
+
   // ── Chat thread state ──────────────────────────────────────────────────────
   const [threads, setThreads]                   = useState<ChatThread[]>([]);
   const [currentThreadId, setCurrentThreadId]   = useState('');
@@ -3808,36 +3819,25 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                     </div>
                   );
                 })()}
-                {/* ── User bubble edit toolbar (hover-reveal, position:absolute) ── */}
-                {msg.role === 'user' && msg.id !== editingMsgId && !isLoading && (
-                  <div className="ds-bubble-toolbar ds-bubble-toolbar-user">
-                    <div className="ds-bubble-toolbar-left" />
-                    <div className="ds-bubble-toolbar-right">
-                      <button
-                        className="ds-bubble-tool-btn"
-                        data-tip="Edit and resend"
-                        onClick={() => {
-                          setEditingMsgId(msg.id);
-                          setEditingText((msg.content ?? '').trim());
-                        }}
-                      >
-                        {/* Pencil icon */}
-                        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M11.5 2.5l2 2L5 13H3v-2L11.5 2.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-                          <path d="M9.5 4.5l2 2" stroke="currentColor" strokeWidth="1.5"/>
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                )}
                 {/* ── Bubble content ── */}
                 {(() => {
                   const isStreaming = msg.id === activeStreamId;
                   const isLong = (msg.content?.length ?? 0) >= COLLAPSE_THRESHOLD;
                   const collapsed = !isStreaming && isLong && collapsedMsgs.has(msg.id);
 
-                  // Inline editor for user messages
+                  // Inline editor for user messages — click bubble to edit,
+                  // Enter to resend, Escape or click-outside to cancel
                   if (msg.role === 'user' && msg.id === editingMsgId) {
+                    const doSend = () => {
+                      const text = editingText.trim();
+                      if (!text) return;
+                      setEditingMsgId(null);
+                      setMessages(prev => {
+                        const idx = prev.findIndex(m => m.id === msg.id);
+                        return idx >= 0 ? prev.slice(0, idx) : prev;
+                      });
+                      void handleSend(text);
+                    };
                     return (
                       <div className="ds-msg-edit-wrap">
                         <textarea
@@ -3846,41 +3846,25 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                           autoFocus
                           ref={el => {
                             if (el) {
-                              // Size to content on mount so it matches the original bubble height
                               el.style.height = 'auto';
                               el.style.height = el.scrollHeight + 'px';
                             }
                           }}
                           onChange={e => {
                             setEditingText(e.target.value);
-                            // Auto-grow/shrink with content
                             e.target.style.height = 'auto';
                             e.target.style.height = e.target.scrollHeight + 'px';
                           }}
                           onKeyDown={e => {
-                            if (e.key === 'Escape') setEditingMsgId(null);
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              doSend();
+                            } else if (e.key === 'Escape') {
+                              setEditingMsgId(null);
+                            }
                           }}
                         />
-                        <div className="ds-msg-edit-actions">
-                          <button
-                            className="ds-msg-edit-send"
-                            disabled={!editingText.trim()}
-                            onClick={() => {
-                              const text = editingText.trim();
-                              setEditingMsgId(null);
-                              // Remove edited message and everything after it
-                              setMessages(prev => {
-                                const idx = prev.findIndex(m => m.id === msg.id);
-                                return idx >= 0 ? prev.slice(0, idx) : prev;
-                              });
-                              void handleSend(text);
-                            }}
-                          >Send</button>
-                          <button
-                            className="ds-msg-edit-cancel"
-                            onClick={() => setEditingMsgId(null)}
-                          >Cancel</button>
-                        </div>
+                        <div className="ds-msg-edit-hint">↵ send · Shift+↵ newline · Esc cancel</div>
                       </div>
                     );
                   }
@@ -3888,7 +3872,13 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                   return (
                     <div className={`ds-msg-collapsible-wrap${collapsed ? ' ds-msg-collapsed' : ''}`}>
                       {msg.role === 'user' ? (
-                        <div className="ds-assistant-message-content">
+                        <div
+                          className={`ds-assistant-message-content${!isLoading ? ' ds-user-editable' : ''}`}
+                          onClick={!isLoading ? () => {
+                            setEditingMsgId(msg.id);
+                            setEditingText((msg.content ?? '').trim());
+                          } : undefined}
+                        >
                           {(msg.displayContent ?? msg.content).trim()}
                         </div>
                       ) : (
