@@ -471,21 +471,26 @@
   flex-direction: column;
   gap: 6px;
   width: 100%;
+  /* Thin bottom highlight so the user knows this bubble is being edited */
+  border-bottom: 2px solid var(--jp-brand-color1, #2196f3);
 }
 .ds-msg-edit-textarea {
   width: 100%;
   min-height: 40px;    /* floor — JS auto-sizes to content on mount */
-  padding: 6px 8px;
-  font-size: 12px;
+  padding: 0;          /* bubble padding already handled by ds-assistant-message */
+  font-size: var(--jp-ui-font-size1);
   font-family: var(--jp-ui-font-family, sans-serif);
-  line-height: 1.5;
-  background: var(--jp-layout-color0, #fff);
-  color: var(--jp-ui-font-color0, #111);
-  border: 1px solid var(--jp-brand-color1, #2196f3);
-  border-radius: 6px;
-  resize: vertical;
+  line-height: 1.45;
+  background: transparent;
+  color: inherit;
+  border: none;
+  border-radius: 0;
+  resize: none;
   outline: none;
   box-sizing: border-box;
+  white-space: pre-wrap;
+  overflow: hidden;      /* let JS height control scrolling */
+  caret-color: var(--jp-brand-color1, #2196f3);
 }
 .ds-msg-edit-actions {
   display: flex;
@@ -513,11 +518,10 @@
   color: var(--jp-ui-font-color1, #333);
 }
 .ds-msg-edit-cancel:hover { background: var(--jp-layout-color3, #d8d8d8); }
-/* Night mode */
+/* Night mode — transparent so bubble gradient shows through */
 .ds-chat-night .ds-msg-edit-textarea {
-  background: var(--ds-surface, #1e1e1e);
-  color: var(--ds-text, #e0e0e0);
-  border-color: var(--jp-brand-color1, #2196f3);
+  background: transparent;
+  color: inherit;
 }
 .ds-chat-night .ds-msg-edit-cancel {
   background: var(--ds-surface2, #2a2a2a);
