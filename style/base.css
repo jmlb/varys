@@ -125,15 +125,11 @@
    would make trailing \n characters appear as blank space in the bubble */
 .ds-assistant-message-user {
   align-self: flex-end;
-  max-width: 50%;
+  width: 50%;
   position: relative;
   border-bottom-right-radius: 2px;
   background: linear-gradient(135deg, #e4e7ef 0%, #d8dce8 100%);
   border-left: 3px solid #8892b0;
-}
-/* Lock the bubble to its full max-width while the inline editor is open */
-.ds-assistant-message-user--editing {
-  width: 50%;
 }
 
 /* Plain-text segments inside user bubbles — preserve newlines */
