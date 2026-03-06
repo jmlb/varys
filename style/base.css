@@ -327,6 +327,14 @@
 .ds-chat-night .ds-markdown pre {
   background: rgba(255,255,255,0.08);
 }
+/* .ds-chat-night .ds-markdown code above (specificity 0,2,1) beats the day-mode
+   .ds-markdown pre code rule (0,1,2) and re-applies a background to <code>
+   inside <pre>.  Because <code> is inline, its background only covers text
+   content — not leading indentation — creating visible "line highlights" on
+   indented lines.  This rule (0,2,2) wins and removes that double-stack. */
+.ds-chat-night .ds-markdown pre code {
+  background: transparent;
+}
 .ds-chat-night .ds-markdown th {
   background: rgba(255,255,255,0.07);
 }
