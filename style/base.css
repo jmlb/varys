@@ -1586,25 +1586,38 @@
   flex-direction: column;
 }
 
-/* Chip pinned to top-left corner of the textarea */
-.ds-input-body .ds-nb-ctx-chip {
+/* Row pinned to top-left of the textarea: "context: [×/+ notebook]" */
+.ds-input-body .ds-nb-ctx-row {
   position: absolute;
   top: 5px;
   left: 8px;
   z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
-/* Push textarea text below the chip */
+/* "context:" static label */
+.ds-nb-ctx-label {
+  font-size: 10px;
+  font-family: var(--jp-ui-font-family);
+  color: var(--jp-ui-font-color3, #aaa);
+  opacity: 0.7;
+  user-select: none;
+  white-space: nowrap;
+}
+
+/* Push textarea text below the chip row */
 .ds-input-body .ds-assistant-input {
   padding-top: 26px;
 }
 
-/* notebook context chip — chain icon + "notebook" label */
+/* notebook context chip — ×/+ prefix + "notebook" label */
 .ds-nb-ctx-chip {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 1px 6px;
+  padding: 1px 5px;
   border-radius: 4px;
   border: none;
   font-size: 11px;
@@ -1616,6 +1629,12 @@
   white-space: nowrap;
   line-height: 1.6;
   transition: background 0.12s, color 0.12s, opacity 0.12s;
+}
+/* ×/+ sign inside the chip */
+.ds-nb-ctx-sign {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
 }
 /* Active: blue-tinted background, blue text */
 .ds-nb-ctx-chip--on {
@@ -1813,7 +1832,10 @@
 .ds-chat-night .ds-thread-toggle:hover {
   background: var(--ds-surface2, rgba(255,255,255,0.06));
 }
-/* Night mode: @notebook chip */
+/* Night mode: context chip */
+.ds-chat-night .ds-nb-ctx-label {
+  color: var(--ds-text-dim, #888);
+}
 .ds-chat-night .ds-nb-ctx-chip--on {
   background: rgba(33, 150, 243, 0.2);
   color: #90caf9;
