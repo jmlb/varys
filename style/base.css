@@ -132,6 +132,10 @@
   background: linear-gradient(135deg, #e4e7ef 0%, #d8dce8 100%);
   border-left: 3px solid #8892b0;
 }
+/* Lock the bubble to its full max-width while the inline editor is open */
+.ds-assistant-message-user--editing {
+  width: 50%;
+}
 
 .ds-assistant-message-assistant {
   align-self: flex-start;

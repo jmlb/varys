@@ -3646,7 +3646,11 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
         {messages.map(msg => (
           <div
             key={msg.id}
-            className={`ds-assistant-message ds-assistant-message-${msg.role}`}
+            className={[
+              'ds-assistant-message',
+              `ds-assistant-message-${msg.role}`,
+              msg.role === 'user' && msg.id === editingMsgId ? 'ds-assistant-message-user--editing' : '',
+            ].filter(Boolean).join(' ')}
           >
             {msg.role === 'disambiguation' ? (
               /* ── Disambiguation card ───────────────────────────── */
