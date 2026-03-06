@@ -124,7 +124,6 @@
 /* pre-wrap only for user messages — assistant messages render HTML, so pre-wrap
    would make trailing \n characters appear as blank space in the bubble */
 .ds-assistant-message-user {
-  white-space: pre-wrap;
   align-self: flex-end;
   max-width: 50%;
   position: relative;
@@ -135,6 +134,22 @@
 /* Lock the bubble to its full max-width while the inline editor is open */
 .ds-assistant-message-user--editing {
   width: 50%;
+}
+
+/* Plain-text segments inside user bubbles — preserve newlines */
+.ds-user-text {
+  display: block;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Code blocks inside user bubbles need a darker background to stand out
+   against the blue-ish gradient */
+.ds-assistant-message-user .ds-code-block-wrapper pre {
+  background: rgba(0, 0, 0, 0.13);
+}
+.ds-chat-night .ds-assistant-message-user .ds-code-block-wrapper pre {
+  background: rgba(0, 0, 0, 0.25);
 }
 
 .ds-assistant-message-assistant {

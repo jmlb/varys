@@ -79,6 +79,51 @@ function renderMarkdown(text: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// User-bubble content renderer
+// ---------------------------------------------------------------------------
+
+/** Escape HTML special characters in a plain-text segment. */
+function _escHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
+ * Renders a user message:
+ *  - Fenced code blocks (```lang\n…```) → styled <pre><code> with copy button
+ *  - Inline backticks (`code`) → <code>
+ *  - Everything else → escaped plain text with pre-wrap
+ *
+ * Deliberately does NOT parse full markdown so that patterns like "#5" or
+ * "**bold**" in a user's question are never silently reinterpreted.
+ */
+function renderUserContent(text: string): string {
+  if (!text) return '';
+  // Split on fenced code blocks; capture the fence so we can inspect it
+  const segments = text.split(/(```[\w.-]*\r?\n[\s\S]*?```)/g);
+  let html = '';
+  for (const seg of segments) {
+    const fenceMatch = seg.match(/^```([\w.-]*)\r?\n([\s\S]*?)```$/);
+    if (fenceMatch) {
+      const lang    = fenceMatch[1] ? ` class="language-${_escHtml(fenceMatch[1])}"` : '';
+      const code    = _escHtml(fenceMatch[2]);
+      html +=
+        `<div class="ds-code-block-wrapper">` +
+        `<button class="ds-copy-code-btn" aria-label="Copy code">Copy</button>` +
+        `<pre><code${lang}>${code}</code></pre>` +
+        `</div>`;
+    } else if (seg) {
+      // Handle inline backticks, then wrap in a pre-wrap span
+      const withInline = _escHtml(seg).replace(/`([^`\r\n]+)`/g, '<code>$1</code>');
+      html += `<span class="ds-user-text">${withInline}</span>`;
+    }
+  }
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['span', 'div', 'pre', 'code', 'button'],
+    ALLOWED_ATTR: ['class', 'aria-label'],
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -3873,14 +3918,17 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                     <div className={`ds-msg-collapsible-wrap${collapsed ? ' ds-msg-collapsed' : ''}`}>
                       {msg.role === 'user' ? (
                         <div
-                          className={`ds-assistant-message-content${!isLoading ? ' ds-user-editable' : ''}`}
+                          className={`ds-assistant-message-content ds-markdown${!isLoading ? ' ds-user-editable' : ''}`}
                           onClick={!isLoading ? () => {
                             setEditingMsgId(msg.id);
                             setEditingText((msg.content ?? '').trim());
                           } : undefined}
-                        >
-                          {(msg.displayContent ?? msg.content).trim()}
-                        </div>
+                          dangerouslySetInnerHTML={{
+                            __html: msg.displayContent
+                              ? `<span class="ds-user-text">${_escHtml(msg.displayContent.trim())}</span>`
+                              : renderUserContent((msg.content ?? '').trim()),
+                          }}
+                        />
                       ) : (
                         <div
                           className="ds-assistant-message-content ds-markdown"
