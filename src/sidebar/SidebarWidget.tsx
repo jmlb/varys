@@ -3812,8 +3812,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                       <div className="ds-bubble-toolbar-right ds-bubble-toolbar-actions">
                         {showPush && (
                           <button
-                            className="ds-bubble-tool-btn"
-                            data-tip={hasCode ? 'Push code to new cell' : 'Push response to markdown cell'}
+                            className="ds-bubble-tool-btn ds-bubble-push-btn"
                             onClick={() => {
                               const nb = notebookTracker.currentWidget?.content;
                               const insertIdx = nb
@@ -3827,10 +3826,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                                 });
                             }}
                           >
-                            <svg viewBox="0 0 16 16" width="13" height="13" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M8 2v8M4 7l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                              <path d="M2 13h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                            </svg>
+                            push to cell
                           </button>
                         )}
                         <button

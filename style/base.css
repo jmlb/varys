@@ -440,6 +440,22 @@
 .ds-bubble-tool-btn:active {
   background: var(--jp-layout-color3, rgba(0,0,0,0.12));
 }
+/* Text variant for the "push to cell" button */
+.ds-bubble-push-btn {
+  width: auto;
+  height: auto;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  opacity: 0.65;
+}
+.ds-bubble-push-btn:hover {
+  background: transparent;
+  opacity: 1;
+}
 /* Night mode */
 .ds-chat-night .ds-bubble-toolbar {
   border-bottom-color: rgba(255,255,255,0.08);
