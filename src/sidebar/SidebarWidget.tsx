@@ -3804,7 +3804,12 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                   const codeBlocks = extractCodeBlocks(msg.content);
                   const hasCode    = codeBlocks.length > 0;
                   const allCode    = hasCode ? codeBlocks.join('\n\n') : '';
-                  const showPush   = !msg.hadCellOps && !!(msg.content?.trim());
+                  // Show the push button only when the user's chosen mode is Auto or
+                  // Always (i.e. they want output in cells). Also show for /chat
+                  // responses (isChatOnly) so the user can still save those manually.
+                  const effectivePushMode = notebookAware ? cellMode : 'chat';
+                  const showPush   = !msg.hadCellOps && !!(msg.content?.trim()) &&
+                                     (effectivePushMode === 'auto' || effectivePushMode === 'doc' || !!msg.isChatOnly);
                   const isLong     = (msg.content?.length ?? 0) >= COLLAPSE_THRESHOLD;
                   return (
                     <div className="ds-bubble-toolbar">
@@ -3812,7 +3817,8 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                       <div className="ds-bubble-toolbar-right ds-bubble-toolbar-actions">
                         {showPush && (
                           <button
-                            className="ds-bubble-tool-btn ds-bubble-push-btn"
+                            className="ds-bubble-push-btn"
+                            data-tip={hasCode ? 'Insert code into a new code cell' : 'Insert response into a new markdown cell'}
                             onClick={() => {
                               const nb = notebookTracker.currentWidget?.content;
                               const insertIdx = nb
@@ -3826,6 +3832,11 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                                 });
                             }}
                           >
+                            {/* small "insert into cell" arrow */}
+                            <svg viewBox="0 0 12 12" width="9" height="9" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                              <path d="M6 1v7M3 6l3 3 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M1 10.5h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                            </svg>
                             push to cell
                           </button>
                         )}
