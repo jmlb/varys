@@ -485,6 +485,17 @@
   background: var(--ds-surface2, rgba(255,255,255,0.08));
   color: var(--ds-text, #ddd);
 }
+/* Push-to-cell button: tone down from white to muted dim-text in night mode */
+.ds-chat-night .ds-bubble-push-btn {
+  background: var(--ds-surface2, #28283a);
+  color: var(--ds-text-dim, #8890a8);
+  border: 1px solid var(--ds-border, #35354a);
+}
+.ds-chat-night .ds-bubble-push-btn:hover {
+  background: var(--ds-chip-bg, #26263a);
+  color: var(--ds-text, #c5c5cc);
+  border-color: var(--ds-chip-border, #38385a);
+}
 
 /* ── Custom lightweight tooltips (replaces native browser title= popup) ──
    Usage: add  data-tip="label"  to any element.
