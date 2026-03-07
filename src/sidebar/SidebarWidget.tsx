@@ -2431,6 +2431,21 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     } catch { return 80; }
   });
   const dragStateRef = useRef<{ startY: number; startH: number } | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize textarea to fit content, capped at the user-configured max height.
+  // Runs whenever `input` changes (including programmatic clear after send) and
+  // whenever `inputHeight` changes (user dragged to a new max).
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    if (!input) {
+      el.style.height = `${MIN_INPUT_HEIGHT}px`;
+    } else {
+      el.style.height = 'auto';
+      el.style.height = `${Math.min(el.scrollHeight, inputHeight)}px`;
+    }
+  }, [input, inputHeight]);
 
   const handleResizeMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -4508,12 +4523,18 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
             </button>
           </div>
           <textarea
+            ref={textareaRef}
             className="ds-assistant-input"
             value={input}
-            style={{ height: inputHeight }}
+            style={{ minHeight: MIN_INPUT_HEIGHT, maxHeight: inputHeight }}
             onChange={e => {
               const val = e.target.value;
               setInput(val);
+              // Grow the box immediately as the user types; scrollbar appears
+              // only after scrollHeight exceeds the user-configured max height.
+              const el = e.target as HTMLTextAreaElement;
+              el.style.height = 'auto';
+              el.style.height = `${Math.min(el.scrollHeight, inputHeight)}px`;
               // Show autocomplete when line starts with "/"
               if (val.match(/^\/[\w-]*/)) {
                 setShowCmdPopup(true);

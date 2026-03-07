@@ -1365,8 +1365,8 @@
 
 .ds-assistant-input {
   width: 100%;
-  resize: none;          /* height controlled by drag handle */
-  min-height: 56px;
+  resize: none;          /* height is auto-managed by JS; drag handle sets the cap */
+  min-height: 56px;      /* base height when the input is empty */
   padding: 6px 8px;
   border: 1px solid var(--jp-border-color2);
   border-radius: 4px;
@@ -1376,7 +1376,7 @@
   font-size: var(--jp-ui-font-size1);
   box-sizing: border-box;
   line-height: 1.45;
-  overflow-y: auto;
+  overflow-y: auto;      /* scrollbar appears once content exceeds maxHeight cap */
 }
 
 .ds-assistant-input:focus {
