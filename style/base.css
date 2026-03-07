@@ -1557,7 +1557,7 @@
 .ds-thread-pills {
   display: flex;
   align-items: stretch;
-  flex: 1;
+  flex: 0 1 auto;   /* size to content; shrink if needed, never grow to fill row */
   min-width: 0;
   overflow: hidden;
   gap: 0;
