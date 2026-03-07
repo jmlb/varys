@@ -1099,6 +1099,34 @@
   opacity: 0.55;
 }
 
+/* H-1: Night-mode overrides for all action buttons */
+.ds-chat-night .ds-assistant-btn-accept {
+  background: #1a5c2a;
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-chat-night .ds-assistant-btn-accept:hover { background: #216933; }
+.ds-chat-night .ds-assistant-btn-accept-run {
+  background: #1a3760;
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-chat-night .ds-assistant-btn-accept-run:hover { background: #1f4272; }
+.ds-chat-night .ds-assistant-btn-undo {
+  background: #6b3810;
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-chat-night .ds-assistant-btn-undo:hover { background: #7a4214; }
+.ds-chat-night .ds-assistant-btn-apply {
+  background: var(--ds-surface2, #28283a);
+  color: var(--ds-text, #c5c5cc);
+  border: 1px solid var(--ds-border, #35354a);
+}
+.ds-chat-night .ds-assistant-btn-apply:hover { background: var(--ds-chip-bg, #26263a); }
+.ds-chat-night .ds-assistant-btn-apply:disabled {
+  background: var(--ds-surface, #1e1e2a);
+  color: var(--ds-text-dim, #8890a8);
+  opacity: 0.5;
+}
+
 /* ----------------------------------------------------------
    Diff hint text
    ---------------------------------------------------------- */
@@ -1259,6 +1287,31 @@
 
 .ds-chat-night .ds-hunk-btn--active.ds-hunk-btn--accept { background: #1a6b2a; }
 .ds-chat-night .ds-hunk-btn--active.ds-hunk-btn--reject { background: #6b1a1a; }
+
+/* M-2: Night-mode diff stats */
+.ds-chat-night .ds-diff-stats--insert { color: #4dc97a; }
+.ds-chat-night .ds-diff-stats--modify { color: #6bbfdb; }
+.ds-chat-night .ds-diff-stats--delete { color: #e07a83; }
+
+/* M-3: Night-mode hunk text colours */
+.ds-chat-night .ds-hunk-del            { color: #e07a83; }
+.ds-chat-night .ds-hunk-ins            { color: #4dc97a; }
+.ds-chat-night .ds-hunk-label          { color: var(--ds-text-dim, #8890a8); }
+.ds-chat-night .ds-hunk-status--accepted { color: #4dc97a; }
+.ds-chat-night .ds-hunk-status--rejected { color: #e07a83; }
+.ds-chat-night .ds-hunk-progress       { color: #b07fff; background: rgba(167,139,250,0.12); }
+.ds-chat-night .ds-hunk-btn--accept    { color: #4dc97a; border-color: #4dc97a; }
+.ds-chat-night .ds-hunk-btn--reject    { color: #e07a83; border-color: #e07a83; }
+
+/* M-9: Night-mode hunk banner accent borders */
+.ds-chat-night .ds-hunk-banner--accepted { border-left-color: #4dc97a; }
+.ds-chat-night .ds-hunk-banner--rejected { border-left-color: #e07a83; }
+
+/* L-5: Night-mode hunk section separator */
+.ds-chat-night .ds-hunk-section { border-bottom-color: var(--ds-border, #35354a); }
+
+/* H-4: Night-mode diff hunk lines background */
+.ds-chat-night .ds-diff-lines--hunk { background: var(--ds-surface, #1e1e2a); }
 
 
 /* ----------------------------------------------------------
@@ -2514,6 +2567,7 @@
 .ds-chat-night .ds-assistant-message-warning {
   background: var(--ds-msg-warning) !important;
   color:      var(--ds-text) !important;
+  border-left-color: #f0ad00 !important;  /* M-8: keep amber accent in night mode */
 }
 
 /* Input area */
@@ -2593,6 +2647,11 @@
   background: var(--ds-input-bg) !important;
   color:      var(--ds-text) !important;
   border:     1px solid var(--ds-border) !important;
+}
+
+/* H-5: Night-mode input focus ring */
+.ds-chat-night .ds-assistant-input:focus {
+  box-shadow: 0 0 0 2px rgba(126, 200, 227, 0.25) !important;
 }
 
 .ds-chat-day .ds-assistant-input::placeholder,
@@ -2706,6 +2765,17 @@
 .ds-chat-day .ds-model-switcher-option--active:hover {
   background: #dce8fd !important;
 }
+
+/* M-1: Night-mode for Ollama provider badge */
+.ds-chat-night .ds-provider-badge-ollama {
+  background: rgba(77, 201, 122, 0.12);
+  color: #6bcf94;
+  border-color: rgba(107, 207, 148, 0.35);
+}
+.ds-chat-night .ds-provider-segment-ollama { color: #6bcf94; }
+
+/* M-7: Night-mode for unconfigured model state */
+.ds-chat-night .ds-model-switcher-btn--unconfigured { color: #ef9a9a !important; }
 
 /* Provider badge */
 .ds-chat-day .ds-assistant-title,
@@ -3301,6 +3371,17 @@
 .ds-chat-night .ds-mcp-tools-toggle       { color: var(--ds-text-dim, #8890a8); }
 .ds-chat-night .ds-mcp-tool-name          { color: var(--ds-text, #c5c5cc); }
 .ds-chat-night .ds-mcp-empty              { color: #555870; }
+
+/* M-4: Night-mode for MCP server toggle knob */
+.ds-chat-night .ds-mcp-server-toggle-slider {
+  background: var(--ds-border, #35354a);
+}
+.ds-chat-night .ds-mcp-server-toggle-slider::before {
+  background: #aab0c4;
+}
+.ds-chat-night .ds-mcp-server-toggle input:checked + .ds-mcp-server-toggle-slider {
+  background: #388e3c;
+}
 
 .ds-mcp-server-header {
   display: flex;
@@ -4024,6 +4105,22 @@
   color: #7ec8e3;
 }
 
+/* M-4: Night-mode for skill toggle knob */
+.ds-chat-night .ds-skill-toggle {
+  background: var(--ds-border, #35354a);
+}
+.ds-chat-night .ds-skill-toggle::after {
+  background: #aab0c4;
+}
+.ds-chat-night .ds-skill-toggle--on {
+  background: #1a5c2a;
+}
+
+/* L-3: Night-mode for skill library accent icons */
+.ds-chat-night .ds-skill-library-check { color: #4dc97a; }
+.ds-chat-night .ds-skill-new-ok         { color: #4dc97a; }
+.ds-chat-night .ds-skill-new-cancel     { color: #e07a83; }
+
 /* ── end skill library ─────────────────────────────────────────────── */
 
 .ds-skill-new-row {
@@ -4444,6 +4541,16 @@
 .ds-chat-night .ds-settings-label {
   color: var(--ds-text-dim, #8890a8);
 }
+/* M-4: Night-mode for settings toggle slider knob */
+.ds-chat-night .ds-settings-toggle-slider {
+  background: var(--ds-border, #35354a);
+}
+.ds-chat-night .ds-settings-toggle-slider::before {
+  background: #aab0c4;
+}
+.ds-chat-night .ds-settings-toggle-switch input:checked + .ds-settings-toggle-slider {
+  background: #2a5298;
+}
 .ds-chat-night .ds-settings-toggle-desc {
   color: var(--ds-text-dim, #8890a8);
 }
@@ -4827,6 +4934,25 @@
   cursor: default;
 }
 
+/* H-3: Night-mode for report card */
+.ds-chat-night .ds-report-card {
+  border-color: var(--ds-border, #35354a);
+  border-left-color: #4dc97a;
+}
+.ds-chat-night .ds-report-card-title   { color: #4dc97a; }
+.ds-chat-night .ds-report-card-filename { color: var(--ds-text-dim, #8890a8); }
+.ds-chat-night .ds-report-card-stats   { color: var(--ds-text-dim, #8890a8); }
+.ds-chat-night .ds-report-card-download      { background: #1a5c2a; color: var(--ds-text, #c5c5cc); }
+.ds-chat-night .ds-report-card-download:hover { background: #216933; color: var(--ds-text, #c5c5cc); }
+
+/* M-6: Night-mode for code-review fix panel */
+.ds-chat-night .ds-fix-panel           { border-color: var(--ds-border, #35354a); }
+.ds-chat-night .ds-fix-panel-header    { color: var(--ds-text, #c5c5cc); border-bottom-color: var(--ds-border, #35354a); }
+.ds-chat-night .ds-fix-card            { border-bottom-color: var(--ds-border, #35354a); }
+.ds-chat-night .ds-fix-card-desc       { color: var(--ds-text, #c5c5cc); }
+.ds-chat-night .ds-fix-card-code       { background: var(--ds-surface2, #28283a); color: var(--ds-text, #c5c5cc); }
+.ds-chat-night .ds-fix-card-btn:disabled { border-color: #4dc97a; color: #4dc97a; }
+
 /* ── Reproducibility Guardian ────────────────────────────────────────────── */
 
 
@@ -5056,6 +5182,27 @@
   background: rgba(211,47,47,0.08);
   border-top: 1px solid rgba(211,47,47,0.2);
 }
+
+/* M-5: Night-mode for Reproducibility Guardian panel */
+.ds-chat-night .ds-repro-panel          { background: var(--ds-bg, #13131c); color: var(--ds-text, #c5c5cc); }
+.ds-chat-night .ds-repro-panel-header   { border-bottom-color: var(--ds-border, #35354a); }
+.ds-chat-night .ds-repro-counts         { border-bottom-color: var(--ds-border, #35354a); }
+.ds-chat-night .ds-repro-badge--critical { background: #7f1d1d; }
+.ds-chat-night .ds-repro-badge--warning  { background: #78350f; }
+.ds-chat-night .ds-repro-count--critical { color: #fca5a5; background: rgba(252,165,165,0.12); }
+.ds-chat-night .ds-repro-count--warning  { color: #fcd34d; background: rgba(252,211,77,0.12);  }
+.ds-chat-night .ds-repro-count--info     { color: #7ec8e3; background: rgba(126,200,227,0.12); }
+.ds-chat-night .ds-repro-card            { border-bottom-color: var(--ds-border, #35354a); background: var(--ds-bg, #13131c); }
+.ds-chat-night .ds-repro-card-title      { color: var(--ds-text, #c5c5cc); }
+.ds-chat-night .ds-repro-card-message    { color: var(--ds-text-dim, #8890a8); }
+.ds-chat-night .ds-repro-section-title   { background: var(--ds-surface, #1e1e2a); border-top-color: var(--ds-border, #35354a); }
+.ds-chat-night .ds-repro-section--critical .ds-repro-section-title { color: #fca5a5; }
+.ds-chat-night .ds-repro-section--warning  .ds-repro-section-title { color: #fcd34d; }
+.ds-chat-night .ds-repro-section--info     .ds-repro-section-title { color: #7ec8e3; }
+.ds-chat-night .ds-repro-card-explanation  { border-left-color: var(--ds-border, #35354a); color: var(--ds-text-dim, #8890a8); }
+.ds-chat-night .ds-repro-error             { color: #fca5a5; background: rgba(252,165,165,0.08); border-top-color: rgba(252,165,165,0.2); }
+.ds-chat-night .ds-repro-footer            { border-top-color: var(--ds-border, #35354a); }
+.ds-chat-night .ds-repro-btn--dismiss:hover { background: var(--ds-surface2, #28283a); }
 
 /* ── Cell Tags & Metadata Panel ──────────────────────────────────────────── */
 
@@ -5483,11 +5630,16 @@
   user-select: none;
 }
 
-/* Slightly darker in JupyterLab dark themes */
+/* L-1: Dark JupyterLab themes — cell tag overlay and position badge */
 .jp-mod-dark .ds-cell-position-badge,
 body[data-jp-theme-light="false"] .ds-cell-position-badge {
   color: #666;
   opacity: 0.85;
+}
+.jp-mod-dark .ds-cell-tag-overlay,
+body[data-jp-theme-light="false"] .ds-cell-tag-overlay {
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 
 /* Night mode overrides */
@@ -5502,6 +5654,12 @@ body[data-jp-theme-light="false"] .ds-cell-position-badge {
 .ds-chat-night .ds-tags-add-btn:hover { background: #6d28d9; }
 .ds-chat-night .ds-tags-cell-row { border-color: #45475a; }
 .ds-chat-night .ds-tags-cell-row:hover { background: #1e1e2e; }
+/* L-4: Night-mode for tags meta save button border */
+.ds-chat-night .ds-tags-meta-save-btn {
+  border-color: var(--ds-border, #35354a);
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-chat-night .ds-tags-meta-save-btn:hover { background: var(--ds-surface2, #28283a); }
 
 /* ─── Output Overlay: badges (E), hover (D), context menu (D) ─────────────── */
 
@@ -5608,6 +5766,24 @@ body[data-jp-theme-light="false"] .ds-cell-position-badge {
 .ds-output-ctx-menu-item:hover {
   background: #eff6ff;
   color: #2563eb;
+}
+
+/* H-2: Night-mode overrides for output context menu (appended to body, themed via modifier class) */
+.ds-output-ctx-menu--night {
+  background: var(--ds-surface, #1e1e2a);
+  border-color: var(--ds-border, #35354a);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.55);
+}
+.ds-output-ctx-menu--night .ds-output-ctx-menu-title {
+  color: var(--ds-text-dim, #8890a8);
+  border-bottom-color: var(--ds-border, #35354a);
+}
+.ds-output-ctx-menu--night .ds-output-ctx-menu-item {
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-output-ctx-menu--night .ds-output-ctx-menu-item:hover {
+  background: var(--ds-surface2, #28283a);
+  color: var(--ds-text, #e8e8ef);
 }
 
 /* ─── Disambiguation card ──────────────────────────────────────────────────── */

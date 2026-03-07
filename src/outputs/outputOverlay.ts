@@ -168,8 +168,9 @@ function showOutputContextMenu(
 ): void {
   closeActiveMenu();
 
+  const isNight = !!document.querySelector('.ds-chat-night');
   const menu = document.createElement('div');
-  menu.className = MENU_CLASS;
+  menu.className = isNight ? `${MENU_CLASS} ${MENU_CLASS}--night` : MENU_CLASS;
   menu.style.cssText = `position:fixed;left:${x}px;top:${y}px;z-index:9999`;
 
   const title = document.createElement('div');
