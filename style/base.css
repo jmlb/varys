@@ -2385,6 +2385,10 @@
   --ds-btn-bg:          #e4e5ed;
   --ds-btn-border:      #c6c8d4;
   --ds-btn-text:        #3b3e55;
+  /* Scrollbars */
+  --ds-scrollbar-track:       transparent;
+  --ds-scrollbar-thumb:       rgba(136, 146, 176, 0.32);
+  --ds-scrollbar-thumb-hover: rgba(99,  110, 155, 0.60);
 }
 
 /* ── Night theme (gray-ish / dark) ── */
@@ -2415,6 +2419,10 @@
   --ds-btn-bg:          #26263a;
   --ds-btn-border:      #38385a;
   --ds-btn-text:        #b2b6cc;
+  /* Scrollbars */
+  --ds-scrollbar-track:       transparent;
+  --ds-scrollbar-thumb:       rgba(98,  114, 164, 0.40);
+  --ds-scrollbar-thumb-hover: rgba(139, 155, 204, 0.68);
 }
 
 /* Apply theme vars to the concrete elements */
@@ -2469,6 +2477,71 @@
   background:    var(--ds-input-bg) !important;
   border-top:    1px solid var(--ds-border) !important;
 }
+
+/* ── Themed scrollbars ─────────────────────────────────────────────────────────
+   Slim (5 px), pill-shaped thumb.  Color tokens are defined per theme above so
+   the thumb always harmonises with the surface it sits on.
+   The settings tab-bar keeps its hidden scrollbar via its own rule below.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* Firefox — scrollbar-color / scrollbar-width */
+.ds-chat-day *,
+.ds-chat-night * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ds-scrollbar-thumb) var(--ds-scrollbar-track);
+}
+
+/* WebKit / Blink (Chrome, Edge, Safari) */
+.ds-chat-day ::-webkit-scrollbar,
+.ds-chat-night ::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.ds-chat-day ::-webkit-scrollbar-track,
+.ds-chat-night ::-webkit-scrollbar-track {
+  background: var(--ds-scrollbar-track);
+}
+
+.ds-chat-day ::-webkit-scrollbar-thumb,
+.ds-chat-night ::-webkit-scrollbar-thumb {
+  background: var(--ds-scrollbar-thumb);
+  border-radius: 10px;
+  transition: background 0.2s;
+}
+
+.ds-chat-day ::-webkit-scrollbar-thumb:hover,
+.ds-chat-night ::-webkit-scrollbar-thumb:hover {
+  background: var(--ds-scrollbar-thumb-hover);
+}
+
+.ds-chat-day ::-webkit-scrollbar-corner,
+.ds-chat-night ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Settings tab-bar: keep it hidden — it wraps with tabs, no visible scroll needed */
+.ds-chat-day .ds-settings-tabbar,
+.ds-chat-night .ds-settings-tabbar {
+  scrollbar-width: none !important;
+}
+.ds-chat-day .ds-settings-tabbar::-webkit-scrollbar,
+.ds-chat-night .ds-settings-tabbar::-webkit-scrollbar {
+  display: none !important;
+}
+
+/* Code blocks have a dark semi-transparent tint in BOTH modes.
+   Override with a light thumb so it stays visible on the dark surface. */
+.ds-chat-day .ds-markdown pre::-webkit-scrollbar-thumb,
+.ds-chat-night .ds-markdown pre::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+}
+.ds-chat-day .ds-markdown pre::-webkit-scrollbar-thumb:hover,
+.ds-chat-night .ds-markdown pre::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.44);
+}
+
+/* ── END Themed scrollbars ───────────────────────────────────────────────── */
 
 .ds-chat-day .ds-assistant-input,
 .ds-chat-night .ds-assistant-input {
