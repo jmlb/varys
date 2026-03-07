@@ -2043,6 +2043,9 @@ function translateCellRefs(
 // ThreadBar component
 // ---------------------------------------------------------------------------
 
+/** Max thread pills shown directly in the bar before overflow into ··· menu */
+const MAX_VISIBLE_THREADS = 4;
+
 interface ThreadBarProps {
   threads: ChatThread[];
   currentId: string;
@@ -2076,9 +2079,6 @@ const ThreadBar: React.FC<ThreadBarProps> = ({
     return true;
   };
 
-  const current = threads.find(t => t.id === currentId);
-  const idx     = threads.findIndex(t => t.id === currentId);
-
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
@@ -2091,21 +2091,39 @@ const ThreadBar: React.FC<ThreadBarProps> = ({
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  const visibleThreads = threads.slice(0, MAX_VISIBLE_THREADS);
+  const hiddenCount    = Math.max(0, threads.length - MAX_VISIBLE_THREADS);
+
   return (
     <div className="ds-thread-bar" ref={popupRef}>
+      {/* Named thread pills — one-click switching, up to MAX_VISIBLE_THREADS */}
+      <div className="ds-thread-pills">
+        {visibleThreads.map(t => (
+          <button
+            key={t.id}
+            className={`ds-thread-pill${t.id === currentId ? ' ds-thread-pill--active' : ''}`}
+            onClick={() => onSwitch(t.id)}
+            title={t.name}
+          >
+            {t.name}
+          </button>
+        ))}
+      </div>
+
+      {/* ··· / +N  — manage all threads, access hidden ones, create new */}
       <button
-        className="ds-thread-toggle"
+        className={`ds-thread-overflow-btn${open ? ' ds-thread-overflow-btn--open' : ''}`}
         onClick={() => setOpen(o => !o)}
-        title="Switch or manage chat threads"
+        title={open ? 'Close thread menu' : 'Manage threads'}
+        aria-label="Thread menu"
       >
-        <span className="ds-thread-icon">≡</span>
-        <span className="ds-thread-name">{current?.name ?? 'Thread'}</span>
-        <span className="ds-thread-count">({idx + 1}/{threads.length})</span>
-        <span className={`ds-thread-chevron ${open ? 'ds-thread-chevron-up' : ''}`}>›</span>
+        {hiddenCount > 0 ? `+${hiddenCount}` : '···'}
       </button>
+
+      {/* Management popup */}
       {open && (
         <div className="ds-thread-popup">
-          {/* Notebook context header — clarifies which notebook's threads are listed */}
+          {/* Notebook context header */}
           {notebookName && (
             <div className="ds-thread-popup-notebook">
               <span className="ds-thread-popup-nb-icon">📓</span>

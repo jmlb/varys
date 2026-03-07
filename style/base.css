@@ -1546,29 +1546,76 @@
   position: relative;
   display: flex;
   align-items: center;
-  padding: 0 8px;
-  min-height: 26px;
+  padding: 0 4px;
+  min-height: 28px;
   border-bottom: 1px solid var(--jp-border-color2, #e0e0e0);
   flex-shrink: 0;
+  gap: 0;
 }
 
-/* Toggle button (opens the popup) */
-.ds-thread-toggle {
+/* ── Named thread pill strip ── */
+.ds-thread-pills {
   display: flex;
+  align-items: stretch;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  gap: 0;
+}
+
+/* Individual named tab pill */
+.ds-thread-pill {
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  padding: 4px 8px 3px;
+  font-size: 11px;
+  font-family: var(--jp-ui-font-family);
+  color: var(--jp-ui-font-color2, #777);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 82px;
+  border-radius: 3px 3px 0 0;
+  flex-shrink: 0;
+  transition: color 0.12s, background 0.12s, border-bottom-color 0.12s;
+  line-height: 1.4;
+}
+.ds-thread-pill:hover {
+  color: var(--jp-ui-font-color0, #222);
+  background: var(--jp-layout-color2, rgba(0,0,0,0.05));
+}
+.ds-thread-pill--active {
+  color: var(--jp-ui-font-color0, #1a1a2e);
+  font-weight: 600;
+  border-bottom-color: var(--jp-brand-color1, #1976d2);
+}
+
+/* ··· / +N  overflow + manage button */
+.ds-thread-overflow-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   cursor: pointer;
-  padding: 3px 6px;
+  padding: 3px 7px;
   border-radius: 4px;
   font-size: 11px;
-  color: var(--jp-ui-font-color1, #333);
-  max-width: 100%;
-  overflow: hidden;
+  font-family: var(--jp-ui-font-family);
+  color: var(--jp-ui-font-color3, #aaa);
+  letter-spacing: 0.06em;
+  min-width: 26px;
+  transition: background 0.12s, color 0.12s;
 }
-.ds-thread-toggle:hover {
-  background: var(--jp-layout-color3, rgba(0,0,0,0.07));
+.ds-thread-overflow-btn:hover,
+.ds-thread-overflow-btn--open {
+  background: var(--jp-layout-color2, rgba(0,0,0,0.07));
+  color: var(--jp-ui-font-color1, #444);
 }
 
 /* ── Textarea wrapper: needed so @notebook chip can sit at top-left ── */
@@ -1761,38 +1808,12 @@
   color: var(--ds-text-dim, #aaa);
 }
 
-.ds-thread-icon {
-  font-size: 13px;
-  opacity: 0.6;
-  flex-shrink: 0;
-}
-.ds-thread-name {
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 140px;
-}
-.ds-thread-count {
-  opacity: 0.5;
-  font-size: 10px;
-  flex-shrink: 0;
-}
-.ds-thread-chevron {
-  opacity: 0.5;
-  font-size: 12px;
-  transition: transform 0.15s;
-  flex-shrink: 0;
-}
-.ds-thread-chevron-up {
-  transform: rotate(90deg);
-}
-
-/* Popup panel */
+/* Popup panel — anchored to right edge where the ··· button lives */
 .ds-thread-popup {
   position: absolute;
   top: calc(100% + 2px);
-  left: 0;
+  right: 0;
+  left: auto;
   z-index: 1000;
   min-width: 200px;
   max-width: 280px;
@@ -1933,11 +1954,24 @@
 .ds-chat-night .ds-thread-bar {
   border-color: var(--ds-border, rgba(255,255,255,0.1));
 }
-.ds-chat-night .ds-thread-toggle {
-  color: var(--ds-text-dim, #aaa);
+.ds-chat-night .ds-thread-pill {
+  color: var(--ds-text-dim, #8890a8);
 }
-.ds-chat-night .ds-thread-toggle:hover {
+.ds-chat-night .ds-thread-pill:hover {
+  color: var(--ds-text, #c5c5cc);
   background: var(--ds-surface2, rgba(255,255,255,0.06));
+}
+.ds-chat-night .ds-thread-pill--active {
+  color: var(--ds-text, #e0e0e0);
+  border-bottom-color: #6272a4;
+}
+.ds-chat-night .ds-thread-overflow-btn {
+  color: var(--ds-text-dim, #55576a);
+}
+.ds-chat-night .ds-thread-overflow-btn:hover,
+.ds-chat-night .ds-thread-overflow-btn--open {
+  background: var(--ds-surface2, rgba(255,255,255,0.06));
+  color: var(--ds-text, #c5c5cc);
 }
 /* Night mode: context chip */
 .ds-chat-night .ds-nb-ctx-label {
