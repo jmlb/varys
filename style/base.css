@@ -6038,12 +6038,57 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--ds-text-dim, #888);
+  margin-bottom: 6px;
 }
+
+/* Two-column create body */
+.ds-tp-create-body {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.ds-tp-create-inputs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.ds-tp-create-preview {
+  width: 42%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ds-tp-preview-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ds-text-dim, #888);
+}
+.ds-tp-preview-json {
+  flex: 1;
+  margin: 0;
+  padding: 6px 7px;
+  background: var(--jp-layout-color2, #e8e8e8);
+  border-radius: 6px;
+  font-size: 8px;
+  font-family: var(--jp-code-font-family, monospace);
+  color: var(--jp-ui-font-color2, #444);
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.5;
+  overflow: hidden;
+}
+
 .ds-tp-name-input,
-.ds-tp-desc-input {
+.ds-tp-desc-input,
+.ds-tp-topic-select {
   width: 100%;
   box-sizing: border-box;
-  padding: 5px 8px;
+  padding: 4px 7px;
   border: 1px solid var(--jp-border-color1, #ccc);
   border-radius: 6px;
   font-size: 11px;
@@ -6053,23 +6098,8 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
 .ds-tp-name-input:focus,
 .ds-tp-desc-input:focus,
 .ds-tp-topic-select:focus { outline: none; border-color: var(--jp-brand-color1, #1976d2); }
+.ds-tp-topic-select { cursor: pointer; }
 
-.ds-tp-topic-select {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 5px 8px;
-  border: 1px solid var(--jp-border-color1, #ccc);
-  border-radius: 6px;
-  font-size: 11px;
-  background: var(--jp-layout-color0, #fff);
-  color: var(--jp-ui-font-color1, #111);
-  cursor: pointer;
-}
-.ds-chat-night .ds-tp-topic-select {
-  background: #181825;
-  border-color: #45475a;
-  color: #cdd6f4;
-}
 .ds-tp-create-btn {
   width: 100%;
   padding: 5px 10px;
@@ -6084,6 +6114,21 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
 .ds-tp-create-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .ds-tp-create-btn:not(:disabled):hover { background: var(--jp-brand-color0, #1565c0); }
 .ds-tp-error { margin: 0; font-size: 10px; color: #ef4444; }
+
+/* Night mode for create section */
+.ds-chat-night .ds-tp-name-input,
+.ds-chat-night .ds-tp-desc-input,
+.ds-chat-night .ds-tp-topic-select {
+  background: #181825;
+  border-color: #45475a;
+  color: #cdd6f4;
+}
+.ds-chat-night .ds-tp-name-input::placeholder,
+.ds-chat-night .ds-tp-desc-input::placeholder { color: #6c7086; opacity: 1; }
+.ds-chat-night .ds-tp-preview-json {
+  background: rgba(255,255,255,0.05);
+  color: #a6adc8;
+}
 
 /* ── Color picker ─────────────────────────────────────────────────────────── */
 .ds-tp-color-picker {

@@ -1,13 +1,15 @@
 /**
  * Tags Panel — Tag Zoo
  *
- * Layout:
- *   1. Create Tag form  (value · color picker · description · [+ Create])
- *   2. Two-column body:
- *        LEFT  — Tag library grouped by category (click to select)
- *        RIGHT — Details of the selected tag (description + color)
+ * Tag JSON shape: { "value": string, "topic": string, "description": string, "color": string }
  *
- * Tag JSON shape: { "value": string, "description": string, "color"?: string }
+ * Layout:
+ *   1. Create Tag form — two-column:
+ *        LEFT  — inputs (value · description · topic dropdown · color swatches)
+ *        RIGHT — live JSON preview
+ *   2. Tag library — two-column:
+ *        LEFT  — tags grouped by topic (click to select)
+ *        RIGHT — details of selected tag
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -26,55 +28,65 @@ export function tagColorAuto(tag: string): string {
   return TAG_PALETTE[h % TAG_PALETTE.length];
 }
 
-// ── Built-in tag library ──────────────────────────────────────────────────────
+// ── Built-in tag library (each tag carries an explicit topic key) ─────────────
 
-export const BUILT_IN_TAG_DEFS: { category: string; tags: { value: string; description: string }[] }[] = [
+export const BUILT_IN_TAG_DEFS: {
+  category: string;
+  tags: { value: string; topic: string; description: string }[];
+}[] = [
   { category: 'ML Pipeline', tags: [
-    { value: 'data-loading',        description: 'Cells that load data from files, databases, or APIs.' },
-    { value: 'preprocessing',       description: 'Data cleaning, normalization, and transformation steps.' },
-    { value: 'feature-engineering', description: 'Feature creation, selection, and encoding.' },
-    { value: 'training',            description: 'Model training and fitting.' },
-    { value: 'evaluation',          description: 'Metrics, validation, and model assessment.' },
-    { value: 'inference',           description: 'Prediction or scoring on new data.' },
+    { value: 'data-loading',        topic: 'ML Pipeline', description: 'Cells that load data from files, databases, or APIs.' },
+    { value: 'preprocessing',       topic: 'ML Pipeline', description: 'Data cleaning, normalization, and transformation steps.' },
+    { value: 'feature-engineering', topic: 'ML Pipeline', description: 'Feature creation, selection, and encoding.' },
+    { value: 'training',            topic: 'ML Pipeline', description: 'Model training and fitting.' },
+    { value: 'evaluation',          topic: 'ML Pipeline', description: 'Metrics, validation, and model assessment.' },
+    { value: 'inference',           topic: 'ML Pipeline', description: 'Prediction or scoring on new data.' },
   ]},
   { category: 'Quality', tags: [
-    { value: 'todo',           description: 'Cell needs attention or further work.' },
-    { value: 'reviewed',       description: 'Cell has been reviewed and approved.' },
-    { value: 'needs-refactor', description: 'Works but the implementation should be improved.' },
-    { value: 'slow',           description: 'Computationally slow — candidate for optimization.' },
-    { value: 'broken',         description: 'Cell is broken or produces errors.' },
-    { value: 'tested',         description: 'Cell has been verified to produce correct output.' },
+    { value: 'todo',           topic: 'Quality', description: 'Cell needs attention or further work.' },
+    { value: 'reviewed',       topic: 'Quality', description: 'Cell has been reviewed and approved.' },
+    { value: 'needs-refactor', topic: 'Quality', description: 'Works but the implementation should be improved.' },
+    { value: 'slow',           topic: 'Quality', description: 'Computationally slow — candidate for optimization.' },
+    { value: 'broken',         topic: 'Quality', description: 'Cell is broken or produces errors.' },
+    { value: 'tested',         topic: 'Quality', description: 'Cell has been verified to produce correct output.' },
   ]},
   { category: 'Report', tags: [
-    { value: 'report',         description: 'Output to include in an exported report.' },
-    { value: 'figure',         description: 'Cell that generates a figure or chart.' },
-    { value: 'table',          description: 'Cell that generates a table.' },
-    { value: 'key-finding',    description: 'Contains an important result or insight.' },
-    { value: 'report-exclude', description: 'Explicitly exclude from report output.' },
+    { value: 'report',         topic: 'Report', description: 'Output to include in an exported report.' },
+    { value: 'figure',         topic: 'Report', description: 'Cell that generates a figure or chart.' },
+    { value: 'table',          topic: 'Report', description: 'Cell that generates a table.' },
+    { value: 'key-finding',    topic: 'Report', description: 'Contains an important result or insight.' },
+    { value: 'report-exclude', topic: 'Report', description: 'Explicitly exclude from report output.' },
   ]},
   { category: 'Status', tags: [
-    { value: 'draft',       description: 'Work in progress — not finalized.' },
-    { value: 'stable',      description: 'Unlikely to change; safe dependency for other cells.' },
-    { value: 'deprecated',  description: 'No longer needed; kept for reference.' },
-    { value: 'sensitive',   description: 'Contains sensitive data, credentials, or PII.' },
+    { value: 'draft',      topic: 'Status', description: 'Work in progress — not finalized.' },
+    { value: 'stable',     topic: 'Status', description: 'Unlikely to change; safe dependency for other cells.' },
+    { value: 'deprecated', topic: 'Status', description: 'No longer needed; kept for reference.' },
+    { value: 'sensitive',  topic: 'Status', description: 'Contains sensitive data, credentials, or PII.' },
   ]},
 ];
+
+export const BUILT_IN_TOPICS = BUILT_IN_TAG_DEFS.map(g => g.category);
 
 // ── Custom tag store (localStorage) ──────────────────────────────────────────
 
 const CUSTOM_TAGS_KEY = 'varys_custom_tag_definitions';
 
-/** Tag JSON shape: { "value": string, "topic": string, "description": string, "color"?: string } */
-export interface CustomTagDef { value: string; topic?: string; description: string; color?: string }
+/** Tag JSON shape: { "value": string, "topic": string, "description": string, "color": string } */
+export interface CustomTagDef {
+  value:       string;
+  topic:       string;   // required
+  description: string;
+  color?:      string;
+}
 
 export function loadCustomTags(): CustomTagDef[] {
   try {
     const raw = localStorage.getItem(CUSTOM_TAGS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as Array<Record<string, string>>;
-    // Migrate legacy records that used `name` instead of `value`
     return parsed.map(r => ({
       value:       r['value'] ?? r['name'] ?? '',
+      topic:       r['topic'] ?? 'Custom',        // migrate: default to Custom
       description: r['description'] ?? '',
       color:       r['color'],
     })).filter(t => t.value);
@@ -85,8 +97,6 @@ function saveCustomTagsToStorage(tags: CustomTagDef[]): void {
   localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(tags));
 }
 
-export const BUILT_IN_TOPICS = BUILT_IN_TAG_DEFS.map(g => g.category);
-
 function resolveColor(tagValue: string, customTags: CustomTagDef[]): string {
   const custom = customTags.find(t => t.value === tagValue);
   return custom?.color ?? tagColorAuto(tagValue);
@@ -94,10 +104,10 @@ function resolveColor(tagValue: string, customTags: CustomTagDef[]): string {
 
 function findMeta(tagValue: string, customTags: CustomTagDef[]): { description: string; topic: string } {
   const custom = customTags.find(t => t.value === tagValue);
-  if (custom) return { description: custom.description, topic: custom.topic ?? 'Custom' };
+  if (custom) return { description: custom.description, topic: custom.topic };
   for (const group of BUILT_IN_TAG_DEFS) {
     const found = group.tags.find(t => t.value === tagValue);
-    if (found) return { description: found.description, topic: group.category };
+    if (found) return { description: found.description, topic: found.topic };
   }
   return { description: '', topic: '' };
 }
@@ -146,43 +156,49 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
   const [customTags,  setCustomTags]  = useState<CustomTagDef[]>(loadCustomTags);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
-  // Create form state
-  const [newValue, setNewValue]  = useState('');
-  const [newDesc,  setNewDesc]   = useState('');
-  const [newTopic, setNewTopic]  = useState('');
-  const [newColor, setNewColor]  = useState(TAG_PALETTE[0]);
-  const [nameErr,  setNameErr]   = useState('');
+  // Create form
+  const [newValue, setNewValue] = useState('');
+  const [newDesc,  setNewDesc]  = useState('');
+  const [newTopic, setNewTopic] = useState('');
+  const [newColor, setNewColor] = useState(TAG_PALETTE[0]);
+  const [nameErr,  setNameErr]  = useState('');
 
-  // Keep custom tags in sync when another panel writes to localStorage
-  const syncFromStorage = useCallback(() => {
-    setCustomTags(loadCustomTags());
-  }, []);
+  // Live JSON preview object for the create form
+  const previewJson = JSON.stringify({
+    value:       newValue.trim() || '…',
+    topic:       newTopic       || '…',
+    description: newDesc.trim() || '…',
+    color:       newColor,
+  }, null, 2);
 
+  // Keep in sync if Settings panel also writes custom tags
+  const syncFromStorage = useCallback(() => { setCustomTags(loadCustomTags()); }, []);
   useEffect(() => {
     window.addEventListener('storage', syncFromStorage);
     return () => window.removeEventListener('storage', syncFromStorage);
   }, [syncFromStorage]);
 
-  // Subscribe to notebook changes so the component stays alive
   useEffect(() => {
     const noop = () => { /* keep alive */ };
     notebookTracker.currentChanged.connect(noop);
     return () => { notebookTracker.currentChanged.disconnect(noop); };
   }, [notebookTracker]);
 
-  // ── All built-in tag values (for duplicate check) ─────────────────────────
+  // ── All built-in values for duplicate check ───────────────────────────────
   const allBuiltInValues: string[] = ([] as string[]).concat(
     ...BUILT_IN_TAG_DEFS.map(g => g.tags.map(t => t.value))
   );
 
-  // ── Create custom tag ──────────────────────────────────────────────────────
+  // ── Create ────────────────────────────────────────────────────────────────
   const createTag = () => {
     const raw = newValue.trim().toLowerCase().replace(/\s+/g, '-');
-    if (!raw) { setNameErr('Value is required.'); return; }
-    if (!/^[a-z0-9][\w\-.]*$/.test(raw)) { setNameErr('Only a-z, 0-9, - or _ allowed.'); return; }
-    if (allBuiltInValues.includes(raw)) { setNameErr('Already a built-in tag.'); return; }
-    if (customTags.some(t => t.value === raw)) { setNameErr('Custom tag already exists.'); return; }
-    const tag: CustomTagDef = { value: raw, topic: newTopic || undefined, description: newDesc.trim(), color: newColor };
+    if (!raw)                                 { setNameErr('Value is required.'); return; }
+    if (!/^[a-z0-9][\w\-.]*$/.test(raw))     { setNameErr('Only a-z, 0-9, - or _ allowed.'); return; }
+    if (!newTopic)                            { setNameErr('Topic is required.'); return; }
+    if (allBuiltInValues.includes(raw))       { setNameErr('Already a built-in tag.'); return; }
+    if (customTags.some(t => t.value === raw)){ setNameErr('Custom tag already exists.'); return; }
+
+    const tag: CustomTagDef = { value: raw, topic: newTopic, description: newDesc.trim(), color: newColor };
     const updated = [...customTags, tag];
     setCustomTags(updated);
     saveCustomTagsToStorage(updated);
@@ -190,7 +206,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
     setSelectedTag(raw);
   };
 
-  // ── Delete custom tag ──────────────────────────────────────────────────────
+  // ── Delete ────────────────────────────────────────────────────────────────
   const deleteCustomTag = (tagValue: string) => {
     const updated = customTags.filter(t => t.value !== tagValue);
     setCustomTags(updated);
@@ -198,54 +214,68 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
     if (selectedTag === tagValue) setSelectedTag(null);
   };
 
-  // ── Derived for details panel ──────────────────────────────────────────────
-  const isCustom                  = selectedTag ? customTags.some(t => t.value === selectedTag) : false;
-  const selColor                  = selectedTag ? resolveColor(selectedTag, customTags) : TAG_PALETTE[0];
+  // ── Selected tag meta ─────────────────────────────────────────────────────
+  const isCustom = selectedTag ? customTags.some(t => t.value === selectedTag) : false;
+  const selColor = selectedTag ? resolveColor(selectedTag, customTags) : TAG_PALETTE[0];
   const { description: selDesc, topic: selTopic } = selectedTag
     ? findMeta(selectedTag, customTags)
     : { description: '', topic: '' };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="ds-tags-panel ds-tags-panel-v2">
 
-      {/* ── Create Tag form ──────────────────────────────────────────────── */}
+      {/* ── Create Tag: two-column (inputs | live JSON) ───────────────────── */}
       <div className="ds-tp-create-section">
         <div className="ds-tp-create-header">New Tag</div>
-        <input
-          className="ds-tp-name-input"
-          placeholder="tag-value"
-          value={newValue}
-          onChange={e => { setNewValue(e.target.value); setNameErr(''); }}
-          onKeyDown={e => { if (e.key === 'Enter') createTag(); }}
-        />
-        <input
-          className="ds-tp-desc-input"
-          placeholder="Description (optional)"
-          value={newDesc}
-          onChange={e => setNewDesc(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') createTag(); }}
-        />
-        <select
-          className="ds-tp-topic-select"
-          value={newTopic}
-          onChange={e => setNewTopic(e.target.value)}
-        >
-          <option value="">Topic (optional)</option>
-          {BUILT_IN_TOPICS.map(t => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
-        <ColorPicker value={newColor} onChange={setNewColor} />
-        {nameErr && <p className="ds-tp-error">{nameErr}</p>}
-        <button
-          className="ds-tp-create-btn"
-          onClick={createTag}
-          disabled={!newValue.trim()}
-        >+ Create</button>
+
+        <div className="ds-tp-create-body">
+
+          {/* LEFT — inputs */}
+          <div className="ds-tp-create-inputs">
+            <input
+              className="ds-tp-name-input"
+              placeholder="tag-value"
+              value={newValue}
+              onChange={e => { setNewValue(e.target.value); setNameErr(''); }}
+              onKeyDown={e => { if (e.key === 'Enter') createTag(); }}
+            />
+            <input
+              className="ds-tp-desc-input"
+              placeholder="Description"
+              value={newDesc}
+              onChange={e => setNewDesc(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') createTag(); }}
+            />
+            <select
+              className="ds-tp-topic-select"
+              value={newTopic}
+              onChange={e => setNewTopic(e.target.value)}
+            >
+              <option value="">— Topic —</option>
+              {BUILT_IN_TOPICS.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+            <ColorPicker value={newColor} onChange={setNewColor} />
+            {nameErr && <p className="ds-tp-error">{nameErr}</p>}
+            <button
+              className="ds-tp-create-btn"
+              onClick={createTag}
+              disabled={!newValue.trim() || !newTopic}
+            >+ Create</button>
+          </div>
+
+          {/* RIGHT — live JSON preview */}
+          <div className="ds-tp-create-preview">
+            <div className="ds-tp-preview-label">Preview</div>
+            <pre className="ds-tp-preview-json">{previewJson}</pre>
+          </div>
+
+        </div>
       </div>
 
-      {/* ── Body: tag list (left) + details (right) ──────────────────────── */}
+      {/* ── Tag library: grouped list (left) + details (right) ───────────── */}
       <div className="ds-tp-body">
 
         {/* LEFT — grouped tag library */}
@@ -301,7 +331,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
 
               <div className="ds-tp-details-json">
                 <pre className="ds-tp-details-json-pre">{JSON.stringify(
-                  { value: selectedTag, topic: selTopic || undefined, description: selDesc, color: selColor },
+                  { value: selectedTag, topic: selTopic, description: selDesc, color: selColor },
                   null, 2
                 )}</pre>
               </div>
@@ -316,7 +346,6 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
                 <button
                   className="ds-tp-details-del-btn"
                   onClick={() => deleteCustomTag(selectedTag)}
-                  title="Delete this custom tag"
                 >🗑 Delete</button>
               )}
             </>
@@ -324,6 +353,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
             <p className="ds-tp-details-hint">← Select a tag</p>
           )}
         </div>
+
       </div>
     </div>
   );

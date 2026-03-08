@@ -1786,52 +1786,51 @@ const IndexingPanel: React.FC<{ apiClient: APIClient; notebookPath: string }> = 
 // TagsSettingsPanel — tag library: definitions + create/delete custom tags
 // ---------------------------------------------------------------------------
 
-const BUILT_IN_TAG_DEFS: { category: string; tags: { value: string; description: string }[] }[] = [
+const BUILT_IN_TAG_DEFS: { category: string; tags: { value: string; topic: string; description: string }[] }[] = [
   { category: 'ML Pipeline', tags: [
-    { value: 'data-loading',        description: 'Cells that load data from files, databases, or APIs' },
-    { value: 'preprocessing',       description: 'Data cleaning, normalization, and transformation steps' },
-    { value: 'feature-engineering', description: 'Feature creation, selection, and encoding' },
-    { value: 'training',            description: 'Model training and fitting' },
-    { value: 'evaluation',          description: 'Metrics, validation, and model assessment' },
-    { value: 'inference',           description: 'Prediction or scoring on new data' },
+    { value: 'data-loading',        topic: 'ML Pipeline', description: 'Cells that load data from files, databases, or APIs' },
+    { value: 'preprocessing',       topic: 'ML Pipeline', description: 'Data cleaning, normalization, and transformation steps' },
+    { value: 'feature-engineering', topic: 'ML Pipeline', description: 'Feature creation, selection, and encoding' },
+    { value: 'training',            topic: 'ML Pipeline', description: 'Model training and fitting' },
+    { value: 'evaluation',          topic: 'ML Pipeline', description: 'Metrics, validation, and model assessment' },
+    { value: 'inference',           topic: 'ML Pipeline', description: 'Prediction or scoring on new data' },
   ]},
   { category: 'Quality', tags: [
-    { value: 'todo',            description: 'Cell needs attention or further work' },
-    { value: 'reviewed',        description: 'Cell has been reviewed and approved' },
-    { value: 'needs-refactor',  description: 'Works but the implementation should be improved' },
-    { value: 'slow',            description: 'Computationally slow — candidate for optimization' },
-    { value: 'broken',          description: 'Cell is broken or produces errors' },
-    { value: 'tested',          description: 'Cell has been verified to produce correct output' },
+    { value: 'todo',            topic: 'Quality', description: 'Cell needs attention or further work' },
+    { value: 'reviewed',        topic: 'Quality', description: 'Cell has been reviewed and approved' },
+    { value: 'needs-refactor',  topic: 'Quality', description: 'Works but the implementation should be improved' },
+    { value: 'slow',            topic: 'Quality', description: 'Computationally slow — candidate for optimization' },
+    { value: 'broken',          topic: 'Quality', description: 'Cell is broken or produces errors' },
+    { value: 'tested',          topic: 'Quality', description: 'Cell has been verified to produce correct output' },
   ]},
   { category: 'Report', tags: [
-    { value: 'report',          description: 'Output to include in an exported report' },
-    { value: 'figure',          description: 'Cell that generates a figure or chart' },
-    { value: 'table',           description: 'Cell that generates a table' },
-    { value: 'key-finding',     description: 'Contains an important result or insight' },
-    { value: 'report-exclude',  description: 'Explicitly exclude from report output' },
+    { value: 'report',          topic: 'Report', description: 'Output to include in an exported report' },
+    { value: 'figure',          topic: 'Report', description: 'Cell that generates a figure or chart' },
+    { value: 'table',           topic: 'Report', description: 'Cell that generates a table' },
+    { value: 'key-finding',     topic: 'Report', description: 'Contains an important result or insight' },
+    { value: 'report-exclude',  topic: 'Report', description: 'Explicitly exclude from report output' },
   ]},
   { category: 'Status', tags: [
-    { value: 'draft',       description: 'Work in progress — not finalized' },
-    { value: 'stable',      description: 'Unlikely to change; safe dependency for other cells' },
-    { value: 'deprecated',  description: 'No longer needed; kept for reference' },
-    { value: 'sensitive',   description: 'Contains sensitive data, credentials, or PII' },
+    { value: 'draft',       topic: 'Status', description: 'Work in progress — not finalized' },
+    { value: 'stable',      topic: 'Status', description: 'Unlikely to change; safe dependency for other cells' },
+    { value: 'deprecated',  topic: 'Status', description: 'No longer needed; kept for reference' },
+    { value: 'sensitive',   topic: 'Status', description: 'Contains sensitive data, credentials, or PII' },
   ]},
 ];
 
 const CUSTOM_TAGS_KEY = 'varys_custom_tag_definitions';
 
-/** Tag JSON shape: { "value": string, "topic"?: string, "description": string } */
-interface CustomTagDef { value: string; topic?: string; description: string }
+/** Tag JSON shape: { "value": string, "topic": string, "description": string } */
+interface CustomTagDef { value: string; topic: string; description: string }
 
 function loadCustomTags(): CustomTagDef[] {
   try {
     const raw = localStorage.getItem(CUSTOM_TAGS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as Array<Record<string, string>>;
-    // Migrate legacy records that used `name` instead of `value`
     return parsed.map(r => ({
       value:       r['value'] ?? r['name'] ?? '',
-      topic:       r['topic'],
+      topic:       r['topic'] ?? 'Custom',
       description: r['description'] ?? '',
     })).filter(t => t.value);
   } catch { return []; }
@@ -1859,8 +1858,8 @@ const TagsSettingsPanel: React.FC = () => {
   const [editIdx, setEditIdx]       = useState<number | null>(null);
 
   const allBuiltInValues: string[] = ([] as string[]).concat(
-    ...BUILT_IN_TAG_DEFS.map((g: { category: string; tags: { value: string; description: string }[] }) =>
-      g.tags.map((t: { value: string; description: string }) => t.value)
+    ...BUILT_IN_TAG_DEFS.map((g: { category: string; tags: { value: string; topic: string; description: string }[] }) =>
+      g.tags.map((t: { value: string; topic: string; description: string }) => t.value)
     )
   );
 
@@ -1870,7 +1869,7 @@ const TagsSettingsPanel: React.FC = () => {
     if (!/^[a-z0-9][\w\-.]*$/.test(raw)) { setNameErr('Only a-z, 0-9, - or _ allowed.'); return; }
     if (allBuiltInValues.includes(raw)) { setNameErr('This value is already a built-in tag.'); return; }
     if (customTags.some(t => t.value === raw)) { setNameErr('Tag already exists.'); return; }
-    const updated = [...customTags, { value: raw, description: newDesc.trim() }];
+    const updated = [...customTags, { value: raw, topic: 'Custom', description: newDesc.trim() }];
     setCustomTags(updated);
     saveCustomTags(updated);
     setNewValue(''); setNewDesc(''); setNameErr('');

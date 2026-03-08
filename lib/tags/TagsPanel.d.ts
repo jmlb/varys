@@ -1,13 +1,15 @@
 /**
  * Tags Panel — Tag Zoo
  *
- * Layout:
- *   1. Create Tag form  (value · color picker · description · [+ Create])
- *   2. Two-column body:
- *        LEFT  — Tag library grouped by category (click to select)
- *        RIGHT — Details of the selected tag (description + color)
+ * Tag JSON shape: { "value": string, "topic": string, "description": string, "color": string }
  *
- * Tag JSON shape: { "value": string, "description": string, "color"?: string }
+ * Layout:
+ *   1. Create Tag form — two-column:
+ *        LEFT  — inputs (value · description · topic dropdown · color swatches)
+ *        RIGHT — live JSON preview
+ *   2. Tag library — two-column:
+ *        LEFT  — tags grouped by topic (click to select)
+ *        RIGHT — details of selected tag
  */
 import React from 'react';
 import { INotebookTracker } from '@jupyterlab/notebook';
@@ -17,18 +19,19 @@ export declare const BUILT_IN_TAG_DEFS: {
     category: string;
     tags: {
         value: string;
+        topic: string;
         description: string;
     }[];
 }[];
-/** Tag JSON shape: { "value": string, "topic": string, "description": string, "color"?: string } */
+export declare const BUILT_IN_TOPICS: string[];
+/** Tag JSON shape: { "value": string, "topic": string, "description": string, "color": string } */
 export interface CustomTagDef {
     value: string;
-    topic?: string;
+    topic: string;
     description: string;
     color?: string;
 }
 export declare function loadCustomTags(): CustomTagDef[];
-export declare const BUILT_IN_TOPICS: string[];
 export interface TagsPanelProps {
     notebookTracker: INotebookTracker;
 }
