@@ -7,6 +7,7 @@ Routes (registered in app.py):
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import traceback
 
@@ -29,7 +30,10 @@ class ReproAnalyzeHandler(JupyterHandler):
             cells         = body.get('cells', [])
             root_dir      = self.settings.get('ds_assistant_root_dir', '.')
 
-            issues = analyze_notebook(cells)
+            # Run in a thread so the synchronous rule checks don't block
+            # Tornado's event loop — otherwise it cannot forward the kernel's
+            # execute_reply WebSocket frame while analysis is running.
+            issues = await asyncio.to_thread(analyze_notebook, cells)
 
             storage = ReproducibilityStorage(root_dir, notebook_path)
             await storage.save(issues)
