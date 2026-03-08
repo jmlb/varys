@@ -1,11 +1,13 @@
 /**
- * Tags Panel — redesigned
+ * Tags Panel — Tag Zoo
  *
  * Layout:
- *   1. Create Tag form  (name · color picker · description · [+ Create])
+ *   1. Create Tag form  (value · color picker · description · [+ Create])
  *   2. Two-column body:
- *        LEFT  — Specs panel: details of the currently selected tag
- *        RIGHT — Tag library: all tags grouped by topic, click to select
+ *        LEFT  — Tag library grouped by category (click to select)
+ *        RIGHT — Details of the selected tag (description + color)
+ *
+ * Tag JSON shape: { "value": string, "description": string, "color"?: string }
  */
 import React from 'react';
 import { INotebookTracker } from '@jupyterlab/notebook';
@@ -14,12 +16,13 @@ export declare function tagColorAuto(tag: string): string;
 export declare const BUILT_IN_TAG_DEFS: {
     category: string;
     tags: {
-        name: string;
+        value: string;
         description: string;
     }[];
 }[];
+/** Tag JSON shape: { "value": string, "description": string, "color"?: string } */
 export interface CustomTagDef {
-    name: string;
+    value: string;
     description: string;
     color?: string;
 }

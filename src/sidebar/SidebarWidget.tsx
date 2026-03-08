@@ -1786,47 +1786,53 @@ const IndexingPanel: React.FC<{ apiClient: APIClient; notebookPath: string }> = 
 // TagsSettingsPanel — tag library: definitions + create/delete custom tags
 // ---------------------------------------------------------------------------
 
-const BUILT_IN_TAG_DEFS: { category: string; tags: { name: string; description: string }[] }[] = [
+const BUILT_IN_TAG_DEFS: { category: string; tags: { value: string; description: string }[] }[] = [
   { category: 'ML Pipeline', tags: [
-    { name: 'data-loading',        description: 'Cells that load data from files, databases, or APIs' },
-    { name: 'preprocessing',       description: 'Data cleaning, normalization, and transformation steps' },
-    { name: 'feature-engineering', description: 'Feature creation, selection, and encoding' },
-    { name: 'training',            description: 'Model training and fitting' },
-    { name: 'evaluation',          description: 'Metrics, validation, and model assessment' },
-    { name: 'inference',           description: 'Prediction or scoring on new data' },
+    { value: 'data-loading',        description: 'Cells that load data from files, databases, or APIs' },
+    { value: 'preprocessing',       description: 'Data cleaning, normalization, and transformation steps' },
+    { value: 'feature-engineering', description: 'Feature creation, selection, and encoding' },
+    { value: 'training',            description: 'Model training and fitting' },
+    { value: 'evaluation',          description: 'Metrics, validation, and model assessment' },
+    { value: 'inference',           description: 'Prediction or scoring on new data' },
   ]},
   { category: 'Quality', tags: [
-    { name: 'todo',            description: 'Cell needs attention or further work' },
-    { name: 'reviewed',        description: 'Cell has been reviewed and approved' },
-    { name: 'needs-refactor',  description: 'Works but the implementation should be improved' },
-    { name: 'slow',            description: 'Computationally slow — candidate for optimization' },
-    { name: 'broken',          description: 'Cell is broken or produces errors' },
-    { name: 'tested',          description: 'Cell has been verified to produce correct output' },
+    { value: 'todo',            description: 'Cell needs attention or further work' },
+    { value: 'reviewed',        description: 'Cell has been reviewed and approved' },
+    { value: 'needs-refactor',  description: 'Works but the implementation should be improved' },
+    { value: 'slow',            description: 'Computationally slow — candidate for optimization' },
+    { value: 'broken',          description: 'Cell is broken or produces errors' },
+    { value: 'tested',          description: 'Cell has been verified to produce correct output' },
   ]},
   { category: 'Report', tags: [
-    { name: 'report',          description: 'Output to include in an exported report' },
-    { name: 'figure',          description: 'Cell that generates a figure or chart' },
-    { name: 'table',           description: 'Cell that generates a table' },
-    { name: 'key-finding',     description: 'Contains an important result or insight' },
-    { name: 'report-exclude',  description: 'Explicitly exclude from report output' },
+    { value: 'report',          description: 'Output to include in an exported report' },
+    { value: 'figure',          description: 'Cell that generates a figure or chart' },
+    { value: 'table',           description: 'Cell that generates a table' },
+    { value: 'key-finding',     description: 'Contains an important result or insight' },
+    { value: 'report-exclude',  description: 'Explicitly exclude from report output' },
   ]},
   { category: 'Status', tags: [
-    { name: 'draft',       description: 'Work in progress — not finalized' },
-    { name: 'stable',      description: 'Unlikely to change; safe dependency for other cells' },
-    { name: 'deprecated',  description: 'No longer needed; kept for reference' },
-    { name: 'sensitive',   description: 'Contains sensitive data, credentials, or PII' },
+    { value: 'draft',       description: 'Work in progress — not finalized' },
+    { value: 'stable',      description: 'Unlikely to change; safe dependency for other cells' },
+    { value: 'deprecated',  description: 'No longer needed; kept for reference' },
+    { value: 'sensitive',   description: 'Contains sensitive data, credentials, or PII' },
   ]},
 ];
 
 const CUSTOM_TAGS_KEY = 'varys_custom_tag_definitions';
 
-interface CustomTagDef { name: string; description: string }
+/** Tag JSON shape: { "value": string, "description": string } */
+interface CustomTagDef { value: string; description: string }
 
 function loadCustomTags(): CustomTagDef[] {
   try {
     const raw = localStorage.getItem(CUSTOM_TAGS_KEY);
     if (!raw) return [];
-    return JSON.parse(raw) as CustomTagDef[];
+    const parsed = JSON.parse(raw) as Array<Record<string, string>>;
+    // Migrate legacy records that used `name` instead of `value`
+    return parsed.map(r => ({
+      value:       r['value'] ?? r['name'] ?? '',
+      description: r['description'] ?? '',
+    })).filter(t => t.value);
   } catch { return []; }
 }
 
@@ -1846,27 +1852,27 @@ function tagColorTs(tag: string): string {
 
 const TagsSettingsPanel: React.FC = () => {
   const [customTags, setCustomTags] = useState<CustomTagDef[]>(loadCustomTags);
-  const [newName, setNewName]       = useState('');
+  const [newValue, setNewValue]     = useState('');
   const [newDesc, setNewDesc]       = useState('');
   const [nameErr, setNameErr]       = useState('');
   const [editIdx, setEditIdx]       = useState<number | null>(null);
 
-  const allBuiltInNames: string[] = ([] as string[]).concat(
-    ...BUILT_IN_TAG_DEFS.map((g: { category: string; tags: { name: string; description: string }[] }) =>
-      g.tags.map((t: { name: string; description: string }) => t.name)
+  const allBuiltInValues: string[] = ([] as string[]).concat(
+    ...BUILT_IN_TAG_DEFS.map((g: { category: string; tags: { value: string; description: string }[] }) =>
+      g.tags.map((t: { value: string; description: string }) => t.value)
     )
   );
 
   const addCustomTag = () => {
-    const raw = newName.trim().toLowerCase().replace(/\s+/g, '-');
-    if (!raw) { setNameErr('Name is required.'); return; }
+    const raw = newValue.trim().toLowerCase().replace(/\s+/g, '-');
+    if (!raw) { setNameErr('Value is required.'); return; }
     if (!/^[a-z0-9][\w\-.]*$/.test(raw)) { setNameErr('Only a-z, 0-9, - or _ allowed.'); return; }
-    if (allBuiltInNames.includes(raw)) { setNameErr('This name is already a built-in tag.'); return; }
-    if (customTags.some(t => t.name === raw)) { setNameErr('Tag already exists.'); return; }
-    const updated = [...customTags, { name: raw, description: newDesc.trim() }];
+    if (allBuiltInValues.includes(raw)) { setNameErr('This value is already a built-in tag.'); return; }
+    if (customTags.some(t => t.value === raw)) { setNameErr('Tag already exists.'); return; }
+    const updated = [...customTags, { value: raw, description: newDesc.trim() }];
     setCustomTags(updated);
     saveCustomTags(updated);
-    setNewName(''); setNewDesc(''); setNameErr('');
+    setNewValue(''); setNewDesc(''); setNameErr('');
   };
 
   const deleteCustomTag = (idx: number) => {
@@ -1925,11 +1931,11 @@ const TagsSettingsPanel: React.FC = () => {
         )}
 
         {customTags.map((tag, idx) => (
-          <div key={tag.name} className="ds-tags-settings-row">
+          <div key={tag.value} className="ds-tags-settings-row">
             <span
               className="ds-tags-settings-pill"
-              style={{ '--pill-color': tagColorTs(tag.name) } as React.CSSProperties}
-            >{tag.name}</span>
+              style={{ '--pill-color': tagColorTs(tag.value) } as React.CSSProperties}
+            >{tag.value}</span>
             {editIdx === idx ? (
               <EditDescRow
                 initial={tag.description}
@@ -1953,9 +1959,9 @@ const TagsSettingsPanel: React.FC = () => {
           <div className="ds-tags-settings-new-row">
             <input
               className="ds-tags-settings-name-input"
-              placeholder="tag-name"
-              value={newName}
-              onChange={e => { setNewName(e.target.value); setNameErr(''); }}
+              placeholder="tag-value"
+              value={newValue}
+              onChange={e => { setNewValue(e.target.value); setNameErr(''); }}
               onKeyDown={e => { if (e.key === 'Enter') addCustomTag(); }}
             />
             <input
@@ -1968,7 +1974,7 @@ const TagsSettingsPanel: React.FC = () => {
             <button
               className="ds-tags-settings-add-btn"
               onClick={addCustomTag}
-              disabled={!newName.trim()}
+              disabled={!newValue.trim()}
             >+ Add</button>
           </div>
           {nameErr && <p className="ds-tags-settings-error">{nameErr}</p>}
@@ -1979,17 +1985,17 @@ const TagsSettingsPanel: React.FC = () => {
       <div className="ds-tags-settings-section">
         <div className="ds-tags-settings-section-header">
           <span className="ds-tags-settings-section-title">Built-in Tags</span>
-          <span className="ds-tags-settings-section-count">{allBuiltInNames.length}</span>
+          <span className="ds-tags-settings-section-count">{allBuiltInValues.length}</span>
         </div>
         {BUILT_IN_TAG_DEFS.map(group => (
           <div key={group.category} className="ds-tags-settings-group">
             <div className="ds-tags-settings-group-label">{group.category}</div>
             {group.tags.map(tag => (
-              <div key={tag.name} className="ds-tags-settings-row ds-tags-settings-row--builtin">
+              <div key={tag.value} className="ds-tags-settings-row ds-tags-settings-row--builtin">
                 <span
                   className="ds-tags-settings-pill"
-                  style={{ '--pill-color': tagColorTs(tag.name) } as React.CSSProperties}
-                >{tag.name}</span>
+                  style={{ '--pill-color': tagColorTs(tag.value) } as React.CSSProperties}
+                >{tag.value}</span>
                 <span className="ds-tags-settings-desc">{tag.description}</span>
               </div>
             ))}
