@@ -169,6 +169,43 @@ def _check_api_key(provider_name: str, settings: Dict[str, Any]) -> None:
         )
 
 
+def create_simple_task_provider(settings: Dict[str, Any]) -> "BaseLLMProvider | None":
+    """Return a provider configured with DS_SIMPLE_TASKS_MODEL for lightweight tasks.
+
+    Uses the same provider type as the chat task but substitutes
+    ``DS_SIMPLE_TASKS_MODEL`` as the model name.  Returns ``None`` when
+    DS_SIMPLE_TASKS_MODEL is not configured or the provider cannot be built.
+    """
+    _load_varys_env()
+    simple_model = (
+        settings.get("ds_assistant_simple_tasks_model", "")
+        or os.environ.get("DS_SIMPLE_TASKS_MODEL", "")
+    ).strip()
+    if not simple_model:
+        return None
+
+    provider_name = (
+        settings.get("ds_assistant_chat_provider", "")
+        or os.environ.get("DS_CHAT_PROVIDER", "")
+    ).strip().lower()
+    if not provider_name:
+        return None
+
+    try:
+        _sync_credentials(settings)
+        _check_api_key(provider_name, settings)
+        # Cache under "simple" task to avoid colliding with chat/completion cache entries
+        key = _cache_key(provider_name, "simple", simple_model, settings)
+        if key in _provider_cache:
+            return _provider_cache[key]
+        provider = _build_provider(provider_name, "chat", simple_model, settings)
+        _provider_cache[key] = provider
+        return provider
+    except Exception as exc:
+        log.debug("create_simple_task_provider: %s", exc)
+        return None
+
+
 def create_provider(settings: Dict[str, Any], task: TaskType = "chat") -> BaseLLMProvider:
     """Return a configured provider instance for *task* ('chat' or 'completion')."""
     provider_name, model = _resolve(settings, task)

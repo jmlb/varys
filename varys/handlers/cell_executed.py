@@ -65,6 +65,7 @@ class CellExecutedHandler(JupyterHandler):
                 error_text      = body.get("error_text") or None,
                 cell_type       = body.get("cell_type", "code"),
                 kernel_snapshot = body.get("kernel_snapshot") or {},
+                settings        = dict(self.settings),
             )
         )
 
@@ -83,8 +84,13 @@ async def _summarize_and_store(
     error_text:      "str | None",
     cell_type:       str,
     kernel_snapshot: dict,
+    settings:        dict,
 ) -> None:
-    """Build a summary and persist it to the SummaryStore."""
+    """Build a summary and persist it to the SummaryStore.
+
+    After a successful write, checks the inference counter and fires the
+    long-term memory inference pipeline when the threshold is reached.
+    """
     try:
         from ..context.summary_store import SummaryStore
         from ..context.summarizer    import build_summary
@@ -106,6 +112,12 @@ async def _summarize_and_store(
                 "SummaryStore: upserted cell %s … (notebook: %s)",
                 cell_id[:8], notebook_path,
             )
+            # Fire long-term memory inference when counter reaches threshold
+            if store.should_run_inference():
+                from ..memory.inference import run_inference
+                asyncio.create_task(run_inference(root_dir, notebook_path, settings))
+                log.debug("Inference pipeline triggered for %s", notebook_path)
+
     except Exception as exc:
         log.warning(
             "SummaryStore: background summarize failed for cell %s: %s",

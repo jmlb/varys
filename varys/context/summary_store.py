@@ -5,6 +5,10 @@ Storage path:
 
 JSON schema:
   {
+    "_meta": {
+      "versions_since_inference": 7,
+      "last_inference_run": "2026-03-06T10:15:00"
+    },
     "<cell_id>": [
       {
         "version":   1,
@@ -22,6 +26,7 @@ Key invariants (from spec §2.1):
   - Entries are never deleted; a `deleted` flag is set instead (supports undo).
   - The active entry is always the LAST element: cell_id[-1].
   - A new version is appended only when sha256(cell.source) changes.
+  - ``_meta`` is a reserved top-level key managed by this class.
 """
 from __future__ import annotations
 
@@ -38,6 +43,8 @@ log = logging.getLogger(__name__)
 
 # Module-level mtime cache: absolute_path_str → (mtime, data_dict)
 _STORE_CACHE: Dict[str, Tuple[float, Dict]] = {}
+
+_INFERENCE_TRIGGER_N = 10   # default: fire inference every 10 new cell versions
 
 
 class SummaryStore:
@@ -110,10 +117,13 @@ class SummaryStore:
         """Return {cell_id: summary} for the latest version of all cells.
 
         Excludes deleted cells unless include_deleted=True.
+        ``_meta`` is excluded from the result.
         """
         result: Dict[str, Dict] = {}
         for cell_id, versions in self._load().items():
-            if not versions:
+            if cell_id == "_meta":
+                continue
+            if not isinstance(versions, list) or not versions:
                 continue
             last = versions[-1]
             if not include_deleted and last.get("deleted", False):
@@ -126,6 +136,7 @@ class SummaryStore:
     def upsert(self, cell_id: str, source: str, summary: Dict[str, Any]) -> bool:
         """Append a new version entry if source hash differs from the latest.
 
+        Increments ``_meta.versions_since_inference`` on every new version written.
         Returns True if a new version was written, False if it was a no-op.
         """
         new_hash = self._hash(source)
@@ -145,8 +156,29 @@ class SummaryStore:
         }
         versions.append(entry)
         data[cell_id] = versions
+
+        # Update inference counter in _meta
+        meta = data.get("_meta") if isinstance(data.get("_meta"), dict) else {}
+        meta["versions_since_inference"] = meta.get("versions_since_inference", 0) + 1
+        meta.setdefault("last_inference_run", None)
+        data["_meta"] = meta
+
         self._save(data)
         return True
+
+    def should_run_inference(self, trigger_n: int = _INFERENCE_TRIGGER_N) -> bool:
+        """Return True if the inference counter has reached *trigger_n*."""
+        meta = self._load().get("_meta") or {}
+        return isinstance(meta, dict) and meta.get("versions_since_inference", 0) >= trigger_n
+
+    def reset_inference_counter(self) -> None:
+        """Set ``_meta.versions_since_inference`` to 0 and record timestamp."""
+        data = self._load()
+        meta = data.get("_meta") if isinstance(data.get("_meta"), dict) else {}
+        meta["versions_since_inference"] = 0
+        meta["last_inference_run"] = self._now()
+        data["_meta"] = meta
+        self._save(data)
 
     def mark_deleted(self, cell_id: str) -> None:
         """Set deleted=True on the latest version entry."""

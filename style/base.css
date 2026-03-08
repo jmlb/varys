@@ -2978,6 +2978,26 @@
   box-sizing: border-box;
   font-family: var(--jp-code-font-family, monospace);
 }
+.ds-settings-text-input {
+  font-size: 12px;
+  padding: 5px 7px;
+  border: 1px solid var(--ds-border, #d8dae0);
+  border-radius: 4px;
+  background: var(--ds-input-bg, #fff);
+  color: var(--ds-text, #1e1e2e);
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--jp-code-font-family, monospace);
+}
+.ds-settings-text-input::placeholder {
+  color: var(--ds-text-muted, #8a8a9a);
+  font-style: italic;
+}
+.ds-settings-text-input:focus {
+  outline: none;
+  border-color: var(--jp-brand-color1, #1976d2);
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
+}
 .ds-settings-input:focus,
 .ds-settings-select:focus {
   outline: none;
@@ -4563,11 +4583,13 @@
 
 /* ── Inputs & selects ── */
 .ds-chat-night .ds-settings-input:focus,
-.ds-chat-night .ds-settings-select:focus {
+.ds-chat-night .ds-settings-select:focus,
+.ds-chat-night .ds-settings-text-input:focus {
   border-color: #7ec8e3;
   box-shadow: 0 0 0 2px rgba(126,200,227,0.15);
 }
-.ds-chat-night .ds-settings-input::placeholder {
+.ds-chat-night .ds-settings-input::placeholder,
+.ds-chat-night .ds-settings-text-input::placeholder {
   color: #555870;
 }
 

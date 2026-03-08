@@ -14,6 +14,12 @@ from ..llm.factory import create_provider
 from ..llm.context_utils import build_notebook_context
 from ..skills.loader import SkillLoader
 from ..memory.manager import MemoryManager
+from ..memory.preference_store import PreferenceStore
+from ..memory.injection import (
+    select_preferences as _select_preferences,
+    format_preferences_for_prompt as _fmt_prefs,
+    detect_explicit_preference as _detect_explicit_pref,
+)
 from ..utils.config import get_config as _get_cfg
 
 log = logging.getLogger(__name__)
@@ -584,8 +590,32 @@ class TaskHandler(JupyterHandler):
                 # 'auto' — respect existing skill/heuristic logic
                 skill_wanted_cells = False
 
-            memory_manager = MemoryManager(root_dir, notebook_path)
-            memory = memory_manager.load()
+            # ── Long-term memory: load preferences from structured store ───
+            pref_store = PreferenceStore(root_dir, notebook_path)
+
+            # Capture explicit preference in user message (fire-and-forget)
+            _explicit = _detect_explicit_pref(message)
+            if _explicit:
+                _scope = "notebook" if notebook_path else "project"
+                pref_store.upsert(_explicit, scope=_scope)
+
+            # Trigger background migration from legacy preferences.md if needed
+            if pref_store.needs_migration():
+                simple_model = self.settings.get("ds_assistant_simple_tasks_model", "")
+                if simple_model:
+                    from ..memory.inference import migrate_preferences_llm as _migrate_llm
+                    asyncio.create_task(_migrate_llm(pref_store, dict(self.settings)))
+                else:
+                    pref_store.migrate_sync()
+
+            # Select relevant preferences for this query
+            selected_prefs = await _select_preferences(message, pref_store, self.settings)
+            memory = _fmt_prefs(selected_prefs)
+
+            # Fallback: if no structured preferences yet, use legacy preferences.md
+            if not memory.strip():
+                memory_manager = MemoryManager(root_dir, notebook_path)
+                memory = memory_manager.load()
 
             provider = create_provider(self.settings, task="chat")
 

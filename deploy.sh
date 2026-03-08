@@ -27,6 +27,11 @@ PKG_STATIC="$VARYSENV/lib/python3.12/site-packages/varys/labextension/static"
 
 cp "$STATIC_SRC"/* "$LAB_STATIC/"
 cp "$STATIC_SRC"/* "$PKG_STATIC/"
+# Ensure package.json exists at the labextension root (needed by JupyterLab to
+# discover the correct remoteEntry hash — must be present before the Python update step).
+PKG_JSON_SRC="$SRC/varys/labextension/package.json"
+cp "$PKG_JSON_SRC" "$VARYSENV/share/jupyter/labextensions/varys/package.json"
+cp "$PKG_JSON_SRC" "$VARYSENV/lib/python3.12/site-packages/varys/labextension/package.json"
 echo "    Copied static files → $VARYSENV"
 
 python3 - <<PYEOF

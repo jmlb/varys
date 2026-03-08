@@ -432,9 +432,10 @@ const TAB_GROUPS: TabGroup[] = [
     providerKey: null,
     zooKey: null,
     fields: [
-      { key: 'DS_CHAT_PROVIDER',        label: 'Chat',        type: 'select' },
-      { key: 'DS_COMPLETION_PROVIDER',  label: 'Completion',  type: 'select' },
-      { key: 'DS_EMBED_PROVIDER',       label: 'Embedding',   type: 'select' },
+      { key: 'DS_CHAT_PROVIDER',        label: 'Chat',              type: 'select' },
+      { key: 'DS_COMPLETION_PROVIDER',  label: 'Completion',        type: 'select' },
+      { key: 'DS_EMBED_PROVIDER',       label: 'Embedding',         type: 'select' },
+      { key: 'DS_SIMPLE_TASKS_MODEL',   label: 'Simple tasks model', type: 'text' },
     ]
   },
   {
@@ -1164,6 +1165,15 @@ const ModelsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSaved
                       />
                     </label>
                   </div>
+                ) : field.type === 'text' ? (
+                  <input
+                    className="ds-settings-text-input"
+                    type="text"
+                    value={values[field.key] ?? ''}
+                    placeholder="e.g. claude-haiku-4-5 — leave blank for keyword matching"
+                    onChange={e => handleChange(field.key, e.target.value)}
+                    title="Model name within the active chat provider used for lightweight tasks (preference generation, selection). Leave blank to use keyword matching instead."
+                  />
                 ) : (
                   <select
                     className="ds-settings-select"

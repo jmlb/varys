@@ -23,6 +23,7 @@ _ENV_KEYS = [
     "DS_CHAT_PROVIDER",
     "DS_COMPLETION_PROVIDER",
     "COMPLETION_MAX_TOKENS",
+    "DS_SIMPLE_TASKS_MODEL",
     # Anthropic
     "ANTHROPIC_API_KEY",
     "ANTHROPIC_CHAT_MODEL",
@@ -144,6 +145,7 @@ def _reload_settings(handler: JupyterHandler, env_path: Path) -> None:
     s["ds_assistant_chat_provider"]         = os.environ.get("DS_CHAT_PROVIDER", "").lower()
     s["ds_assistant_completion_provider"]   = os.environ.get("DS_COMPLETION_PROVIDER", "").lower()
     s["ds_assistant_completion_max_tokens"] = int(os.environ.get("COMPLETION_MAX_TOKENS", "") or "128")
+    s["ds_assistant_simple_tasks_model"]    = os.environ.get("DS_SIMPLE_TASKS_MODEL", "")
 
     # Anthropic feature flags (default true — "false" string turns them off)
     s["ds_assistant_anthropic_extended_thinking"] = (
