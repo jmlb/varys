@@ -72,6 +72,10 @@ function deleteTag(
 
 /** Render tag + position overlays for every cell in the current notebook. */
 function renderOverlays(tracker: INotebookTracker, refresh: () => void): void {
+  // Don't re-render while the user is interacting with a pending-delete pill —
+  // clearOverlays() would destroy the DOM node before × can be clicked.
+  if (document.querySelector('.ds-cell-tag-pill--pending')) return;
+
   clearOverlays();
 
   const nb = tracker.currentWidget?.content;
