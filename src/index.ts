@@ -452,7 +452,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
     // ── Cell execution listener ──────────────────────────────────────────────
     // After every cell execution:
-    //  1. Run reproducibility rules (existing behaviour).
+    //  1. Run reproducibility rules (fire-and-forget, never awaited).
     //  2. Notify the Smart Cell Context backend to update the SummaryStore.
     NotebookActions.executed.connect((_sender, { notebook: _nb, cell }) => {
       const panel = notebookTracker.currentWidget;
@@ -462,8 +462,6 @@ const plugin: JupyterFrontEndPlugin<void> = {
       // Must NOT use await here: any await in this synchronous signal handler
       // delays the microtask queue that resolves NotebookActions.run(), causing
       // programmatic cell execution (Varys run_cell) to appear to hang.
-      // We snapshot the context synchronously, then let the HTTP round-trip
-      // complete in the background via .then()/.catch().
       try {
         const ctx = notebookReader.getFullContext();
         if (ctx && ctx.cells.length) {
@@ -494,7 +492,6 @@ const plugin: JupyterFrontEndPlugin<void> = {
         const source       = model.sharedModel.getSource();
         const cellType     = model.type as string;
 
-        // Extract output and check for errors from the cell model directly
         let   output: string | null     = null;
         let   hadError                  = false;
         let   errorText: string | null  = null;
@@ -525,11 +522,6 @@ const plugin: JupyterFrontEndPlugin<void> = {
           }
         }
 
-        // kernel_snapshot (symbol_values / symbol_types) omitted: sending
-        // a requestExecute here queues a second kernel job that blocks any
-        // subsequent cell that Varys (or the user) runs immediately after.
-        // The summary_store still gets source, output, error, and
-        // AST-derived symbols_defined/consumed without a kernel roundtrip.
         apiClient.cellExecuted({
           cell_id:         cellId,
           notebook_path:   notebookPath,

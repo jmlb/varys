@@ -10,9 +10,6 @@ except ImportError:
     except importlib.metadata.PackageNotFoundError:
         __version__ = "0.0.0"
 
-from .app import DSAssistantExtension
-
-
 def _jupyter_labextension_paths():
     return [{"src": "labextension", "dest": "varys"}]
 
@@ -30,6 +27,12 @@ def _jupyter_server_extension_points():
 
 def _load_jupyter_server_extension(serverapp):
     """Load the Jupyter server extension."""
+    # Lazy import: DSAssistantExtension (and its entire dependency chain —
+    # handlers, LLM providers, httpx, anthropic, etc.) must NOT be imported
+    # at package level.  When the kernel runs `%load_ext varys.magic`, Python
+    # executes varys/__init__.py first; a top-level import here would cold-load
+    # every Varys server module from disk, causing a 20+ second hang on HDDs.
+    from .app import DSAssistantExtension  # noqa: PLC0415
     ext = DSAssistantExtension()
     ext._link_jupyter_server_extension(serverapp)
     ext.initialize()
