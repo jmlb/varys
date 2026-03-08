@@ -3107,6 +3107,53 @@
   color: var(--ds-text-dim, #5a5f72);
   word-break: break-all;
 }
+.ds-settings-path-text {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.ds-settings-path-custom {
+  color: var(--ds-accent, #7b9cff);
+}
+.ds-settings-path-edit-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 11px;
+  color: var(--ds-text-dim, #5a5f72);
+  opacity: 0.5;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.ds-settings-path-edit-btn:hover { opacity: 1; }
+.ds-settings-path-edit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ds-settings-path-input {
+  flex: 1;
+  font-size: 10px;
+  font-family: var(--jp-code-font-family, monospace);
+  background: var(--ds-input-bg, #f0f1f5);
+  color: var(--ds-text-primary, #1e2130);
+  border: 1px solid var(--ds-border, #d0d3df);
+  border-radius: 4px;
+  padding: 2px 5px;
+  min-width: 0;
+}
+.ds-settings-path-cancel-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 11px;
+  color: var(--ds-text-dim, #5a5f72);
+  flex-shrink: 0;
+}
+.ds-settings-path-cancel-btn:hover { color: var(--ds-danger, #e06c75); }
 
 .ds-settings-status {
   padding: 5px 9px;
@@ -4576,6 +4623,13 @@
 }
 .ds-chat-night .ds-settings-path {
   color: #555870;
+}
+.ds-chat-night .ds-settings-path-edit-btn,
+.ds-chat-night .ds-settings-path-cancel-btn { color: #555870; }
+.ds-chat-night .ds-settings-path-input {
+  background: #1e2130;
+  color: #c5c9d6;
+  border-color: #3a3d52;
 }
 .ds-chat-night .ds-settings-loading {
   color: var(--ds-text-dim, #8890a8);

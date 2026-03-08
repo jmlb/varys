@@ -19,8 +19,12 @@ from .base import BaseLLMProvider
 
 
 def _load_varys_env() -> None:
-    """Load ~/.jupyter/varys.env into os.environ (only keys not already set)."""
-    env_file = Path.home() / ".jupyter" / "varys.env"
+    """Load the active varys.env into os.environ (only keys not already set)."""
+    try:
+        from ..handlers.settings import resolve_env_path
+        env_file = resolve_env_path()
+    except Exception:
+        env_file = Path.home() / ".jupyter" / "varys.env"
     if not env_file.exists():
         return
     for line in env_file.read_text(encoding="utf-8").splitlines():

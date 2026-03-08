@@ -60,10 +60,11 @@ class DSAssistantExtension(ExtensionApp):
         """Initialize extension settings."""
         self.log.info("Varys: Initializing settings")
 
-        # Load ~/.jupyter/varys.env (user-level, persists across projects)
+        # Load the configured varys.env (user-level, persists across projects)
         # then optionally overlay with a project-level .env in root_dir.
+        from .handlers.settings import resolve_env_path
         env_paths = [
-            Path.home() / ".jupyter" / "varys.env",
+            resolve_env_path(),
             Path(self.serverapp.root_dir) / ".env",
         ]
         for env_path in env_paths:

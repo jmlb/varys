@@ -975,6 +975,9 @@ const ModelsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSaved
   const [masked, setMasked] = useState<Record<string, boolean>>({});
   const [envPath, setEnvPath] = useState('');
   const [envExists, setEnvExists] = useState(false);
+  const [envPathIsCustom, setEnvPathIsCustom] = useState(false);
+  const [newEnvPath, setNewEnvPath] = useState('');
+  const [editingEnvPath, setEditingEnvPath] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('routing');
@@ -1000,6 +1003,7 @@ const ModelsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSaved
         setMasked(m);
         setEnvPath(String((data as any)._env_path ?? ''));
         setEnvExists(Boolean((data as any)._env_exists));
+        setEnvPathIsCustom(Boolean((data as any)._env_path_is_custom));
         setLoading(false);
       })
       .catch(err => {
@@ -1083,10 +1087,21 @@ const ModelsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSaved
     }
     setSaving(true);
     try {
-      const result = await apiClient.saveSettings(values);
+      const payload: Record<string, string> = { ...values };
+      if (editingEnvPath && newEnvPath.trim()) {
+        payload['_new_env_path'] = newEnvPath.trim();
+      }
+      const result = await apiClient.saveSettings(payload);
       if (result.error) {
         setStatus({ type: 'error', text: result.error });
       } else {
+        if (editingEnvPath && newEnvPath.trim()) {
+          setEnvPath(newEnvPath.trim());
+          setEnvPathIsCustom(true);
+          setEnvExists(true);
+          setEditingEnvPath(false);
+          setNewEnvPath('');
+        }
         setStatus({
           type: 'success',
           text: `Saved ${(result.updated ?? []).length} setting(s). Active immediately.`
@@ -1274,7 +1289,35 @@ const ModelsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSaved
           </div>
         )}
         <div className="ds-settings-path">
-          {envExists ? envPath : `Will create: ${envPath}`}
+          {editingEnvPath ? (
+            <div className="ds-settings-path-edit">
+              <input
+                className="ds-settings-path-input"
+                type="text"
+                value={newEnvPath}
+                placeholder={envPath}
+                onChange={e => setNewEnvPath(e.target.value)}
+                autoFocus
+              />
+              <button
+                className="ds-settings-path-cancel-btn"
+                onClick={() => { setEditingEnvPath(false); setNewEnvPath(''); }}
+                title="Cancel"
+              >✕</button>
+            </div>
+          ) : (
+            <span
+              className={`ds-settings-path-text${envPathIsCustom ? ' ds-settings-path-custom' : ''}`}
+              title={envExists ? envPath : `Will be created: ${envPath}`}
+            >
+              {envExists ? envPath : `Will create: ${envPath}`}
+              <button
+                className="ds-settings-path-edit-btn"
+                onClick={() => { setEditingEnvPath(true); setNewEnvPath(envPath); }}
+                title="Change .env file location"
+              >✎</button>
+            </span>
+          )}
         </div>
         <div className="ds-settings-actions">
           <button

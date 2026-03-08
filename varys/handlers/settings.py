@@ -96,13 +96,42 @@ _SENSITIVE = {
 _MASK_PLACEHOLDER = "••••••••"
 
 
-def _env_path(settings: dict) -> Path:
-    """Return path to the Varys .env config file.
+_DEFAULT_ENV_PATH = Path.home() / ".jupyter" / "varys.env"
+_POINTER_FILE     = Path.home() / ".jupyter" / ".varys_env_path"
 
-    Stored in ~/.jupyter/varys.env so it persists across projects and is
-    never accidentally committed to a repo.
+
+def resolve_env_path() -> Path:
+    """Return the active varys.env path.
+
+    Resolution order (first match wins):
+      1. ``VARYS_ENV_PATH`` environment variable — set in your shell profile
+         or when launching JupyterLab to override for that session.
+      2. Pointer file ``~/.jupyter/.varys_env_path`` — a single-line text
+         file written by the Settings UI when the user chooses a custom
+         location.
+      3. Default: ``~/.jupyter/varys.env``
     """
-    return Path.home() / ".jupyter" / "varys.env"
+    # 1. Shell / process environment variable
+    env_var = os.environ.get("VARYS_ENV_PATH", "").strip()
+    if env_var:
+        return Path(env_var).expanduser()
+
+    # 2. Pointer file written by the UI
+    if _POINTER_FILE.exists():
+        try:
+            stored = _POINTER_FILE.read_text(encoding="utf-8").strip()
+            if stored:
+                return Path(stored).expanduser()
+        except OSError:
+            pass
+
+    # 3. Default
+    return _DEFAULT_ENV_PATH
+
+
+def _env_path(settings: dict) -> Path:
+    """Return path to the Varys .env config file (settings-dict compat wrapper)."""
+    return resolve_env_path()
 
 
 def _read_env(path: Path) -> dict:
@@ -262,8 +291,9 @@ class SettingsHandler(JupyterHandler):
             else:
                 result[key] = {"value": val, "masked": False}
 
-        result["_env_path"] = str(path)
-        result["_env_exists"] = path.exists()
+        result["_env_path"]         = str(path)
+        result["_env_exists"]       = path.exists()
+        result["_env_path_is_custom"] = path != _DEFAULT_ENV_PATH
 
         # Include advisory phrases so the frontend can use the user-configured
         # list instead of the hardcoded defaults.
@@ -284,6 +314,29 @@ class SettingsHandler(JupyterHandler):
             self.finish(json.dumps({"error": "Invalid JSON"}))
             return
 
+        # ── Handle env-file path change BEFORE collecting key/value updates ─
+        new_path_raw = body.get("_new_env_path", "").strip()
+        if new_path_raw:
+            new_path = Path(new_path_raw).expanduser().resolve()
+            old_path = path
+            if new_path != old_path:
+                try:
+                    new_path.parent.mkdir(parents=True, exist_ok=True)
+                    # Copy existing env content to the new location
+                    if old_path.exists():
+                        import shutil
+                        shutil.copy2(old_path, new_path)
+                    else:
+                        new_path.touch()
+                    # Write pointer so future startups use the new path
+                    _POINTER_FILE.write_text(str(new_path), encoding="utf-8")
+                    path = new_path
+                    self.log.info("Varys: env file moved to %s", new_path)
+                except Exception as e:
+                    self.set_status(400)
+                    self.finish(json.dumps({"error": f"Cannot move env file: {e}"}))
+                    return
+
         updates = {}
         for key in _ENV_KEYS:
             val = body.get(key)
@@ -294,12 +347,13 @@ class SettingsHandler(JupyterHandler):
                 continue
             updates[key] = str(val).strip()
 
-        if not updates:
+        if not updates and new_path_raw == "":
             self.finish(json.dumps({"status": "no changes"}))
             return
 
         try:
-            _write_env(path, updates)
+            if updates:
+                _write_env(path, updates)
             _reload_settings(self, path)
             self.log.info("Varys: settings updated and reloaded from %s", path)
             self.finish(json.dumps({"status": "ok", "updated": list(updates.keys())}))
