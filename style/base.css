@@ -6054,6 +6054,9 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
   gap: 5px;
   min-width: 0;
 }
+/* Push create button to the very bottom of the inputs column */
+.ds-tp-create-inputs .ds-tp-create-btn { margin-top: auto; }
+
 .ds-tp-create-preview {
   width: 42%;
   flex-shrink: 0;
@@ -6070,16 +6073,8 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
 }
 .ds-tp-preview-json {
   flex: 1;
-  margin: 0;
-  padding: 6px 7px;
-  background: var(--jp-layout-color2, #e8e8e8);
+  background: #282c34;   /* One Dark background */
   border-radius: 6px;
-  font-size: 8px;
-  font-family: var(--jp-code-font-family, monospace);
-  color: var(--jp-ui-font-color2, #444);
-  white-space: pre-wrap;
-  word-break: break-all;
-  line-height: 1.5;
   overflow: hidden;
 }
 
@@ -6125,10 +6120,7 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
 }
 .ds-chat-night .ds-tp-name-input::placeholder,
 .ds-chat-night .ds-tp-desc-input::placeholder { color: #6c7086; opacity: 1; }
-.ds-chat-night .ds-tp-preview-json {
-  background: rgba(255,255,255,0.05);
-  color: #a6adc8;
-}
+/* .ds-tp-json-hl always uses One Dark bg — no night override needed */
 
 /* ── Color picker ─────────────────────────────────────────────────────────── */
 .ds-tp-color-picker {
@@ -6275,20 +6267,23 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
   font-family: var(--jp-code-font-family, monospace);
   color: var(--ds-text-dim, #888);
 }
-.ds-tp-details-json {
-  background: var(--jp-layout-color2, #e8e8e8);
-  border-radius: 4px;
-  padding: 4px 5px;
-  overflow-x: auto;
-}
-.ds-tp-details-json-pre {
+/* Shared syntax-highlighted JSON block */
+.ds-tp-json-hl {
   margin: 0;
-  font-size: 7px;
+  padding: 6px 7px;
+  font-size: 7.5px;
   font-family: var(--jp-code-font-family, monospace);
-  color: var(--jp-ui-font-color2, #555);
   white-space: pre-wrap;
-  word-break: break-all;
-  line-height: 1.4;
+  word-break: break-word;
+  line-height: 1.5;
+  background: #282c34;
+  color: #abb2bf;
+  border-radius: 6px;
+}
+
+.ds-tp-details-json {
+  border-radius: 5px;
+  overflow: hidden;
 }
 .ds-tp-details-desc {
   font-size: 8.5px;
@@ -6417,8 +6412,7 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
 .ds-chat-night .ds-tp-details-desc        { color: #a6adc8; }
 .ds-chat-night .ds-tp-details-desc--empty { color: #45475a; }
 .ds-chat-night .ds-tp-details-hex         { color: #6c7086; }
-.ds-chat-night .ds-tp-details-json        { background: rgba(255,255,255,0.06); }
-.ds-chat-night .ds-tp-details-json-pre    { color: #a6adc8; }
+/* .ds-tp-json-hl always uses One Dark bg */
 .ds-chat-night .ds-tp-group-label         { color: #6c7086; border-bottom-color: #313145; }
 
 /* ── Tags Settings Panel ───────────────────────────────────────────────────── */

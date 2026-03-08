@@ -12,8 +12,52 @@
  *        RIGHT — details of selected tag
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Fragment } from 'react';
 import { INotebookTracker } from '@jupyterlab/notebook';
+
+// ── JSON syntax highlighter (Python/One-Dark palette) ─────────────────────────
+
+const J = {
+  brace:   '#abb2bf',   // { } [ ] , :
+  key:     '#61afef',   // "key"
+  str:     '#98c379',   // "string value"
+  num:     '#d19a66',   // 42 / 3.14
+  kw:      '#c678dd',   // true / false / null
+};
+
+function JsonHighlight({ value }: { value: object }): React.ReactElement {
+  const json   = JSON.stringify(value, null, 2);
+  // Token regex: captures keys (string + colon), plain strings, keywords, numbers, punctuation
+  const TOKEN  = /("(?:[^"\\]|\\.)*")(\s*:)|("(?:[^"\\]|\\.)*")|(true|false|null)|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|([{}\[\],])/g;
+  const nodes: React.ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let idx = 0;
+
+  while ((m = TOKEN.exec(json)) !== null) {
+    // Plain text between tokens (whitespace / newlines)
+    if (m.index > last) {
+      nodes.push(<Fragment key={`t${idx++}`}>{json.slice(last, m.index)}</Fragment>);
+    }
+    if (m[1] && m[2] !== undefined) {
+      // "key":
+      nodes.push(<span key={`k${idx++}`} style={{ color: J.key }}>{m[1]}</span>);
+      nodes.push(<span key={`c${idx++}`} style={{ color: J.brace }}>{m[2]}</span>);
+    } else if (m[3]) {
+      nodes.push(<span key={`s${idx++}`} style={{ color: J.str }}>{m[3]}</span>);
+    } else if (m[4]) {
+      nodes.push(<span key={`kw${idx++}`} style={{ color: J.kw }}>{m[4]}</span>);
+    } else if (m[5]) {
+      nodes.push(<span key={`n${idx++}`} style={{ color: J.num }}>{m[5]}</span>);
+    } else if (m[6]) {
+      nodes.push(<span key={`p${idx++}`} style={{ color: J.brace }}>{m[6]}</span>);
+    }
+    last = m.index + m[0].length;
+  }
+  if (last < json.length) nodes.push(<Fragment key={`e${idx}`}>{json.slice(last)}</Fragment>);
+
+  return <pre className="ds-tp-json-hl">{nodes}</pre>;
+}
 
 // ── Palette & colour helpers ──────────────────────────────────────────────────
 
@@ -169,14 +213,6 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
   const [editTopic, setEditTopic] = useState('');
   const [editColor, setEditColor] = useState(TAG_PALETTE[0]);
 
-  // Live JSON preview object for the create form
-  const previewJson = JSON.stringify({
-    value:       newValue.trim() || '…',
-    topic:       newTopic       || '…',
-    description: newDesc.trim() || '…',
-    color:       newColor,
-  }, null, 2);
-
   // Keep in sync if Settings panel also writes custom tags
   const syncFromStorage = useCallback(() => { setCustomTags(loadCustomTags()); }, []);
   useEffect(() => {
@@ -301,7 +337,14 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
           {/* RIGHT — live JSON preview */}
           <div className="ds-tp-create-preview">
             <div className="ds-tp-preview-label">Preview</div>
-            <pre className="ds-tp-preview-json">{previewJson}</pre>
+            <div className="ds-tp-preview-json">
+              <JsonHighlight value={{
+                value:       newValue.trim() || '…',
+                topic:       newTopic       || '…',
+                description: newDesc.trim() || '…',
+                color:       newColor,
+              }} />
+            </div>
           </div>
 
         </div>
@@ -394,10 +437,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
                   </div>
 
                   <div className="ds-tp-details-json">
-                    <pre className="ds-tp-details-json-pre">{JSON.stringify(
-                      { value: selectedTag, topic: selTopic, description: selDesc, color: selColor },
-                      null, 2
-                    )}</pre>
+                    <JsonHighlight value={{ value: selectedTag, topic: selTopic, description: selDesc, color: selColor }} />
                   </div>
 
                   {selDesc ? (
