@@ -15,13 +15,17 @@ No Node.js required on the user's machine. No cloud account lock-in. Works with 
 
 ---
 
-## What's new since v0.2.0
+## What's new in v0.3.0
 
 > Full details in [CHANGELOG.md](CHANGELOG.md).
 
 | Area | What changed |
 |---|---|
-| **Smart Cell Context** | Structured, versioned Summary Store replaces the hard 2 000-char truncation; the LLM receives rich per-cell summaries (symbols defined/consumed, types, values, error flags) plus full-fidelity source and output for the focal cell |
+| **Long-Term Memory** | Structured YAML preference store (global / project / notebook scopes); persists across sessions; preferences are inferred automatically from coding patterns and captured from explicit user statements mid-chat |
+| **Inference Pipeline** | Background pattern detection every 10 cell versions: symbol value consistency (e.g. always `random_state=42`) and import frequency (e.g. always `import pandas as pd`) auto-generate preferences |
+| **Injection Pipeline** | Relevant preferences are selected at query time via keyword matching (+ optional LLM re-rank); formatted memory block replaces flat `preferences.md` in the system prompt |
+| **Simple Tasks Model** | New `DS_SIMPLE_TASKS_MODEL` setting — a lighter model within your chat provider for background inference; leave blank to use keyword-only matching |
+| **Smart Cell Context** | Structured, versioned Summary Store replaces the hard 2 000-char truncation; per-cell summaries include symbols, types, live values and error flags; focal cell receives full-fidelity output |
 | **MCP support** | Connect any MCP-compatible server (filesystem, DBs, custom APIs) via Settings → MCP tab |
 | **Sequential Thinking** | Python-native reasoning loop — no Node.js; LLM thinks step-by-step before answering |
 | **Stable cell IDs** | Cells carry persistent UUIDs; references survive insertion/deletion |
@@ -38,6 +42,8 @@ No Node.js required on the user's machine. No cloud account lock-in. Works with 
 ## Highlights
 
 - **Chat assistant** — ask questions, get code, run multi-step notebook operations in natural language
+- **Long-term memory** — automatically learns your coding style (preferred libraries, consistent settings, workflow patterns) and injects relevant preferences into every conversation
+- **Smart Cell Context** — structured, versioned cell summaries; the LLM always gets full-fidelity output for the cell you're focused on
 - **Inline code completion** — ghost-text suggestions as you type, powered by any LLM provider
 - **Skill system** — composable prompt skills triggered by `/commands` or keywords; ship your own
 - **RAG knowledge base** — index PDFs, notebooks, and markdown; query with `/ask`
@@ -239,6 +245,8 @@ Settings are stored in `~/.jupyter/varys.env` and hot-reloaded on save — no se
 DS_CHAT_PROVIDER=ANTHROPIC
 DS_COMPLETION_PROVIDER=OLLAMA
 COMPLETION_MAX_TOKENS=128
+DS_SIMPLE_TASKS_MODEL=claude-haiku-4-5   # optional — lighter model for preference inference
+                                          # leave blank to use keyword-only matching
 
 ANTHROPIC_API_KEY=sk-ant-...
 ANTHROPIC_CHAT_MODEL=claude-sonnet-4-6
@@ -322,7 +330,7 @@ Drop PDFs, notebooks, or markdown files into `.jupyter-assistant/knowledge/`, th
 ## Verify installation
 
 ```bash
-jupyter labextension list      # varys v0.1.0  enabled  OK
+jupyter labextension list      # varys v0.3.0  enabled  OK
 jupyter server extension list  # varys  enabled
 ```
 
@@ -375,7 +383,7 @@ varys/
 │   ├── skills/                    Skill loader and registry
 │   ├── bundled_skills/            Skills shipped with the package
 │   ├── bundled_config/            Default config files (llm, completion, rag, reproducibility)
-│   ├── memory/                    Long-term preference storage
+│   ├── memory/                    Long-term memory — Preference Store, Inference & Injection pipelines
 │   ├── modules/                   Feature modules
 │   │   └── reproducibility_guardian/  Passive cell-run analysis engine
 │   ├── rag/                       RAG knowledge base (indexing + retrieval)

@@ -5,6 +5,58 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.3.0] — Long-Term Memory & Smart Cell Context
+
+### New Features
+
+#### Long-Term Memory — Preference Store
+- Structured YAML-based preference registry with three scopes: **global** (`~/.jupyter-assistant/memory/global_memory.yaml`), **project**, and **notebook**
+- Preferences persist across sessions and JupyterLab restarts; never stored in the notebook repo
+- Each entry carries `confidence`, `evidence_count`, `consistent_count`, `source` (explicit / inferred), and `keywords` for relevance matching
+- Deterministic confidence formula: evidence floor × consistency ratio × recency decay (90-day half-life) × source weight
+
+#### Long-Term Memory — Inference Pipeline
+- Pattern detection runs automatically every 10 new cell versions (configurable)
+- **Priority 1 — symbol value consistency**: flags variables set to the same value in ≥ 3 independent cells (e.g. `random_state=42`)
+- **Priority 2 — import frequency**: flags library aliases that appear in ≥ 3 distinct import cells (e.g. `import pandas as pd`)
+- Detected patterns converted to human-readable preference entries via the Simple Tasks model (or a deterministic template fallback)
+
+#### Long-Term Memory — Injection Pipeline
+- `select_preferences()` selects relevant preferences at query time using keyword matching
+- When the candidate list exceeds 10 entries and a Simple Tasks model is configured, an LLM re-ranks the candidates before injection
+- Formatted memory block (§7.5) replaces the flat `preferences.md` injection in the system prompt
+- **Zero-downtime migration**: existing `preferences.md` continues to be injected as a fallback until the new YAML store is populated, then archived to `preferences.md.bak`
+
+#### Explicit preference detection
+- Regex-based scanner detects preference statements in user chat messages ("always use X", "remember to Y", "I prefer Z") and stores them immediately in the preference store without any LLM call
+
+#### Simple Tasks Model (`DS_SIMPLE_TASKS_MODEL`)
+- New optional model name setting in **Settings → Routing** (alongside Chat and Completion)
+- Uses the same provider as the chat model but a lighter/cheaper model for preference selection, generation, and legacy migration
+- Leave blank to use keyword-only matching (no extra API calls)
+- Replaces the old completion-model role for background inference tasks
+
+#### Smart Cell Context (v0.2.5 backport, now stable)
+- Structured, versioned `SummaryStore` replaces the hard 2 000-char per-cell truncation
+- Per-cell summaries include: symbols defined/consumed, types, live values (from kernel snapshot), error flags, import-cell detection
+- Focal cell receives full-fidelity source and output (untruncated) regardless of length
+- `SummaryStore` now carries a `_meta` block tracking `versions_since_inference` and `last_inference_run`
+
+---
+
+### Bug Fixes
+
+- `deploy.sh` now copies `package.json` to both install locations before the hash-update step, preventing `FileNotFoundError` on clean virtual environments
+
+---
+
+### Developer / Ops
+
+- `pyyaml>=6.0` added as a core dependency (was already present transitively via JupyterLab)
+- `create_simple_task_provider()` added to `varys/llm/factory.py` — uses the chat provider type with a model-name override
+
+---
+
 ## [0.2.0] — New Release
 
 ### New Features
