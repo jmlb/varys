@@ -93,19 +93,42 @@ async def _summarize_and_store(
     """
     try:
         from ..context.summary_store import SummaryStore
-        from ..context.summarizer    import build_summary
-
-        store   = SummaryStore(root_dir, notebook_path)
-        summary = build_summary(
-            cell_id         = cell_id,
-            source          = source,
-            cell_type       = cell_type,
-            output          = output,
-            execution_count = execution_count,
-            had_error       = had_error,
-            error_text      = error_text,
-            kernel_snapshot = kernel_snapshot,
+        from ..context.summarizer    import (
+            build_summary,
+            build_markdown_summary_async,
+            MARKDOWN_THRESHOLD,
         )
+        from ..llm.factory import create_simple_task_provider
+
+        store = SummaryStore(root_dir, notebook_path)
+
+        # For large markdown cells, try the LLM prose-summary path first.
+        if cell_type == "markdown" and len(source) > MARKDOWN_THRESHOLD:
+            simple_provider = create_simple_task_provider(settings)
+            if simple_provider:
+                summary = await build_markdown_summary_async(source, simple_provider)
+            else:
+                summary = build_summary(
+                    cell_id         = cell_id,
+                    source          = source,
+                    cell_type       = cell_type,
+                    output          = output,
+                    execution_count = execution_count,
+                    had_error       = had_error,
+                    error_text      = error_text,
+                    kernel_snapshot = kernel_snapshot,
+                )
+        else:
+            summary = build_summary(
+                cell_id         = cell_id,
+                source          = source,
+                cell_type       = cell_type,
+                output          = output,
+                execution_count = execution_count,
+                had_error       = had_error,
+                error_text      = error_text,
+                kernel_snapshot = kernel_snapshot,
+            )
         written = store.upsert(cell_id, source, summary)
         if written:
             log.debug(

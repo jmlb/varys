@@ -1159,12 +1159,38 @@ const ModelsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSaved
       {/* Tab content */}
       <div className="ds-settings-tab-content">
         {currentGroup.id === 'routing' ? (
-          <div className="ds-settings-routing-grid">
-            {currentGroup.fields.map(field => (
-              <React.Fragment key={field.key}>
-                <label className="ds-settings-label">{TASK_LABELS[field.key] ?? field.label}</label>
-                {field.key === 'DS_COMPLETION_PROVIDER' ? (
-                  <div className="ds-settings-routing-controls">
+          <>
+            <div className="ds-settings-routing-grid">
+              {currentGroup.fields.map(field => (
+                <React.Fragment key={field.key}>
+                  <label className="ds-settings-label">{TASK_LABELS[field.key] ?? field.label}</label>
+                  {field.key === 'DS_COMPLETION_PROVIDER' ? (
+                    <div className="ds-settings-routing-controls">
+                      <select
+                        className="ds-settings-select"
+                        value={values[field.key] ?? ''}
+                        onChange={e => handleChange(field.key, e.target.value)}
+                      >
+                        <option value="">— select provider —</option>
+                        {PROVIDER_LIST.map(p => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                      </select>
+                      <label className="ds-settings-token-label" title="Max tokens returned per completion">
+                        Tokens
+                        <input
+                          className="ds-settings-token-input"
+                          type="number"
+                          min={16}
+                          max={2048}
+                          step={16}
+                          value={values['COMPLETION_MAX_TOKENS'] ?? '128'}
+                          onChange={e => handleChange('COMPLETION_MAX_TOKENS', e.target.value)}
+                          title="Max tokens returned per completion (default: 128)"
+                        />
+                      </label>
+                    </div>
+                  ) : (
                     <select
                       className="ds-settings-select"
                       value={values[field.key] ?? ''}
@@ -1175,35 +1201,18 @@ const ModelsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSaved
                         <option key={p} value={p}>{p}</option>
                       ))}
                     </select>
-                    <label className="ds-settings-token-label" title="Max tokens returned per completion">
-                      Tokens
-                      <input
-                        className="ds-settings-token-input"
-                        type="number"
-                        min={16}
-                        max={2048}
-                        step={16}
-                        value={values['COMPLETION_MAX_TOKENS'] ?? '128'}
-                        onChange={e => handleChange('COMPLETION_MAX_TOKENS', e.target.value)}
-                        title="Max tokens returned per completion (default: 128)"
-                      />
-                    </label>
-                  </div>
-                ) : (
-                  <select
-                    className="ds-settings-select"
-                    value={values[field.key] ?? ''}
-                    onChange={e => handleChange(field.key, e.target.value)}
-                  >
-                    <option value="">— select provider —</option>
-                    {PROVIDER_LIST.map(p => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                )}
-              </React.Fragment>
-            ))}
-          </div>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+            <p className="ds-settings-simple-tasks-note">
+              <strong>Simple tasks</strong> powers background work: long-term memory
+              inference, preference extraction, and LLM prose summarization of large
+              markdown cells (&gt;2 000 chars). Without a configured Simple Tasks model,
+              large markdown cells are <em>truncated at a sentence boundary</em> rather
+              than summarized.
+            </p>
+          </>
         ) : (
           <>
             {currentGroup.fields.map(field => {

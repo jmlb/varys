@@ -184,12 +184,17 @@ def _format_summary_cell(cell: Dict[str, Any], store: SummaryStore) -> str:
         if ec is not None:
             lines.append(f"Execution: [{ec}]")
     else:
-        # Markdown / raw: show snippet
-        snippet = summary.get("source_snippet", "")
-        if snippet:
-            lines.append(snippet)
-        if summary.get("truncated"):
-            lines.append("[markdown section truncated — summary only]")
+        # Markdown / raw: prefer LLM prose summary when available
+        llm_summary = summary.get("llm_summary")
+        if llm_summary:
+            lines.append(llm_summary)
+            lines.append("[LLM-generated summary]")
+        else:
+            snippet = summary.get("source_snippet", "")
+            if snippet:
+                lines.append(snippet)
+            if summary.get("truncated"):
+                lines.append("[markdown truncated at sentence boundary — configure Simple Tasks model for full LLM summarization]")
 
     lines.append("---")
     return "\n".join(lines)

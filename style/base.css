@@ -3040,6 +3040,24 @@
   line-height: 1.4;
 }
 
+/* Simple Tasks info note — shown in the Routing tab */
+.ds-settings-simple-tasks-note {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--jp-brand-color1, #1976d2);
+  background: color-mix(in srgb, var(--jp-brand-color1, #1976d2) 8%, transparent);
+  color: var(--jp-ui-font-color2, #555);
+  font-size: 0.75rem;
+  line-height: 1.55;
+  border-radius: 0 4px 4px 0;
+}
+.ds-settings-simple-tasks-note strong {
+  color: var(--jp-ui-font-color1);
+}
+.ds-settings-simple-tasks-note em {
+  font-style: italic;
+}
+
 .ds-settings-toggle-switch {
   position: relative;
   display: inline-flex;
@@ -4620,6 +4638,14 @@
 }
 .ds-chat-night .ds-settings-toggle-desc {
   color: var(--ds-text-dim, #8890a8);
+}
+.ds-chat-night .ds-settings-simple-tasks-note {
+  border-left-color: #7d9fce;
+  background: rgba(125, 159, 206, 0.10);
+  color: #a6adc8;
+}
+.ds-chat-night .ds-settings-simple-tasks-note strong {
+  color: #cdd6f4;
 }
 .ds-chat-night .ds-settings-path {
   color: #555870;

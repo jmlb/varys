@@ -1,12 +1,15 @@
 """Cell summarizer — builds structured summary objects from execution data.
 
-All common paths avoid LLM calls.  The deferred markdown-large-cell LLM path
-is currently implemented as sentence-boundary truncation with truncated=True.
+Large markdown cells (> MARKDOWN_THRESHOLD chars) are summarised via the
+Simple Tasks LLM when one is configured.  ``build_markdown_summary_async``
+handles this path and falls back to sentence-boundary truncation when the
+provider is unavailable or the call fails.
 
 Summary object schema (spec §2.3):
   {
     "cell_type":        "code | markdown | raw",
     "source_snippet":   "<first 300 chars of source>",
+    "llm_summary":      "<LLM-generated prose summary | null>",
     "output":           "<output string, up to 1000 chars | null>",
     "symbols_defined":  ["model", "X_train"],
     "symbols_consumed": ["df", "THRESHOLD"],
@@ -32,10 +35,18 @@ log = logging.getLogger(__name__)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
-SNIPPET_CHARS        = 300    # source_snippet length cap
-OUTPUT_SUMMARY_CHARS = 1_000  # output stored in summary
-MARKDOWN_THRESHOLD   = 2_000  # chars before sentence-boundary fallback applies
-SYMBOL_VALUE_MAX     = 500    # max serialized length for symbol_values entries
+SNIPPET_CHARS              = 300    # source_snippet length cap
+OUTPUT_SUMMARY_CHARS       = 1_000  # output stored in summary
+MARKDOWN_THRESHOLD         = 2_000  # chars before LLM/truncation path activates
+LLM_SUMMARY_MAX_INPUT_CHARS = 6_000  # cap on markdown text sent to the LLM
+SYMBOL_VALUE_MAX           = 500    # max serialized length for symbol_values entries
+
+_MARKDOWN_SUMMARY_SYSTEM = (
+    "You are a precise summarizer for Jupyter notebook markdown cells. "
+    "Produce a concise prose summary (2–4 sentences) that captures the main topic, "
+    "key concepts, and any important context or decisions. "
+    "Output ONLY the summary text — no preamble, no labels, no markdown formatting."
+)
 
 # ── Builtins set (excluded from consumed to reduce noise) ─────────────────────
 
@@ -174,6 +185,7 @@ def _build_code_summary(
         return {
             "cell_type":        "code",
             "source_snippet":   source[:SNIPPET_CHARS],
+            "llm_summary":      None,
             "output":           None,
             "symbols_defined":  defined,
             "symbols_consumed": [],
@@ -242,6 +254,7 @@ def _build_code_summary(
     return {
         "cell_type":        "code",
         "source_snippet":   source[:SNIPPET_CHARS],
+        "llm_summary":      None,
         "output":           summary_output,
         "symbols_defined":  defined,
         "symbols_consumed": consumed,
@@ -263,6 +276,7 @@ def _build_markdown_summary(source: str) -> Dict[str, Any]:
     return {
         "cell_type":        "markdown",
         "source_snippet":   snippet,
+        "llm_summary":      None,
         "output":           None,
         "symbols_defined":  [],
         "symbols_consumed": [],
@@ -282,6 +296,7 @@ def _build_raw_summary(source: str) -> Dict[str, Any]:
     return {
         "cell_type":        "raw",
         "source_snippet":   source[:SNIPPET_CHARS],
+        "llm_summary":      None,
         "output":           None,
         "symbols_defined":  [],
         "symbols_consumed": [],
@@ -295,6 +310,61 @@ def _build_raw_summary(source: str) -> Dict[str, Any]:
         "truncated":        False,
         "deleted":          False,
     }
+
+
+# ── Async LLM path for large markdown cells ───────────────────────────────────
+
+
+async def build_markdown_summary_async(
+    source: str,
+    provider: Any,
+) -> Dict[str, Any]:
+    """Summarise a large markdown cell via the Simple Tasks LLM.
+
+    Calls ``provider.chat()`` with a concise instruction prompt and stores the
+    result in the ``llm_summary`` field.  Falls back gracefully to
+    ``_build_markdown_summary()`` (sentence-boundary truncation) when:
+      - ``len(source) <= MARKDOWN_THRESHOLD`` (not large enough to need LLM)
+      - the LLM call raises any exception
+
+    Args:
+        source:   Full markdown source text.
+        provider: A configured ``BaseLLMProvider`` instance (Simple Tasks model).
+    """
+    if len(source) <= MARKDOWN_THRESHOLD:
+        return _build_markdown_summary(source)
+
+    capped   = source[:LLM_SUMMARY_MAX_INPUT_CHARS]
+    user_msg = f"Summarize this Jupyter notebook markdown cell:\n\n{capped}"
+
+    try:
+        summary_text = await provider.chat(
+            system=_MARKDOWN_SUMMARY_SYSTEM,
+            user=user_msg,
+        )
+        return {
+            "cell_type":        "markdown",
+            "source_snippet":   source[:SNIPPET_CHARS],
+            "llm_summary":      summary_text.strip() if summary_text else None,
+            "output":           None,
+            "symbols_defined":  [],
+            "symbols_consumed": [],
+            "symbol_values":    {},
+            "symbol_types":     {},
+            "execution_count":  None,
+            "had_error":        False,
+            "error_text":       None,
+            "is_mutation_only": False,
+            "is_import_cell":   False,
+            "truncated":        False,
+            "deleted":          False,
+        }
+    except Exception as exc:
+        log.warning(
+            "build_markdown_summary_async: LLM call failed, falling back to truncation: %s",
+            exc,
+        )
+        return _build_markdown_summary(source)
 
 
 # ── Utility ────────────────────────────────────────────────────────────────────
