@@ -3400,16 +3400,6 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
         context.dataframes = [];
       }
 
-      // ── Enrich context with live DataFrame schemas from kernel ───────
-      // Only when notebook-aware; the strip above would be undone otherwise.
-      if (notebookAware) {
-        setProgressText('Inspecting kernel variables…');
-        const dataframes = await notebookReader.getDataFrameSchemas();
-        if (dataframes.length > 0) {
-          context.dataframes = dataframes;
-        }
-      }
-
       // ── Resolve @variable_name references in the message ─────────────
       let resolvedVariables: ResolvedVariable[] = [];
       const varRefs = parseVariableRefs(message);
@@ -3671,9 +3661,6 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
               appendToStream(` ✗ (no active notebook)`);
               break;
             }
-            const dfs = await notebookReader.getDataFrameSchemas();
-            if (dfs.length > 0) freshContext.dataframes = dfs;
-
             try {
               const stepOpId = `${masterOpId}_s${si}`;
               const stepResponse = await apiClient.executeTaskStreaming(

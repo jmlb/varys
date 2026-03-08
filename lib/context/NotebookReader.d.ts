@@ -2,14 +2,9 @@
  * NotebookReader - Extracts full context from the active JupyterLab notebook.
  */
 import { INotebookTracker } from '@jupyterlab/notebook';
-import { CellInfo, NotebookContext, DataFrameSchema } from '../api/client';
+import { CellInfo, NotebookContext } from '../api/client';
 export declare class NotebookReader {
     private tracker;
-    /**
-     * Cache for DataFrame schemas.  Invalidated whenever the max execution
-     * count across all cells changes (i.e. after any cell is run).
-     */
-    private _dfCache;
     constructor(tracker: INotebookTracker);
     /**
      * Returns the full context of the currently active notebook.
@@ -40,35 +35,6 @@ export declare class NotebookReader {
      * base64 string (no data-URI prefix).  Returns null if no image present.
      */
     private _extractImage;
-    /**
-     * Executes a Python snippet in the live kernel to collect the schema
-     * (shape, column names, dtypes, 3-row sample) for every pandas DataFrame
-     * currently in the kernel namespace.
-     *
-     * Returns an empty array when:
-     *  - No notebook is open
-     *  - The kernel is not running
-     *  - pandas is not installed
-     *  - Any other error occurs (silent failure)
-     *
-     * Results are cached until the max execution count changes, so repeated
-     * calls within the same execution cycle are essentially free.
-     */
-    getDataFrameSchemas(): Promise<DataFrameSchema[]>;
-    /**
-     * Computes a cache-key from the current max execution count across all
-     * cells.  Changes as soon as any cell is executed.
-     */
-    private _executionCountKey;
-    /**
-     * Runs the DataFrame inspection snippet in the kernel and parses the JSON
-     * written to stdout.
-     *
-     * A 5-second safety timeout guards against kernels that take a long time to
-     * serialise large DataFrames — the future is disposed and [] is returned so
-     * the chat flow is never blocked indefinitely.
-     */
-    private _inspectKernel;
     /**
      * Returns a single cell by index, or null if out of bounds.
      */
