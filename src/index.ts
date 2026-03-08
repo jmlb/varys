@@ -454,13 +454,16 @@ const plugin: JupyterFrontEndPlugin<void> = {
     // After every cell execution:
     //  1. Run reproducibility rules (existing behaviour).
     //  2. Notify the Smart Cell Context backend to update the SummaryStore.
-    NotebookActions.executed.connect(async (_sender, { notebook: _nb, cell }) => {
+    NotebookActions.executed.connect((_sender, { notebook: _nb, cell }) => {
       const panel = notebookTracker.currentWidget;
       if (!panel) return;
 
-      // ── Reproducibility check ──
-      // Only send cells up to and including the one that just executed —
-      // future cells haven't run yet so there's nothing to analyse there.
+      // ── Reproducibility check — fully fire-and-forget ──
+      // Must NOT use await here: any await in this synchronous signal handler
+      // delays the microtask queue that resolves NotebookActions.run(), causing
+      // programmatic cell execution (Varys run_cell) to appear to hang.
+      // We snapshot the context synchronously, then let the HTTP round-trip
+      // complete in the background via .then()/.catch().
       try {
         const ctx = notebookReader.getFullContext();
         if (ctx && ctx.cells.length) {
@@ -470,11 +473,10 @@ const plugin: JupyterFrontEndPlugin<void> = {
           const cellsToAnalyze = executedIndex >= 0
             ? ctx.cells.filter(c => c.index <= executedIndex)
             : ctx.cells;
-          const result = await apiClient.analyzeReproducibility({
+          apiClient.analyzeReproducibility({
             notebookPath: ctx.notebookPath ?? '',
             cells: cellsToAnalyze,
-          });
-          reproStore.emit(result.issues);
+          }).then(result => reproStore.emit(result.issues)).catch(() => { /* non-fatal */ });
         }
       } catch {
         // Non-fatal
