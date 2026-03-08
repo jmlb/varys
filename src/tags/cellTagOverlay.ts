@@ -181,6 +181,11 @@ function showAddTagDropdown(
     }
   }
 
+  // Apply night-mode class when Varys sidebar is in night mode
+  if (document.querySelector('.ds-chat-night')) {
+    dropdown.classList.add('ds-tag-add-dropdown--night');
+  }
+
   document.body.appendChild(dropdown);
   _activeDropdown = dropdown;
 
