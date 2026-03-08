@@ -21,6 +21,7 @@ No Node.js required on the user's machine. No cloud account lock-in. Works with 
 
 | Area | What changed |
 |---|---|
+| **Smart Cell Context** | Structured, versioned Summary Store replaces the hard 2 000-char truncation; the LLM receives rich per-cell summaries (symbols defined/consumed, types, values, error flags) plus full-fidelity source and output for the focal cell |
 | **MCP support** | Connect any MCP-compatible server (filesystem, DBs, custom APIs) via Settings → MCP tab |
 | **Sequential Thinking** | Python-native reasoning loop — no Node.js; LLM thinks step-by-step before answering |
 | **Stable cell IDs** | Cells carry persistent UUIDs; references survive insertion/deletion |
@@ -369,6 +370,7 @@ varys/
 ├── varys/                         Python package (server extension)
 │   ├── handlers/                  Jupyter Server request handlers
 │   ├── llm/                       LLM provider adapters (Anthropic, OpenAI, Ollama…)
+│   ├── context/                   Smart Cell Context — Summary Store, Assembler, Scorer
 │   ├── completion/                Inline code completion engine
 │   ├── skills/                    Skill loader and registry
 │   ├── bundled_skills/            Skills shipped with the package
