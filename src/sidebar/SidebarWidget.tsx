@@ -1782,13 +1782,251 @@ const IndexingPanel: React.FC<{ apiClient: APIClient; notebookPath: string }> = 
   );
 };
 
+// ---------------------------------------------------------------------------
+// TagsSettingsPanel — tag library: definitions + create/delete custom tags
+// ---------------------------------------------------------------------------
+
+const BUILT_IN_TAG_DEFS: { category: string; tags: { name: string; description: string }[] }[] = [
+  { category: 'ML Pipeline', tags: [
+    { name: 'data-loading',        description: 'Cells that load data from files, databases, or APIs' },
+    { name: 'preprocessing',       description: 'Data cleaning, normalization, and transformation steps' },
+    { name: 'feature-engineering', description: 'Feature creation, selection, and encoding' },
+    { name: 'training',            description: 'Model training and fitting' },
+    { name: 'evaluation',          description: 'Metrics, validation, and model assessment' },
+    { name: 'inference',           description: 'Prediction or scoring on new data' },
+  ]},
+  { category: 'Quality', tags: [
+    { name: 'todo',            description: 'Cell needs attention or further work' },
+    { name: 'reviewed',        description: 'Cell has been reviewed and approved' },
+    { name: 'needs-refactor',  description: 'Works but the implementation should be improved' },
+    { name: 'slow',            description: 'Computationally slow — candidate for optimization' },
+    { name: 'broken',          description: 'Cell is broken or produces errors' },
+    { name: 'tested',          description: 'Cell has been verified to produce correct output' },
+  ]},
+  { category: 'Report', tags: [
+    { name: 'report',          description: 'Output to include in an exported report' },
+    { name: 'figure',          description: 'Cell that generates a figure or chart' },
+    { name: 'table',           description: 'Cell that generates a table' },
+    { name: 'key-finding',     description: 'Contains an important result or insight' },
+    { name: 'report-exclude',  description: 'Explicitly exclude from report output' },
+  ]},
+  { category: 'Status', tags: [
+    { name: 'draft',       description: 'Work in progress — not finalized' },
+    { name: 'stable',      description: 'Unlikely to change; safe dependency for other cells' },
+    { name: 'deprecated',  description: 'No longer needed; kept for reference' },
+    { name: 'sensitive',   description: 'Contains sensitive data, credentials, or PII' },
+  ]},
+];
+
+const CUSTOM_TAGS_KEY = 'varys_custom_tag_definitions';
+
+interface CustomTagDef { name: string; description: string }
+
+function loadCustomTags(): CustomTagDef[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_TAGS_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as CustomTagDef[];
+  } catch { return []; }
+}
+
+function saveCustomTags(tags: CustomTagDef[]): void {
+  localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(tags));
+}
+
+const TAG_PALETTE_TS = [
+  '#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6',
+  '#06b6d4','#f97316','#ec4899','#14b8a6','#6366f1',
+];
+function tagColorTs(tag: string): string {
+  let h = 0;
+  for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
+  return TAG_PALETTE_TS[h % TAG_PALETTE_TS.length];
+}
+
+const TagsSettingsPanel: React.FC = () => {
+  const [customTags, setCustomTags] = useState<CustomTagDef[]>(loadCustomTags);
+  const [newName, setNewName]       = useState('');
+  const [newDesc, setNewDesc]       = useState('');
+  const [nameErr, setNameErr]       = useState('');
+  const [editIdx, setEditIdx]       = useState<number | null>(null);
+
+  const allBuiltInNames: string[] = ([] as string[]).concat(
+    ...BUILT_IN_TAG_DEFS.map((g: { category: string; tags: { name: string; description: string }[] }) =>
+      g.tags.map((t: { name: string; description: string }) => t.name)
+    )
+  );
+
+  const addCustomTag = () => {
+    const raw = newName.trim().toLowerCase().replace(/\s+/g, '-');
+    if (!raw) { setNameErr('Name is required.'); return; }
+    if (!/^[a-z0-9][\w\-.]*$/.test(raw)) { setNameErr('Only a-z, 0-9, - or _ allowed.'); return; }
+    if (allBuiltInNames.includes(raw)) { setNameErr('This name is already a built-in tag.'); return; }
+    if (customTags.some(t => t.name === raw)) { setNameErr('Tag already exists.'); return; }
+    const updated = [...customTags, { name: raw, description: newDesc.trim() }];
+    setCustomTags(updated);
+    saveCustomTags(updated);
+    setNewName(''); setNewDesc(''); setNameErr('');
+  };
+
+  const deleteCustomTag = (idx: number) => {
+    const updated = customTags.filter((_, i) => i !== idx);
+    setCustomTags(updated);
+    saveCustomTags(updated);
+    if (editIdx === idx) setEditIdx(null);
+  };
+
+  const saveEdit = (idx: number, desc: string) => {
+    const updated = customTags.map((t, i) => i === idx ? { ...t, description: desc } : t);
+    setCustomTags(updated);
+    saveCustomTags(updated);
+    setEditIdx(null);
+  };
+
+  return (
+    <div className="ds-tags-settings-panel">
+
+      {/* ── About ──────────────────────────────────────────────────────────── */}
+      <div className="ds-tags-settings-about">
+        <div className="ds-tags-settings-about-title">🏷️ What are tags?</div>
+        <p>Tags let you label notebook cells with their role or status. They appear as coloured pills in the thin bar above each cell and can be added, removed, and browsed without leaving the notebook.</p>
+        <div className="ds-tags-settings-usecases">
+          <div className="ds-tags-settings-usecase">
+            <span className="ds-tags-settings-usecase-icon">🔬</span>
+            <span><strong>Pipeline stages</strong> — mark cells as <em>data-loading</em>, <em>training</em>, or <em>evaluation</em> to navigate large notebooks at a glance.</span>
+          </div>
+          <div className="ds-tags-settings-usecase">
+            <span className="ds-tags-settings-usecase-icon">✅</span>
+            <span><strong>Quality tracking</strong> — use <em>reviewed</em>, <em>todo</em>, or <em>needs-refactor</em> in code reviews or collaborative work.</span>
+          </div>
+          <div className="ds-tags-settings-usecase">
+            <span className="ds-tags-settings-usecase-icon">📄</span>
+            <span><strong>Report control</strong> — tag cells as <em>report</em> or <em>report-exclude</em> to control what gets exported.</span>
+          </div>
+          <div className="ds-tags-settings-usecase">
+            <span className="ds-tags-settings-usecase-icon">🏗️</span>
+            <span><strong>Custom workflows</strong> — create your own tags below to match your team's conventions.</span>
+          </div>
+        </div>
+        <p className="ds-tags-settings-how">
+          Add tags from the <strong>[+] button</strong> above any cell, or use the <strong>🏷️ panel</strong> in the sidebar to browse all tagged cells and jump between them.
+        </p>
+      </div>
+
+      {/* ── Custom tags ────────────────────────────────────────────────────── */}
+      <div className="ds-tags-settings-section">
+        <div className="ds-tags-settings-section-header">
+          <span className="ds-tags-settings-section-title">Custom Tags</span>
+          <span className="ds-tags-settings-section-count">{customTags.length}</span>
+        </div>
+
+        {customTags.length === 0 && (
+          <p className="ds-tags-settings-empty">No custom tags yet. Create one below.</p>
+        )}
+
+        {customTags.map((tag, idx) => (
+          <div key={tag.name} className="ds-tags-settings-row">
+            <span
+              className="ds-tags-settings-pill"
+              style={{ '--pill-color': tagColorTs(tag.name) } as React.CSSProperties}
+            >{tag.name}</span>
+            {editIdx === idx ? (
+              <EditDescRow
+                initial={tag.description}
+                onSave={desc => saveEdit(idx, desc)}
+                onCancel={() => setEditIdx(null)}
+              />
+            ) : (
+              <>
+                <span className="ds-tags-settings-desc" onClick={() => setEditIdx(idx)}>
+                  {tag.description || <em className="ds-tags-settings-desc-empty">no description — click to add</em>}
+                </span>
+                <button className="ds-tags-settings-edit-btn" onClick={() => setEditIdx(idx)} title="Edit description">✎</button>
+                <button className="ds-tags-settings-del-btn" onClick={() => deleteCustomTag(idx)} title="Delete tag">🗑</button>
+              </>
+            )}
+          </div>
+        ))}
+
+        {/* New tag form */}
+        <div className="ds-tags-settings-new-form">
+          <div className="ds-tags-settings-new-row">
+            <input
+              className="ds-tags-settings-name-input"
+              placeholder="tag-name"
+              value={newName}
+              onChange={e => { setNewName(e.target.value); setNameErr(''); }}
+              onKeyDown={e => { if (e.key === 'Enter') addCustomTag(); }}
+            />
+            <input
+              className="ds-tags-settings-desc-input"
+              placeholder="Description (optional)"
+              value={newDesc}
+              onChange={e => setNewDesc(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') addCustomTag(); }}
+            />
+            <button
+              className="ds-tags-settings-add-btn"
+              onClick={addCustomTag}
+              disabled={!newName.trim()}
+            >+ Add</button>
+          </div>
+          {nameErr && <p className="ds-tags-settings-error">{nameErr}</p>}
+        </div>
+      </div>
+
+      {/* ── Built-in tags ──────────────────────────────────────────────────── */}
+      <div className="ds-tags-settings-section">
+        <div className="ds-tags-settings-section-header">
+          <span className="ds-tags-settings-section-title">Built-in Tags</span>
+          <span className="ds-tags-settings-section-count">{allBuiltInNames.length}</span>
+        </div>
+        {BUILT_IN_TAG_DEFS.map(group => (
+          <div key={group.category} className="ds-tags-settings-group">
+            <div className="ds-tags-settings-group-label">{group.category}</div>
+            {group.tags.map(tag => (
+              <div key={tag.name} className="ds-tags-settings-row ds-tags-settings-row--builtin">
+                <span
+                  className="ds-tags-settings-pill"
+                  style={{ '--pill-color': tagColorTs(tag.name) } as React.CSSProperties}
+                >{tag.name}</span>
+                <span className="ds-tags-settings-desc">{tag.description}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const EditDescRow: React.FC<{ initial: string; onSave: (d: string) => void; onCancel: () => void }> = ({ initial, onSave, onCancel }) => {
+  const [val, setVal] = useState(initial);
+  return (
+    <div className="ds-tags-settings-edit-row">
+      <input
+        className="ds-tags-settings-desc-input"
+        autoFocus
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter')  { onSave(val); }
+          if (e.key === 'Escape') { onCancel(); }
+        }}
+      />
+      <button className="ds-tags-settings-save-btn" onClick={() => onSave(val)}>Save</button>
+      <button className="ds-tags-settings-cancel-btn-sm" onClick={onCancel}>✕</button>
+    </div>
+  );
+};
+
 // SettingsPanel — top-level wrapper with [Models | Skills | Commands] tabs
 // ---------------------------------------------------------------------------
 
 const SettingsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSaved?: () => void; notebookPath?: string }> = ({
   apiClient, onClose, onSaved, notebookPath = ''
 }) => {
-  const [topTab, setTopTab] = useState<'models' | 'mcp' | 'skills' | 'commands' | 'indexing'>('models');
+  const [topTab, setTopTab] = useState<'models' | 'mcp' | 'skills' | 'commands' | 'indexing' | 'tags'>('models');
   return (
     <div className="ds-settings-outer">
       <div className="ds-settings-top-tabs">
@@ -1812,10 +2050,25 @@ const SettingsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSav
           className={`ds-settings-top-tab${topTab === 'indexing' ? ' ds-settings-top-tab--active' : ''}`}
           onClick={() => setTopTab('indexing')}
         >📂 Indexing &amp; Docs</button>
+        <button
+          className={`ds-settings-top-tab${topTab === 'tags' ? ' ds-settings-top-tab--active' : ''}`}
+          onClick={() => setTopTab('tags')}
+        >🏷️ Tags</button>
       </div>
 
       {topTab === 'models' ? (
         <ModelsPanel apiClient={apiClient} onClose={onClose} onSaved={onSaved} notebookPath={notebookPath} />
+      ) : topTab === 'tags' ? (
+        <>
+          <div className="ds-settings-tab-content">
+            <TagsSettingsPanel />
+          </div>
+          <div className="ds-settings-footer">
+            <div className="ds-settings-actions">
+              <button className="ds-settings-cancel-btn" onClick={onClose}>Close</button>
+            </div>
+          </div>
+        </>
       ) : topTab === 'mcp' ? (
         <>
           <div className="ds-settings-tab-content">
