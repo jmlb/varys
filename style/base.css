@@ -5836,6 +5836,11 @@ body[data-jp-theme-light="false"] .ds-tag-add-input {
   border-color: #45475a;
   color: #cdd6f4;
 }
+.jp-mod-dark .ds-tag-add-input::placeholder,
+body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
+  color: #6c7086;
+  opacity: 1;
+}
 .ds-tag-add-confirm-btn {
   padding: 3px 8px;
   border-radius: 6px;
@@ -5929,6 +5934,11 @@ body[data-jp-theme-light="false"] .ds-tag-add-input {
   color: #cdd6f4;
   border-color: #45475a;
 }
+.ds-chat-night .ds-tags-input::placeholder,
+.ds-chat-night .ds-tags-filter-input::placeholder {
+  color: #6c7086;
+  opacity: 1;
+}
 
 /* Add / confirm buttons */
 .ds-chat-night .ds-tags-add-btn       { background: #7c3aed; }
@@ -5987,6 +5997,10 @@ body[data-jp-theme-light="false"] .ds-tag-add-input {
   background: #181825;
   border-color: #45475a;
   color: #cdd6f4;
+}
+.ds-tag-add-dropdown--night .ds-tag-add-input::placeholder {
+  color: #6c7086;
+  opacity: 1;
 }
 .ds-tag-add-dropdown--night .ds-tag-add-confirm-btn {
   background: #7c3aed;
