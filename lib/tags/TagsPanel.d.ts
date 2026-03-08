@@ -1,17 +1,29 @@
 /**
- * Cell Tagging & Metadata Panel
+ * Tags Panel — redesigned
  *
- * Shows for the currently-active cell:
- *   • Editable tag chips  (stored in cell.metadata.tags)
- *   • Custom metadata JSON editor
- *
- * Shows for the whole notebook:
- *   • All unique tags with per-tag cell counts
- *   • Click a tag to navigate to the next cell that carries it
- *   • Tagged-cells overview list
+ * Layout:
+ *   1. Create Tag form  (name · color picker · description · [+ Create])
+ *   2. Two-column body:
+ *        LEFT  — Specs panel: details of the currently selected tag
+ *        RIGHT — Tag library: all tags grouped by topic, click to select
  */
 import React from 'react';
 import { INotebookTracker } from '@jupyterlab/notebook';
+export declare const TAG_PALETTE: string[];
+export declare function tagColorAuto(tag: string): string;
+export declare const BUILT_IN_TAG_DEFS: {
+    category: string;
+    tags: {
+        name: string;
+        description: string;
+    }[];
+}[];
+export interface CustomTagDef {
+    name: string;
+    description: string;
+    color?: string;
+}
+export declare function loadCustomTags(): CustomTagDef[];
 export interface TagsPanelProps {
     notebookTracker: INotebookTracker;
 }
