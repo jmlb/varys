@@ -451,24 +451,191 @@ const plugin: JupyterFrontEndPlugin<void> = {
     });
 
     // ── Cell execution listener ──────────────────────────────────────────────
-    // After every cell execution, run the reproducibility rules in the
-    // background and push results to the panel via reproStore.
-    NotebookActions.executed.connect(async (_sender, { notebook: _nb }) => {
-      // Only act when a real notebook is focused
+    // After every cell execution:
+    //  1. Run reproducibility rules (existing behaviour).
+    //  2. Notify the Smart Cell Context backend to update the SummaryStore.
+    NotebookActions.executed.connect(async (_sender, { notebook: _nb, cell }) => {
       const panel = notebookTracker.currentWidget;
       if (!panel) return;
+
+      // ── Reproducibility check (existing) ──
       try {
         const ctx = notebookReader.getFullContext();
-        if (!ctx || !ctx.cells.length) return;
-        const result = await apiClient.analyzeReproducibility({
-          notebookPath: ctx.notebookPath ?? '',
-          cells: ctx.cells,
-        });
-        reproStore.emit(result.issues);
+        if (ctx && ctx.cells.length) {
+          const result = await apiClient.analyzeReproducibility({
+            notebookPath: ctx.notebookPath ?? '',
+            cells: ctx.cells,
+          });
+          reproStore.emit(result.issues);
+        }
       } catch {
-        // Non-fatal: reproducibility check is best-effort
+        // Non-fatal
+      }
+
+      // ── Smart Cell Context — fire-and-forget SummaryStore update ──
+      try {
+        if (!cell) return;
+        const model     = cell.model;
+        const cellId: string =
+          (model as any).id ?? (model as any).sharedModel?.id ?? '';
+        if (!cellId) return;
+
+        const notebookPath = panel.context.path;
+        const source       = model.sharedModel.getSource();
+        const cellType     = model.type as string;
+
+        // Extract output and check for errors from the cell model directly
+        let   output: string | null     = null;
+        let   hadError                  = false;
+        let   errorText: string | null  = null;
+        const execCount: number | null  =
+          cellType === 'code' ? ((model as any).executionCount ?? null) : null;
+
+        if (cellType === 'code') {
+          const outputs = (model as any).outputs;
+          if (outputs && outputs.length > 0) {
+            const parts: string[] = [];
+            for (let i = 0; i < outputs.length; i++) {
+              const out = outputs.get ? outputs.get(i) : outputs[i];
+              if (!out) continue;
+              const raw: any = typeof out.toJSON === 'function' ? out.toJSON() : out;
+              const otype    = raw.output_type ?? '';
+              if (otype === 'error') {
+                hadError  = true;
+                errorText = `${raw.ename ?? 'Error'}: ${raw.evalue ?? ''}`;
+              } else if (otype === 'stream') {
+                const t = raw.text ?? '';
+                parts.push(Array.isArray(t) ? t.join('') : String(t));
+              } else if (otype === 'execute_result' || otype === 'display_data') {
+                const plain = (raw.data ?? {})['text/plain'] ?? '';
+                parts.push(Array.isArray(plain) ? plain.join('') : String(plain));
+              }
+            }
+            output = parts.join('\n').trim() || null;
+          }
+        }
+
+        // Gather a lightweight kernel snapshot: all simple scalar/container
+        // variables in the kernel namespace.  The backend uses this dict to
+        // populate symbol_values and symbol_types for the symbols it extracts
+        // via AST analysis.
+        const kernel = panel.sessionContext.session?.kernel;
+        let kernelSnapshot: Record<string, unknown> = {};
+
+        if (kernel) {
+          const snapshotCode = `
+import json as _dss_j
+_dss_r = {}
+try:
+    _dss_ns = get_ipython().user_ns
+    for _dss_n, _dss_v in list(_dss_ns.items()):
+        if _dss_n.startswith('_'): continue
+        _dss_t = type(_dss_v).__name__
+        try:
+            if isinstance(_dss_v, (int, float, bool)):
+                _dss_r[_dss_n] = {"type": _dss_t, "value": _dss_v}
+            elif isinstance(_dss_v, str) and len(_dss_v) <= 200:
+                _dss_r[_dss_n] = {"type": "str", "value": _dss_v}
+            elif isinstance(_dss_v, (list, tuple)) and len(_dss_v) <= 20:
+                _dss_s = list(_dss_v[:15])
+                if len(_dss_j.dumps(_dss_s, default=str)) <= 500:
+                    _dss_r[_dss_n] = {"type": _dss_t, "sample": _dss_s}
+            elif isinstance(_dss_v, dict) and len(_dss_v) <= 20:
+                _dss_s2 = {str(k): repr(v)[:50] for k, v in list(_dss_v.items())[:10]}
+                _dss_r[_dss_n] = {"type": "dict", "sample": _dss_s2}
+            else:
+                try:
+                    import pandas as _dss_pd
+                    if isinstance(_dss_v, _dss_pd.DataFrame):
+                        _dss_r[_dss_n] = {"type": "dataframe", "shape": list(_dss_v.shape)}
+                        continue
+                except ImportError: pass
+                try:
+                    import numpy as _dss_np
+                    if isinstance(_dss_v, _dss_np.ndarray):
+                        _dss_r[_dss_n] = {"type": "ndarray", "shape": list(_dss_v.shape)}
+                        continue
+                except ImportError: pass
+                _dss_r[_dss_n] = {"type": _dss_t, "repr": repr(_dss_v)[:100]}
+        except Exception: pass
+except Exception: pass
+print(_dss_j.dumps(_dss_r))
+`.trim();
+
+          try {
+            let stdout = '';
+            const future = kernel.requestExecute({
+              code: snapshotCode, silent: true, store_history: false,
+            });
+            future.onIOPub = (msg: any) => {
+              if (msg.header.msg_type === 'stream' && msg.content?.name === 'stdout') {
+                stdout += msg.content.text ?? '';
+              }
+            };
+            await future.done;
+            kernelSnapshot = JSON.parse(stdout.trim() || '{}');
+          } catch {
+            // Snapshot failure is non-fatal — we still send the execution event
+          }
+        }
+
+        apiClient.cellExecuted({
+          cell_id:         cellId,
+          notebook_path:   notebookPath,
+          source,
+          output,
+          execution_count: execCount,
+          had_error:       hadError,
+          error_text:      errorText,
+          cell_type:       cellType,
+          kernel_snapshot: kernelSnapshot,
+        });
+      } catch {
+        // Non-fatal: SummaryStore update is best-effort
       }
     });
+
+    // ── Cell lifecycle listener — delete / restore ────────────────────────────
+    // When cells are removed from or re-added to the notebook model, notify
+    // the SummaryStore so it can mark entries as deleted / restored.
+    const _wireCellLifecycle = (panel: NotebookPanel) => {
+      const notebookModel = panel.content.model;
+      if (!notebookModel) return;
+      const cellList = (notebookModel as any).cells;
+      if (!cellList || typeof cellList.changed?.connect !== 'function') return;
+
+      cellList.changed.connect((_list: any, args: any) => {
+        const notebookPath = panel.context.path;
+        if (!notebookPath) return;
+
+        if (args.type === 'remove') {
+          for (const removedCell of (args.oldValues ?? [])) {
+            const cellId: string =
+              (removedCell as any).id ??
+              (removedCell as any).sharedModel?.id ?? '';
+            if (cellId) {
+              apiClient.cellLifecycle({ cell_id: cellId, notebook_path: notebookPath, action: 'deleted' });
+            }
+          }
+        } else if (args.type === 'add') {
+          for (const addedCell of (args.newValues ?? [])) {
+            const cellId: string =
+              (addedCell as any).id ??
+              (addedCell as any).sharedModel?.id ?? '';
+            if (cellId) {
+              // Only notify restore if the backend has seen this cell before.
+              // We send it unconditionally — the backend ignores unknown IDs.
+              apiClient.cellLifecycle({ cell_id: cellId, notebook_path: notebookPath, action: 'restored' });
+            }
+          }
+        }
+      });
+    };
+
+    notebookTracker.widgetAdded.connect((_tracker, panel) => {
+      _wireCellLifecycle(panel);
+    });
+    notebookTracker.forEach(panel => _wireCellLifecycle(panel));
   }
 };
 

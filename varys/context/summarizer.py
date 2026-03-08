@@ -1,0 +1,312 @@
+"""Cell summarizer — builds structured summary objects from execution data.
+
+All common paths avoid LLM calls.  The deferred markdown-large-cell LLM path
+is currently implemented as sentence-boundary truncation with truncated=True.
+
+Summary object schema (spec §2.3):
+  {
+    "cell_type":        "code | markdown | raw",
+    "source_snippet":   "<first 300 chars of source>",
+    "output":           "<output string, up to 1000 chars | null>",
+    "symbols_defined":  ["model", "X_train"],
+    "symbols_consumed": ["df", "THRESHOLD"],
+    "symbol_values":    {"THRESHOLD": 0.85},
+    "symbol_types":     {"model": "GradientBoostingClassifier"},
+    "execution_count":  3,
+    "had_error":        false,
+    "error_text":       null,
+    "is_mutation_only": false,
+    "is_import_cell":   false,
+    "truncated":        false,
+    "deleted":          false
+  }
+"""
+from __future__ import annotations
+
+import ast
+import logging
+import re
+from typing import Any, Dict, List, Optional
+
+log = logging.getLogger(__name__)
+
+# ── Constants ──────────────────────────────────────────────────────────────────
+
+SNIPPET_CHARS        = 300    # source_snippet length cap
+OUTPUT_SUMMARY_CHARS = 1_000  # output stored in summary
+MARKDOWN_THRESHOLD   = 2_000  # chars before sentence-boundary fallback applies
+SYMBOL_VALUE_MAX     = 500    # max serialized length for symbol_values entries
+
+# ── Builtins set (excluded from consumed to reduce noise) ─────────────────────
+
+_BUILTINS: frozenset = frozenset(
+    dir(__builtins__) if isinstance(__builtins__, dict) else dir(__builtins__)  # type: ignore[arg-type]
+)
+
+# ── AST helpers ───────────────────────────────────────────────────────────────
+
+
+def _extract_symbols(source: str) -> tuple[list[str], list[str]]:
+    """Return (symbols_defined, symbols_consumed) via static AST analysis.
+
+    symbols_defined  — names assigned / imported at module (cell) level.
+    symbols_consumed — names loaded that are NOT defined in this cell
+                       and NOT Python builtins.
+
+    Dynamic patterns (exec, globals() manipulation) are not handled —
+    acceptable for typical data-science notebooks.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return [], []
+
+    defined: set[str] = set()
+    consumed: set[str] = set()
+
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            defined.add(node.name)
+        elif isinstance(node, ast.Assign):
+            for target in node.targets:
+                _collect_target_names(target, defined)
+        elif isinstance(node, (ast.AugAssign, ast.AnnAssign)):
+            if node.target:  # type: ignore[union-attr]
+                _collect_target_names(node.target, defined)  # type: ignore[arg-type]
+        elif isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+            consumed.add(node.id)
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                name = alias.asname if alias.asname else alias.name.split(".")[0]
+                defined.add(name)
+        elif isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                name = alias.asname if alias.asname else alias.name
+                if name != "*":
+                    defined.add(name)
+
+    consumed = consumed - defined - _BUILTINS
+    return sorted(defined), sorted(consumed)
+
+
+def _collect_target_names(node: ast.expr, names: set) -> None:
+    """Recursively collect assigned names from an assignment target node."""
+    if isinstance(node, ast.Name):
+        names.add(node.id)
+    elif isinstance(node, (ast.Tuple, ast.List)):
+        for elt in node.elts:
+            _collect_target_names(elt, names)
+    elif isinstance(node, ast.Starred):
+        _collect_target_names(node.value, names)
+
+
+def _is_import_cell(source: str) -> bool:
+    """Return True if every non-blank, non-comment line is an import statement."""
+    lines = [
+        ln.strip()
+        for ln in source.splitlines()
+        if ln.strip() and not ln.strip().startswith("#")
+    ]
+    return bool(lines) and all(
+        ln.startswith("import ") or ln.startswith("from ") for ln in lines
+    )
+
+
+def _is_mutation_only(defined: list[str]) -> bool:
+    """Heuristic: cell only mutates existing objects, defines no new names."""
+    return len(defined) == 0
+
+
+# ── Public entry point ────────────────────────────────────────────────────────
+
+
+def build_summary(
+    cell_id: str,
+    source: str,
+    cell_type: str,
+    output: Optional[str],
+    execution_count: Optional[int],
+    had_error: bool,
+    error_text: Optional[str],
+    kernel_snapshot: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Build a structured summary object for a cell.
+
+    Args:
+        cell_id:          Stable JupyterLab cell UUID (used only for logging).
+        source:           Cell source (code or markdown text).
+        cell_type:        "code" | "markdown" | "raw".
+        output:           Plain-text cell output string, or None.
+        execution_count:  Kernel execution counter, or None if unrun.
+        had_error:        True when the last execution produced an error output.
+        error_text:       "ErrName: message" string if had_error is True.
+        kernel_snapshot:  Dict of {var_name: {type, value/shape/…}} captured from
+                          the live kernel immediately after this cell ran.  The
+                          summarizer uses it to populate symbol_values/symbol_types
+                          for names that appear in symbols_defined.
+    """
+    if cell_type == "markdown":
+        return _build_markdown_summary(source)
+    if cell_type == "raw":
+        return _build_raw_summary(source)
+    return _build_code_summary(
+        source, output, execution_count, had_error, error_text,
+        kernel_snapshot or {}
+    )
+
+
+# ── Cell-type dispatch ─────────────────────────────────────────────────────────
+
+
+def _build_code_summary(
+    source: str,
+    output: Optional[str],
+    execution_count: Optional[int],
+    had_error: bool,
+    error_text: Optional[str],
+    kernel_snapshot: Dict[str, Any],
+) -> Dict[str, Any]:
+    is_import = _is_import_cell(source)
+
+    if is_import:
+        # Import cells: full source IS the summary — symbol_values empty
+        defined, _ = _extract_symbols(source)
+        return {
+            "cell_type":        "code",
+            "source_snippet":   source[:SNIPPET_CHARS],
+            "output":           None,
+            "symbols_defined":  defined,
+            "symbols_consumed": [],
+            "symbol_values":    {},
+            "symbol_types":     {},
+            "execution_count":  execution_count,
+            "had_error":        False,
+            "error_text":       None,
+            "is_mutation_only": False,
+            "is_import_cell":   True,
+            "truncated":        False,
+            "deleted":          False,
+        }
+
+    defined, consumed = _extract_symbols(source)
+    mutation_only = _is_mutation_only(defined)
+
+    # Populate symbol_values and symbol_types from kernel snapshot
+    symbol_values: Dict[str, Any] = {}
+    symbol_types:  Dict[str, str] = {}
+
+    for name in defined:
+        snap = kernel_snapshot.get(name)
+        if snap is None:
+            continue
+        vtype = snap.get("type", "unknown")
+
+        # symbol_types — human-readable type string
+        if vtype == "dataframe":
+            shape = snap.get("shape", [0, 0])
+            symbol_types[name] = f"DataFrame({shape[0]}, {shape[1]})"
+        elif vtype == "ndarray":
+            shape = snap.get("shape", [])
+            symbol_types[name] = f"ndarray{tuple(shape)}"
+        elif vtype in ("function", "builtin_function_or_method", "method"):
+            symbol_types[name] = "function"
+        else:
+            symbol_types[name] = vtype
+
+        # symbol_values — only compact, serializable types (spec §2.5)
+        if vtype in ("int", "float", "bool"):
+            symbol_values[name] = snap.get("value")
+        elif vtype == "str":
+            val = snap.get("value", "")
+            if isinstance(val, str) and len(val) <= 200:
+                symbol_values[name] = val
+        elif vtype in ("list", "tuple"):
+            sample = snap.get("sample")
+            if sample is not None:
+                if len(str(sample)) <= SYMBOL_VALUE_MAX:
+                    symbol_values[name] = sample
+        elif vtype == "dict":
+            sample = snap.get("sample")
+            if sample is not None:
+                if len(str(sample)) <= SYMBOL_VALUE_MAX:
+                    symbol_values[name] = sample
+
+    # Truncate output for summary storage (full output is used for focal cell)
+    summary_output: Optional[str] = None
+    if output and output.strip():
+        if len(output) > OUTPUT_SUMMARY_CHARS:
+            summary_output = output[:OUTPUT_SUMMARY_CHARS] + "\n[…output truncated in summary]"
+        else:
+            summary_output = output
+
+    return {
+        "cell_type":        "code",
+        "source_snippet":   source[:SNIPPET_CHARS],
+        "output":           summary_output,
+        "symbols_defined":  defined,
+        "symbols_consumed": consumed,
+        "symbol_values":    symbol_values,
+        "symbol_types":     symbol_types,
+        "execution_count":  execution_count,
+        "had_error":        had_error,
+        "error_text":       error_text,
+        "is_mutation_only": mutation_only,
+        "is_import_cell":   False,
+        "truncated":        False,
+        "deleted":          False,
+    }
+
+
+def _build_markdown_summary(source: str) -> Dict[str, Any]:
+    truncated = len(source) > MARKDOWN_THRESHOLD
+    snippet = _truncate_at_sentence(source, MARKDOWN_THRESHOLD) if truncated else source
+    return {
+        "cell_type":        "markdown",
+        "source_snippet":   snippet,
+        "output":           None,
+        "symbols_defined":  [],
+        "symbols_consumed": [],
+        "symbol_values":    {},
+        "symbol_types":     {},
+        "execution_count":  None,
+        "had_error":        False,
+        "error_text":       None,
+        "is_mutation_only": False,
+        "is_import_cell":   False,
+        "truncated":        truncated,
+        "deleted":          False,
+    }
+
+
+def _build_raw_summary(source: str) -> Dict[str, Any]:
+    return {
+        "cell_type":        "raw",
+        "source_snippet":   source[:SNIPPET_CHARS],
+        "output":           None,
+        "symbols_defined":  [],
+        "symbols_consumed": [],
+        "symbol_values":    {},
+        "symbol_types":     {},
+        "execution_count":  None,
+        "had_error":        False,
+        "error_text":       None,
+        "is_mutation_only": False,
+        "is_import_cell":   False,
+        "truncated":        False,
+        "deleted":          False,
+    }
+
+
+# ── Utility ────────────────────────────────────────────────────────────────────
+
+
+def _truncate_at_sentence(text: str, limit: int) -> str:
+    """Truncate at the nearest sentence boundary before `limit` chars."""
+    if len(text) <= limit:
+        return text
+    chunk = text[:limit]
+    m = re.search(r"[.!?]\s", chunk[::-1])
+    if m:
+        cut = limit - m.start()
+        return text[:cut].strip() + " […]"
+    return chunk.strip() + " […]"

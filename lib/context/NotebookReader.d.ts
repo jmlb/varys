@@ -23,11 +23,18 @@ export declare class NotebookReader {
      */
     private _getSelection;
     /**
+     * Extracts a full (untruncated) plain-text representation of a code cell's
+     * outputs.  Used for the focal cell's focalCellOutput payload field — the
+     * backend assembler injects this verbatim rather than the stored summary.
+     */
+    private _extractFullOutput;
+    /**
      * Extracts a plain-text representation of a code cell's outputs.
      * Handles: execute_result, display_data, stream (stdout/stderr), error.
      * Caps at 2000 chars to keep context size reasonable.
      */
     private _extractOutput;
+    private _extractOutputImpl;
     /**
      * Extracts the first image/png output from a code cell, returned as a
      * base64 string (no data-URI prefix).  Returns null if no image present.

@@ -8,18 +8,25 @@ across the entire codebase.
 Anthropic's ClaudeClient keeps its own _build_content_blocks() because it
 must produce Anthropic-format message blocks (including base64 image blocks
 interleaved with text).  Everything else calls build_notebook_context().
+
+Smart Cell Context integration
+-------------------------------
+When ``task.py`` has a SummaryStore available it pre-assembles the cell-context
+block and stores it in ``notebook_context['_cell_context_override']``.
+``build_notebook_context()`` uses that pre-built string in place of the old
+per-cell truncation loop.  All other prompt sections (header, selection,
+@variables, DataFrames, selectedOutput) are unaffected.
 """
 from typing import Any, Dict, List, Optional
 
 from ..utils.config import get_config as _get_cfg
 
 # ---------------------------------------------------------------------------
-# Shared constants — overridable via .jupyter-assistant/config/llm.cfg
+# Shared constants — kept for the completion engine and backward-compat paths
+# that do not have a SummaryStore available.
 # ---------------------------------------------------------------------------
 
-# Maximum characters taken from each cell's source and output before we
-# truncate. Keeping this well below typical LLM context windows avoids
-# runaway token counts while still giving sufficient code context.
+# Fallback per-cell truncation limit used when no SummaryStore is present.
 CELL_CONTENT_LIMIT: int = _get_cfg().getint("context", "cell_content_limit", 2_000)
 
 # How many preceding cells to include in inline / multiline completion
@@ -221,29 +228,32 @@ def build_notebook_context(
         lines.append(f"Active cell: #{active_idx + 1}")
     lines.append("")
 
-    for cell in cells:
-        idx: int = cell.get("index", 0)
-        ctype: str = cell.get("type", "code")
-        source: str = cell.get("source", "")
-        ec = cell.get("executionCount")
-        output: Optional[str] = cell.get("output")
-        cell_id: str = cell.get("cellId", "") or ""
+    # ── Smart Cell Context path ──────────────────────────────────────────────
+    # When task.py has pre-assembled the cell context (via SummaryStore +
+    # assemble_context()), it stores the result in _cell_context_override so
+    # we can inject it directly without re-serialising every cell.
+    _override: Optional[str] = notebook_context.get("_cell_context_override")
+    if _override is not None:
+        lines.append(_override)
+    else:
+        # ── Legacy path: per-cell truncation loop (fallback / backward compat) ──
+        for cell in cells:
+            idx: int = cell.get("index", 0)
+            ctype: str = cell.get("type", "code")
+            source: str = cell.get("source", "")
+            ec = cell.get("executionCount")
+            output: Optional[str] = cell.get("output")
+            cell_id: str = cell.get("cellId", "") or ""
 
-        # Use first 8 hex chars of the UUID (before the first dash) as the
-        # compact display tag.  Stable across cell moves and insertions.
-        id_tag = f"  [id:{cell_id.split('-')[0]}]" if cell_id else ""
-
-        run_info = "" if ctype != "code" else ("" if ec is not None else "  [not run]")
-        lines.append(f"#{idx + 1}  {ctype.upper()}{run_info}{id_tag}")
-        lines.append(source[:CELL_CONTENT_LIMIT] if source.strip() else "(empty)")
-        if output and output.strip():
-            # Do NOT re-truncate here — the frontend already applies a per-part
-            # budget (2 000 chars each for regular output and error traceback).
-            # A secondary slice here would silently chop the [2] error block.
-            lines.append(f"OUTPUT:\n{output}")
-        elif cell.get("imageOutput"):
-            lines.append("OUTPUT: [Visualization — image attached]")
-        lines.append("")
+            id_tag = f"  [id:{cell_id.split('-')[0]}]" if cell_id else ""
+            run_info = "" if ctype != "code" else ("" if ec is not None else "  [not run]")
+            lines.append(f"#{idx + 1}  {ctype.upper()}{run_info}{id_tag}")
+            lines.append(source[:CELL_CONTENT_LIMIT] if source.strip() else "(empty)")
+            if output and output.strip():
+                lines.append(f"OUTPUT:\n{output}")
+            elif cell.get("imageOutput"):
+                lines.append("OUTPUT: [Visualization — image attached]")
+            lines.append("")
 
     if selection and selection.get("text", "").strip():
         sel_idx = selection.get("cellIndex", "?")

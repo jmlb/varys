@@ -28,6 +28,8 @@ from .modules.reproducibility_guardian.handler import (
     ReproIssuesHandler,
 )
 from .handlers.mcp_handler import MCPStatusHandler, MCPReloadHandler, MCPServersHandler
+from .handlers.cell_executed import CellExecutedHandler
+from .handlers.cell_lifecycle import CellLifecycleHandler
 
 
 class DSAssistantExtension(ExtensionApp):
@@ -215,4 +217,7 @@ class DSAssistantExtension(ExtensionApp):
             (url_path_join(base, "mcp"),           MCPStatusHandler),
             (url_path_join(base, "mcp", "reload"), MCPReloadHandler),
             (url_path_join(base, "mcp", "servers"), MCPServersHandler),
+            # Smart Cell Context — execution + lifecycle hooks
+            (url_path_join(base, "cell-executed"),  CellExecutedHandler),
+            (url_path_join(base, "cell-lifecycle"), CellLifecycleHandler),
         ])

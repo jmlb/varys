@@ -120,9 +120,28 @@ export class NotebookReader {
       });
     });
 
+    // Stable UUID of the currently focused cell (for Smart Cell Context focal
+    // cell detection).  Sent alongside activeCellIndex for backward compat.
+    const activeCell = notebook.activeCell;
+    const activeCellId: string | undefined =
+      activeCell
+        ? ((activeCell.model as any).id ??
+           (activeCell.model as any).sharedModel?.id ??
+           undefined)
+        : undefined;
+
+    // Full (untruncated) output of the active/focal cell.  The backend uses
+    // this verbatim for the focal cell instead of the stored 1 000-char summary.
+    const focalCellOutput: string | null =
+      activeCell && activeCell.model.type === 'code'
+        ? this._extractFullOutput(activeCell.model)
+        : null;
+
     return {
       cells,
       activeCellIndex,
+      activeCellId,
+      focalCellOutput,
       notebookPath: panel.context.path,
       kernelName: panel.sessionContext.session?.kernel?.name ?? undefined,
       selection: this._getSelection(panel)
@@ -181,11 +200,24 @@ export class NotebookReader {
   }
 
   /**
+   * Extracts a full (untruncated) plain-text representation of a code cell's
+   * outputs.  Used for the focal cell's focalCellOutput payload field — the
+   * backend assembler injects this verbatim rather than the stored summary.
+   */
+  private _extractFullOutput(model: any): string | null {
+    return this._extractOutputImpl(model, false);
+  }
+
+  /**
    * Extracts a plain-text representation of a code cell's outputs.
    * Handles: execute_result, display_data, stream (stdout/stderr), error.
    * Caps at 2000 chars to keep context size reasonable.
    */
   private _extractOutput(model: any): string | null {
+    return this._extractOutputImpl(model, true);
+  }
+
+  private _extractOutputImpl(model: any, applyCapLimit: boolean): string | null {
     const outputs = model.outputs;
     if (!outputs || outputs.length === 0) {
       return null;
@@ -237,10 +269,10 @@ export class NotebookReader {
     const regularText = regularParts.join('\n');
     const errorText   = errorParts.join('\n');
 
-    const cappedRegular = regularText.length > CELL_OUTPUT_MAX_CHARS
+    const cappedRegular = (applyCapLimit && regularText.length > CELL_OUTPUT_MAX_CHARS)
       ? regularText.slice(0, CELL_OUTPUT_MAX_CHARS) + '\n[...output truncated]'
       : regularText;
-    const cappedError = errorText.length > CELL_OUTPUT_MAX_CHARS
+    const cappedError = (applyCapLimit && errorText.length > CELL_OUTPUT_MAX_CHARS)
       ? errorText.slice(0, CELL_OUTPUT_MAX_CHARS) + '\n[...traceback truncated]'
       : errorText;
 

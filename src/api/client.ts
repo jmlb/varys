@@ -92,6 +92,18 @@ export interface NotebookContext {
   kernelName?: string;
   notebookPath?: string;
   activeCellIndex?: number;
+  /**
+   * Stable JupyterLab UUID of the currently focused cell.
+   * Used by the Smart Cell Context assembler to identify the focal cell.
+   * Sent alongside activeCellIndex for backward compatibility.
+   */
+  activeCellId?: string;
+  /**
+   * Full (untruncated) plain-text output of the focal cell, sent at chat
+   * request time.  The backend assembler injects this verbatim for the focal
+   * cell instead of the 1 000-char stored summary output.
+   */
+  focalCellOutput?: string | null;
   /** Text currently selected by the user, if any. */
   selection?: TextSelection | null;
   /**
@@ -621,6 +633,46 @@ export class APIClient {
       }
     );
     if (!response.ok) throw new Error(`deleteChatThread failed: ${response.status}`);
+  }
+
+  // ── Smart Cell Context ─────────────────────────────────────────────────
+
+  /**
+   * Fire-and-forget: notify the backend that a cell was executed.
+   * The backend builds a summary and persists it to the SummaryStore.
+   * Returns immediately — never awaited in the call-site.
+   */
+  cellExecuted(payload: {
+    cell_id:         string;
+    notebook_path:   string;
+    source:          string;
+    output:          string | null;
+    execution_count: number | null;
+    had_error:       boolean;
+    error_text:      string | null;
+    cell_type:       string;
+    kernel_snapshot: Record<string, unknown>;
+  }): void {
+    fetch(`${this.baseUrl}/cell-executed`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-XSRFToken': this.getXSRFToken() },
+      body:    JSON.stringify(payload),
+    }).catch(() => { /* fire-and-forget; errors are non-fatal */ });
+  }
+
+  /**
+   * Fire-and-forget: notify the backend of a cell lifecycle event (deleted / restored).
+   */
+  cellLifecycle(payload: {
+    cell_id:       string;
+    notebook_path: string;
+    action:        'deleted' | 'restored';
+  }): void {
+    fetch(`${this.baseUrl}/cell-lifecycle`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-XSRFToken': this.getXSRFToken() },
+      body:    JSON.stringify(payload),
+    }).catch(() => { /* fire-and-forget; errors are non-fatal */ });
   }
 
   async healthCheck(): Promise<Record<string, unknown>> {

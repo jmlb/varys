@@ -476,6 +476,29 @@ class TaskHandler(JupyterHandler):
             root_dir      = self.settings.get("ds_assistant_root_dir", ".")
             notebook_path = notebook_context.get("notebookPath", "")
 
+            # ── Smart Cell Context pre-assembly ────────────────────────────────
+            # Use the SummaryStore + assembler to build a rich, structured cell
+            # context block.  The result is stored as _cell_context_override so
+            # build_notebook_context() (called later by every provider) can inject
+            # it directly — the old per-cell truncation loop is then bypassed.
+            # Non-fatal: any failure falls back to the legacy truncation path.
+            try:
+                from ..context.summary_store import SummaryStore
+                from ..context.assembler    import assemble_context as _assemble
+                _store = SummaryStore(root_dir, notebook_path)
+                _ctx_override = _assemble(
+                    user_query             = message,
+                    cell_order             = notebook_context.get("cells", []),
+                    summary_store          = _store,
+                    active_cell_id         = notebook_context.get("activeCellId") or None,
+                    focal_cell_full_output = notebook_context.get("focalCellOutput") or None,
+                )
+                # Ensure notebook_context is a mutable copy before patching
+                notebook_context = dict(notebook_context)
+                notebook_context["_cell_context_override"] = _ctx_override
+            except Exception as _ctx_exc:
+                log.debug("Smart context assembly skipped: %s", _ctx_exc)
+
             # Use the pre-loaded loader from startup; fall back to a fresh one.
             skill_loader = self.settings.get("ds_assistant_skill_loader")
             if skill_loader is None:
