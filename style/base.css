@@ -6164,9 +6164,9 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
   line-height: 1.6;
 }
 
-/* RIGHT — details panel (20% of body width) */
+/* RIGHT — details panel (38% of body width) */
 .ds-tp-details {
-  width: 20%;
+  width: 38%;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
