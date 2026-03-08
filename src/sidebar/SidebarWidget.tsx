@@ -4067,7 +4067,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     <div className={`ds-assistant-sidebar ds-chat-${chatTheme}`}>
       {/* Header */}
       <div className="ds-assistant-header">
-        <span className="ds-assistant-title"><span className="ds-varys-spider">🕷️</span> Varys <span className="ds-varys-version">v0.2.0</span></span>
+        <span className="ds-assistant-title"><span className="ds-varys-spider">🕷️</span> Varys <span className="ds-varys-version">v0.3.0</span></span>
         <button
           className="ds-tags-panel-btn"
           onClick={() => setShowTags(true)}
