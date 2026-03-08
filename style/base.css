@@ -6164,21 +6164,21 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
   line-height: 1.6;
 }
 
-/* RIGHT — details panel */
+/* RIGHT — details panel (20% of body width) */
 .ds-tp-details {
-  width: 130px;
+  width: 20%;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 8px;
+  gap: 6px;
+  padding: 8px 6px;
   background: var(--ds-surface, #f4f5f9);
   border: 1px solid var(--jp-border-color2, #e0e0e0);
   border-radius: 8px;
   overflow-y: auto;
 }
 .ds-tp-details-hint {
-  font-size: 10px;
+  font-size: 8.5px;
   color: var(--ds-text-dim, #aaa);
   text-align: center;
   margin: auto 0;
@@ -6186,9 +6186,9 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
 }
 .ds-tp-details-pill {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 1px 6px;
   border-radius: 10px;
-  font-size: 10px;
+  font-size: 8.5px;
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -6201,39 +6201,39 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
 .ds-tp-details-color-row {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
 }
 .ds-tp-details-swatch {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
   border: 1px solid rgba(0,0,0,0.12);
 }
 .ds-tp-details-hex {
-  font-size: 9px;
+  font-size: 7.5px;
   font-family: var(--jp-code-font-family, monospace);
   color: var(--ds-text-dim, #888);
 }
 .ds-tp-details-json {
   background: var(--jp-layout-color2, #e8e8e8);
   border-radius: 4px;
-  padding: 5px 6px;
+  padding: 4px 5px;
   overflow-x: auto;
 }
 .ds-tp-details-json-pre {
   margin: 0;
-  font-size: 8.5px;
+  font-size: 7px;
   font-family: var(--jp-code-font-family, monospace);
   color: var(--jp-ui-font-color2, #555);
   white-space: pre-wrap;
   word-break: break-all;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 .ds-tp-details-desc {
-  font-size: 10px;
+  font-size: 8.5px;
   color: var(--jp-ui-font-color2, #555);
-  line-height: 1.45;
+  line-height: 1.4;
   margin: 0;
   word-break: break-word;
 }
@@ -6243,12 +6243,12 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
 }
 .ds-tp-details-del-btn {
   margin-top: auto;
-  padding: 3px 6px;
+  padding: 2px 5px;
   border-radius: 5px;
   border: 1px solid rgba(239,68,68,0.35);
   background: rgba(239,68,68,0.06);
   color: #ef4444;
-  font-size: 10px;
+  font-size: 8.5px;
   cursor: pointer;
   text-align: center;
 }
