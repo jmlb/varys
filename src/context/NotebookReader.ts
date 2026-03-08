@@ -341,8 +341,18 @@ export class NotebookReader {
     if (!kernel) return [];
 
     const cacheKey = this._executionCountKey(panel);
+
+    // Cache hit — return immediately without touching the kernel.
     if (this._dfCache && this._dfCache.key === cacheKey) {
       return this._dfCache.schemas;
+    }
+
+    // If the kernel is not idle, queueing an execute request would block the
+    // chat until the current computation finishes.  Return stale cache (or [])
+    // so the user can keep working; schemas will refresh on the next call once
+    // the kernel is idle again.
+    if ((kernel as any).status !== 'idle') {
+      return this._dfCache?.schemas ?? [];
     }
 
     try {
@@ -369,6 +379,10 @@ export class NotebookReader {
   /**
    * Runs the DataFrame inspection snippet in the kernel and parses the JSON
    * written to stdout.
+   *
+   * A 5-second safety timeout guards against kernels that take a long time to
+   * serialise large DataFrames — the future is disposed and [] is returned so
+   * the chat flow is never blocked indefinitely.
    */
   private _inspectKernel(kernel: any): Promise<DataFrameSchema[]> {
     return new Promise((resolve, reject) => {
@@ -378,6 +392,11 @@ export class NotebookReader {
         silent: true,          // don't add to notebook history
         store_history: false
       });
+
+      const timeout = setTimeout(() => {
+        try { future.dispose(); } catch { /* ignore */ }
+        resolve([]);
+      }, 5_000);
 
       future.onIOPub = (msg: any) => {
         if (
@@ -389,6 +408,7 @@ export class NotebookReader {
       };
 
       future.done.then(() => {
+        clearTimeout(timeout);
         try {
           const raw: Record<string, any> = JSON.parse(stdout.trim() || '{}');
           const schemas: DataFrameSchema[] = Object.entries(raw).map(
@@ -405,7 +425,10 @@ export class NotebookReader {
         } catch {
           resolve([]);
         }
-      }, reject);
+      }, (err: unknown) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
     });
   }
 

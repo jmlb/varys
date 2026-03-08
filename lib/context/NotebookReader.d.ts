@@ -63,6 +63,10 @@ export declare class NotebookReader {
     /**
      * Runs the DataFrame inspection snippet in the kernel and parses the JSON
      * written to stdout.
+     *
+     * A 5-second safety timeout guards against kernels that take a long time to
+     * serialise large DataFrames — the future is disposed and [] is returned so
+     * the chat flow is never blocked indefinitely.
      */
     private _inspectKernel;
     /**
