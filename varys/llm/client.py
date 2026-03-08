@@ -152,6 +152,34 @@ def func2_new(): ...  # forgot func1, forgot run(func1)
 
 This rule applies whether the user selects text or just mentions a function by name.
 
+## Fixing NameError / dependency errors — TRANSITIVE CHECK REQUIRED
+
+When a cell fails with `NameError: name 'X' is not defined` and you plan to
+fix it by running (or inserting) another cell that defines `X`, you MUST also
+check that cell's own source for any names it uses that are not yet defined.
+
+**Do not stop at the first missing name — walk the full dependency chain.**
+
+Procedure:
+1. Identify the cell that defines `X`.
+2. Read its source carefully. Find every name it calls or uses that is not a
+   Python builtin (e.g. `glob`, `os`, `pd`, `np`, `Path`, custom functions…).
+3. For each such name, check the context to see whether it is defined by an
+   already-executed cell (`[summary]` marker) OR by an earlier cell that you
+   are already planning to run.
+4. If a required name is missing, either:
+   a. Add a `run_cell` step for the import/definition cell that provides it
+      (before the step that needs it), OR
+   b. Add an `insert` step with the missing import at the top of the plan.
+5. Repeat from step 2 for any newly added cells until all dependencies are met.
+
+**Example of correct behaviour:**
+- Cell #7 fails: `NameError: name 'ls_jsons' is not defined`
+- Cell #6 defines `ls_jsons` but uses `glob` and `os` — neither is imported.
+- Cell #1 imports `os` and `glob`.
+- Correct plan: `run_cell #1` → `run_cell #6` → `run_cell #7` (or re-run #7).
+  WRONG plan: `run_cell #6` → `run_cell #7` (glob/os still missing).
+
 ## Important Rules
 1. Be precise with cell indices based on the notebook context provided
 2. Use the skills context to inform code style and approach
