@@ -230,7 +230,7 @@ async def select_preferences(
     ranked = select_by_keywords(query, eligible)
 
     # LLM re-rank when list is large and Simple Tasks model is configured
-    if len(ranked) > _LLM_SELECT_THRESHOLD and settings.get("ds_assistant_simple_tasks_model"):
+    if len(ranked) > _LLM_SELECT_THRESHOLD and settings.get("ds_assistant_simple_tasks_provider"):
         ranked = await _llm_select(query, ranked, settings, limit=_MAX_INJECTED)
 
     # Combine: always-inject first, then ranked (up to cap)

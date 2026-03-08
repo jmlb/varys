@@ -245,8 +245,8 @@ Settings are stored in `~/.jupyter/varys.env` and hot-reloaded on save — no se
 DS_CHAT_PROVIDER=ANTHROPIC
 DS_COMPLETION_PROVIDER=OLLAMA
 COMPLETION_MAX_TOKENS=128
-DS_SIMPLE_TASKS_MODEL=claude-haiku-4-5   # optional — lighter model for preference inference
-                                          # leave blank to use keyword-only matching
+DS_SIMPLE_TASKS_PROVIDER=ANTHROPIC        # optional — provider for background inference tasks
+ANTHROPIC_SIMPLE_TASKS_MODEL=claude-haiku-4-5  # model within that provider (leave blank to use keyword-only matching)
 
 ANTHROPIC_API_KEY=sk-ant-...
 ANTHROPIC_CHAT_MODEL=claude-sonnet-4-6

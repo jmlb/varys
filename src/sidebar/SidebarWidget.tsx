@@ -432,10 +432,10 @@ const TAB_GROUPS: TabGroup[] = [
     providerKey: null,
     zooKey: null,
     fields: [
-      { key: 'DS_CHAT_PROVIDER',        label: 'Chat',              type: 'select' },
-      { key: 'DS_COMPLETION_PROVIDER',  label: 'Completion',        type: 'select' },
-      { key: 'DS_EMBED_PROVIDER',       label: 'Embedding',         type: 'select' },
-      { key: 'DS_SIMPLE_TASKS_MODEL',   label: 'Simple tasks model', type: 'text' },
+      { key: 'DS_CHAT_PROVIDER',           label: 'Chat',         type: 'select' },
+      { key: 'DS_COMPLETION_PROVIDER',     label: 'Completion',   type: 'select' },
+      { key: 'DS_EMBED_PROVIDER',          label: 'Embedding',    type: 'select' },
+      { key: 'DS_SIMPLE_TASKS_PROVIDER',   label: 'Simple tasks', type: 'select' },
     ]
   },
   {
@@ -444,10 +444,11 @@ const TAB_GROUPS: TabGroup[] = [
     providerKey: 'ANTHROPIC',
     zooKey: 'ANTHROPIC_MODELS',
     fields: [
-      { key: 'ANTHROPIC_API_KEY',            label: 'API key',          type: 'password' },
-      { key: 'ANTHROPIC_CHAT_MODEL',         label: 'Chat model',       type: 'model-select' },
-      { key: 'ANTHROPIC_COMPLETION_MODEL',   label: 'Completion model', type: 'model-select' },
-      { key: 'ANTHROPIC_EMBED_MODEL',        label: 'Embedding model',  type: 'model-select' },
+      { key: 'ANTHROPIC_API_KEY',              label: 'API key',           type: 'password' },
+      { key: 'ANTHROPIC_CHAT_MODEL',           label: 'Chat model',        type: 'model-select' },
+      { key: 'ANTHROPIC_COMPLETION_MODEL',     label: 'Completion model',  type: 'model-select' },
+      { key: 'ANTHROPIC_SIMPLE_TASKS_MODEL',   label: 'Simple tasks model',type: 'model-select' },
+      { key: 'ANTHROPIC_EMBED_MODEL',          label: 'Embedding model',   type: 'model-select' },
       {
         key: 'ANTHROPIC_EXTENDED_THINKING',
         label: 'Extended thinking',
@@ -462,10 +463,11 @@ const TAB_GROUPS: TabGroup[] = [
     providerKey: 'OPENAI',
     zooKey: 'OPENAI_MODELS',
     fields: [
-      { key: 'OPENAI_API_KEY',            label: 'API key',          type: 'password' },
-      { key: 'OPENAI_CHAT_MODEL',         label: 'Chat model',       type: 'model-select' },
-      { key: 'OPENAI_COMPLETION_MODEL',   label: 'Completion model', type: 'model-select' },
-      { key: 'OPENAI_EMBED_MODEL',        label: 'Embedding model',  type: 'model-select' },
+      { key: 'OPENAI_API_KEY',               label: 'API key',           type: 'password' },
+      { key: 'OPENAI_CHAT_MODEL',            label: 'Chat model',        type: 'model-select' },
+      { key: 'OPENAI_COMPLETION_MODEL',      label: 'Completion model',  type: 'model-select' },
+      { key: 'OPENAI_SIMPLE_TASKS_MODEL',    label: 'Simple tasks model',type: 'model-select' },
+      { key: 'OPENAI_EMBED_MODEL',           label: 'Embedding model',   type: 'model-select' },
     ]
   },
   {
@@ -474,10 +476,11 @@ const TAB_GROUPS: TabGroup[] = [
     providerKey: 'GOOGLE',
     zooKey: 'GOOGLE_MODELS',
     fields: [
-      { key: 'GOOGLE_API_KEY',            label: 'API key',          type: 'password' },
-      { key: 'GOOGLE_CHAT_MODEL',         label: 'Chat model',       type: 'model-select' },
-      { key: 'GOOGLE_COMPLETION_MODEL',   label: 'Completion model', type: 'model-select' },
-      { key: 'GOOGLE_EMBED_MODEL',        label: 'Embedding model',  type: 'model-select' },
+      { key: 'GOOGLE_API_KEY',               label: 'API key',           type: 'password' },
+      { key: 'GOOGLE_CHAT_MODEL',            label: 'Chat model',        type: 'model-select' },
+      { key: 'GOOGLE_COMPLETION_MODEL',      label: 'Completion model',  type: 'model-select' },
+      { key: 'GOOGLE_SIMPLE_TASKS_MODEL',    label: 'Simple tasks model',type: 'model-select' },
+      { key: 'GOOGLE_EMBED_MODEL',           label: 'Embedding model',   type: 'model-select' },
     ]
   },
   {
@@ -492,9 +495,10 @@ const TAB_GROUPS: TabGroup[] = [
       { key: 'AWS_SECRET_ACCESS_KEY',         label: 'Secret access key',type: 'password', placeholder: '(leave blank when using AWS_PROFILE)' },
       { key: 'AWS_SESSION_TOKEN',             label: 'Session token',    type: 'password', placeholder: '(optional)' },
       { key: 'AWS_REGION',                    label: 'Region',           type: 'text', placeholder: 'us-east-1' },
-      { key: 'BEDROCK_CHAT_MODEL',            label: 'Chat model ID',    type: 'model-select' },
-      { key: 'BEDROCK_COMPLETION_MODEL',      label: 'Completion model ID', type: 'model-select' },
-      { key: 'BEDROCK_EMBED_MODEL',           label: 'Embedding model',  type: 'model-select' },
+      { key: 'BEDROCK_CHAT_MODEL',              label: 'Chat model ID',       type: 'model-select' },
+      { key: 'BEDROCK_COMPLETION_MODEL',        label: 'Completion model ID', type: 'model-select' },
+      { key: 'BEDROCK_SIMPLE_TASKS_MODEL',      label: 'Simple tasks model',  type: 'model-select' },
+      { key: 'BEDROCK_EMBED_MODEL',             label: 'Embedding model',     type: 'model-select' },
     ]
   },
   {
@@ -506,9 +510,10 @@ const TAB_GROUPS: TabGroup[] = [
       { key: 'AZURE_OPENAI_API_KEY',          label: 'API key',              type: 'password' },
       { key: 'AZURE_OPENAI_ENDPOINT',         label: 'Endpoint URL',         type: 'text', placeholder: 'https://YOUR-RESOURCE.openai.azure.com/' },
       { key: 'AZURE_OPENAI_API_VERSION',      label: 'API version',          type: 'text', placeholder: '2024-02-01' },
-      { key: 'AZURE_CHAT_MODEL',              label: 'Chat deployment',       type: 'model-select' },
-      { key: 'AZURE_COMPLETION_MODEL',        label: 'Completion deployment', type: 'model-select' },
-      { key: 'AZURE_EMBED_MODEL',             label: 'Embedding deployment',  type: 'model-select' },
+      { key: 'AZURE_CHAT_MODEL',              label: 'Chat deployment',          type: 'model-select' },
+      { key: 'AZURE_COMPLETION_MODEL',        label: 'Completion deployment',    type: 'model-select' },
+      { key: 'AZURE_SIMPLE_TASKS_MODEL',      label: 'Simple tasks deployment',  type: 'model-select' },
+      { key: 'AZURE_EMBED_MODEL',             label: 'Embedding deployment',     type: 'model-select' },
     ]
   },
   {
@@ -520,9 +525,10 @@ const TAB_GROUPS: TabGroup[] = [
       { key: 'OPENROUTER_API_KEY',             label: 'API key',              type: 'password' },
       { key: 'OPENROUTER_SITE_URL',            label: 'Site URL (optional)',  type: 'text', placeholder: 'https://your-app.com' },
       { key: 'OPENROUTER_SITE_NAME',           label: 'Site name (optional)', type: 'text', placeholder: 'Varys' },
-      { key: 'OPENROUTER_CHAT_MODEL',          label: 'Chat model',           type: 'model-select' },
-      { key: 'OPENROUTER_COMPLETION_MODEL',    label: 'Completion model',     type: 'model-select' },
-      { key: 'OPENROUTER_EMBED_MODEL',         label: 'Embedding model',      type: 'model-select' },
+      { key: 'OPENROUTER_CHAT_MODEL',            label: 'Chat model',           type: 'model-select' },
+      { key: 'OPENROUTER_COMPLETION_MODEL',      label: 'Completion model',     type: 'model-select' },
+      { key: 'OPENROUTER_SIMPLE_TASKS_MODEL',    label: 'Simple tasks model',   type: 'model-select' },
+      { key: 'OPENROUTER_EMBED_MODEL',           label: 'Embedding model',      type: 'model-select' },
     ]
   },
   {
@@ -532,9 +538,10 @@ const TAB_GROUPS: TabGroup[] = [
     zooKey: 'OLLAMA_MODELS',
     fields: [
       { key: 'OLLAMA_URL',                     label: 'Server URL',       type: 'text', placeholder: 'http://localhost:11434' },
-      { key: 'OLLAMA_CHAT_MODEL',              label: 'Chat model',       type: 'model-select' },
-      { key: 'OLLAMA_COMPLETION_MODEL',        label: 'Completion model', type: 'model-select' },
-      { key: 'OLLAMA_EMBED_MODEL',             label: 'Embedding model',  type: 'model-select' },
+      { key: 'OLLAMA_CHAT_MODEL',              label: 'Chat model',        type: 'model-select' },
+      { key: 'OLLAMA_COMPLETION_MODEL',        label: 'Completion model',  type: 'model-select' },
+      { key: 'OLLAMA_SIMPLE_TASKS_MODEL',      label: 'Simple tasks model',type: 'model-select' },
+      { key: 'OLLAMA_EMBED_MODEL',             label: 'Embedding model',   type: 'model-select' },
     ]
   },
 ];
@@ -1098,17 +1105,19 @@ const ModelsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSaved
   }
 
   const activeProviders = new Set([
-    (values['DS_CHAT_PROVIDER']       ?? '').toUpperCase(),
-    (values['DS_COMPLETION_PROVIDER'] ?? '').toUpperCase(),
-    (values['DS_EMBED_PROVIDER']      ?? '').toUpperCase(),
+    (values['DS_CHAT_PROVIDER']           ?? '').toUpperCase(),
+    (values['DS_COMPLETION_PROVIDER']     ?? '').toUpperCase(),
+    (values['DS_EMBED_PROVIDER']          ?? '').toUpperCase(),
+    (values['DS_SIMPLE_TASKS_PROVIDER']   ?? '').toUpperCase(),
   ]);
 
   const currentGroup = TAB_GROUPS.find(g => g.id === activeTab) ?? TAB_GROUPS[0];
 
   const TASK_LABELS: Record<string, string> = {
-    DS_CHAT_PROVIDER:       'Chat',
-    DS_COMPLETION_PROVIDER: 'Completion',
-    DS_EMBED_PROVIDER:      'Embedding',
+    DS_CHAT_PROVIDER:           'Chat',
+    DS_COMPLETION_PROVIDER:     'Completion',
+    DS_EMBED_PROVIDER:          'Embedding',
+    DS_SIMPLE_TASKS_PROVIDER:   'Simple tasks',
   };
 
   return (
@@ -1165,15 +1174,6 @@ const ModelsPanel: React.FC<{ apiClient: APIClient; onClose: () => void; onSaved
                       />
                     </label>
                   </div>
-                ) : field.type === 'text' ? (
-                  <input
-                    className="ds-settings-text-input"
-                    type="text"
-                    value={values[field.key] ?? ''}
-                    placeholder="e.g. claude-haiku-4-5 — leave blank for keyword matching"
-                    onChange={e => handleChange(field.key, e.target.value)}
-                    title="Model name within the active chat provider used for lightweight tasks (preference generation, selection). Leave blank to use keyword matching instead."
-                  />
                 ) : (
                   <select
                     className="ds-settings-select"

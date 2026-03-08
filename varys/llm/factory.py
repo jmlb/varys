@@ -170,25 +170,26 @@ def _check_api_key(provider_name: str, settings: Dict[str, Any]) -> None:
 
 
 def create_simple_task_provider(settings: Dict[str, Any]) -> "BaseLLMProvider | None":
-    """Return a provider configured with DS_SIMPLE_TASKS_MODEL for lightweight tasks.
+    """Return a provider configured for Simple Tasks (DS_SIMPLE_TASKS_PROVIDER +
+    {PROVIDER}_SIMPLE_TASKS_MODEL).
 
-    Uses the same provider type as the chat task but substitutes
-    ``DS_SIMPLE_TASKS_MODEL`` as the model name.  Returns ``None`` when
-    DS_SIMPLE_TASKS_MODEL is not configured or the provider cannot be built.
+    Returns ``None`` when either the provider or the model is not configured,
+    so callers can fall back to keyword-only matching without crashing.
     """
     _load_varys_env()
-    simple_model = (
-        settings.get("ds_assistant_simple_tasks_model", "")
-        or os.environ.get("DS_SIMPLE_TASKS_MODEL", "")
-    ).strip()
-    if not simple_model:
-        return None
 
     provider_name = (
-        settings.get("ds_assistant_chat_provider", "")
-        or os.environ.get("DS_CHAT_PROVIDER", "")
+        settings.get("ds_assistant_simple_tasks_provider", "")
+        or os.environ.get("DS_SIMPLE_TASKS_PROVIDER", "")
     ).strip().lower()
     if not provider_name:
+        return None
+
+    simple_model = (
+        settings.get(f"ds_assistant_{provider_name}_simple_tasks_model", "")
+        or os.environ.get(f"{provider_name.upper()}_SIMPLE_TASKS_MODEL", "")
+    ).strip()
+    if not simple_model:
         return None
 
     try:
