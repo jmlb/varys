@@ -308,13 +308,13 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
               onChange={e => { setNewValue(e.target.value); setNameErr(''); }}
               onKeyDown={e => { if (e.key === 'Enter') createTag(); }}
             />
-            <input
-              className="ds-tp-desc-input"
-              placeholder="Description"
-              value={newDesc}
-              onChange={e => setNewDesc(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') createTag(); }}
-            />
+        <textarea
+          className="ds-tp-desc-input"
+          placeholder="Description"
+          value={newDesc}
+          rows={2}
+          onChange={e => setNewDesc(e.target.value)}
+        />
             <select
               className="ds-tp-topic-select"
               value={newTopic}
