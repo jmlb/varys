@@ -6051,7 +6051,25 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
   color: var(--jp-ui-font-color1, #111);
 }
 .ds-tp-name-input:focus,
-.ds-tp-desc-input:focus { outline: none; border-color: var(--jp-brand-color1, #1976d2); }
+.ds-tp-desc-input:focus,
+.ds-tp-topic-select:focus { outline: none; border-color: var(--jp-brand-color1, #1976d2); }
+
+.ds-tp-topic-select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  border: 1px solid var(--jp-border-color1, #ccc);
+  border-radius: 6px;
+  font-size: 11px;
+  background: var(--jp-layout-color0, #fff);
+  color: var(--jp-ui-font-color1, #111);
+  cursor: pointer;
+}
+.ds-chat-night .ds-tp-topic-select {
+  background: #181825;
+  border-color: #45475a;
+  color: #cdd6f4;
+}
 .ds-tp-create-btn {
   width: 100%;
   padding: 5px 10px;

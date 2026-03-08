@@ -20,13 +20,15 @@ export declare const BUILT_IN_TAG_DEFS: {
         description: string;
     }[];
 }[];
-/** Tag JSON shape: { "value": string, "description": string, "color"?: string } */
+/** Tag JSON shape: { "value": string, "topic": string, "description": string, "color"?: string } */
 export interface CustomTagDef {
     value: string;
+    topic?: string;
     description: string;
     color?: string;
 }
 export declare function loadCustomTags(): CustomTagDef[];
+export declare const BUILT_IN_TOPICS: string[];
 export interface TagsPanelProps {
     notebookTracker: INotebookTracker;
 }

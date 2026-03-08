@@ -1820,8 +1820,8 @@ const BUILT_IN_TAG_DEFS: { category: string; tags: { value: string; description:
 
 const CUSTOM_TAGS_KEY = 'varys_custom_tag_definitions';
 
-/** Tag JSON shape: { "value": string, "description": string } */
-interface CustomTagDef { value: string; description: string }
+/** Tag JSON shape: { "value": string, "topic"?: string, "description": string } */
+interface CustomTagDef { value: string; topic?: string; description: string }
 
 function loadCustomTags(): CustomTagDef[] {
   try {
@@ -1831,6 +1831,7 @@ function loadCustomTags(): CustomTagDef[] {
     // Migrate legacy records that used `name` instead of `value`
     return parsed.map(r => ({
       value:       r['value'] ?? r['name'] ?? '',
+      topic:       r['topic'],
       description: r['description'] ?? '',
     })).filter(t => t.value);
   } catch { return []; }

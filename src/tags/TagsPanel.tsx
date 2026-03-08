@@ -64,8 +64,8 @@ export const BUILT_IN_TAG_DEFS: { category: string; tags: { value: string; descr
 
 const CUSTOM_TAGS_KEY = 'varys_custom_tag_definitions';
 
-/** Tag JSON shape: { "value": string, "description": string, "color"?: string } */
-export interface CustomTagDef { value: string; description: string; color?: string }
+/** Tag JSON shape: { "value": string, "topic": string, "description": string, "color"?: string } */
+export interface CustomTagDef { value: string; topic?: string; description: string; color?: string }
 
 export function loadCustomTags(): CustomTagDef[] {
   try {
@@ -85,19 +85,21 @@ function saveCustomTagsToStorage(tags: CustomTagDef[]): void {
   localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(tags));
 }
 
+export const BUILT_IN_TOPICS = BUILT_IN_TAG_DEFS.map(g => g.category);
+
 function resolveColor(tagValue: string, customTags: CustomTagDef[]): string {
   const custom = customTags.find(t => t.value === tagValue);
   return custom?.color ?? tagColorAuto(tagValue);
 }
 
-function findDescription(tagValue: string, customTags: CustomTagDef[]): string {
+function findMeta(tagValue: string, customTags: CustomTagDef[]): { description: string; topic: string } {
   const custom = customTags.find(t => t.value === tagValue);
-  if (custom) return custom.description;
+  if (custom) return { description: custom.description, topic: custom.topic ?? 'Custom' };
   for (const group of BUILT_IN_TAG_DEFS) {
     const found = group.tags.find(t => t.value === tagValue);
-    if (found) return found.description;
+    if (found) return { description: found.description, topic: group.category };
   }
-  return '';
+  return { description: '', topic: '' };
 }
 
 // ── ColorPicker ───────────────────────────────────────────────────────────────
@@ -147,6 +149,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
   // Create form state
   const [newValue, setNewValue]  = useState('');
   const [newDesc,  setNewDesc]   = useState('');
+  const [newTopic, setNewTopic]  = useState('');
   const [newColor, setNewColor]  = useState(TAG_PALETTE[0]);
   const [nameErr,  setNameErr]   = useState('');
 
@@ -179,11 +182,11 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
     if (!/^[a-z0-9][\w\-.]*$/.test(raw)) { setNameErr('Only a-z, 0-9, - or _ allowed.'); return; }
     if (allBuiltInValues.includes(raw)) { setNameErr('Already a built-in tag.'); return; }
     if (customTags.some(t => t.value === raw)) { setNameErr('Custom tag already exists.'); return; }
-    const tag: CustomTagDef = { value: raw, description: newDesc.trim(), color: newColor };
+    const tag: CustomTagDef = { value: raw, topic: newTopic || undefined, description: newDesc.trim(), color: newColor };
     const updated = [...customTags, tag];
     setCustomTags(updated);
     saveCustomTagsToStorage(updated);
-    setNewValue(''); setNewDesc(''); setNewColor(TAG_PALETTE[0]); setNameErr('');
+    setNewValue(''); setNewDesc(''); setNewTopic(''); setNewColor(TAG_PALETTE[0]); setNameErr('');
     setSelectedTag(raw);
   };
 
@@ -196,9 +199,11 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
   };
 
   // ── Derived for details panel ──────────────────────────────────────────────
-  const isCustom   = selectedTag ? customTags.some(t => t.value === selectedTag) : false;
-  const selColor   = selectedTag ? resolveColor(selectedTag, customTags) : TAG_PALETTE[0];
-  const selDesc    = selectedTag ? findDescription(selectedTag, customTags) : '';
+  const isCustom                  = selectedTag ? customTags.some(t => t.value === selectedTag) : false;
+  const selColor                  = selectedTag ? resolveColor(selectedTag, customTags) : TAG_PALETTE[0];
+  const { description: selDesc, topic: selTopic } = selectedTag
+    ? findMeta(selectedTag, customTags)
+    : { description: '', topic: '' };
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -221,6 +226,16 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
           onChange={e => setNewDesc(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') createTag(); }}
         />
+        <select
+          className="ds-tp-topic-select"
+          value={newTopic}
+          onChange={e => setNewTopic(e.target.value)}
+        >
+          <option value="">Topic (optional)</option>
+          {BUILT_IN_TOPICS.map(t => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
         <ColorPicker value={newColor} onChange={setNewColor} />
         {nameErr && <p className="ds-tp-error">{nameErr}</p>}
         <button
@@ -286,7 +301,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
 
               <div className="ds-tp-details-json">
                 <pre className="ds-tp-details-json-pre">{JSON.stringify(
-                  { value: selectedTag, description: selDesc, color: selColor },
+                  { value: selectedTag, topic: selTopic || undefined, description: selDesc, color: selColor },
                   null, 2
                 )}</pre>
               </div>
