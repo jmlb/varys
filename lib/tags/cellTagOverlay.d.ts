@@ -2,18 +2,20 @@
  * Cell Tag & Position Overlay
  *
  * Injects a thin bar at the top of every notebook cell that shows:
- *   • LEFT  — coloured tag pills (only when the cell carries tags)
+ *   • LEFT  — coloured tag pills + a [+] button to add tags inline
  *   • RIGHT — a small "#N" position badge (always, on every cell)
  *
  * Clicking a tag pill enters "delete mode" — the pill expands to show an ×
  * button. Clicking × removes the tag from cell metadata and re-renders.
- * Clicking anywhere else dismisses delete mode.
  *
- * The position number reflects the cell's 1-based index in the notebook and
- * updates automatically whenever:
- *   • The active cell or notebook changes
- *   • Cells are inserted, deleted, or moved (model.cells.changed signal)
- *   • A periodic 1.5 s fallback fires (catches metadata edits in the panel)
+ * Clicking [+] opens a floating dropdown with:
+ *   • A text input to type/create a new custom tag
+ *   • Tags already used elsewhere in the notebook (quick-add)
+ *   • Built-in preset groups (ML Pipeline, Quality, Report, Status)
+ *   Only tags NOT already applied to the cell are shown.
+ *
+ * Re-renders are suppressed while the dropdown or a pending-delete pill is
+ * open so the user can interact without the DOM being destroyed under them.
  */
 import { INotebookTracker } from '@jupyterlab/notebook';
 /**

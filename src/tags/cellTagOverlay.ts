@@ -2,18 +2,20 @@
  * Cell Tag & Position Overlay
  *
  * Injects a thin bar at the top of every notebook cell that shows:
- *   • LEFT  — coloured tag pills (only when the cell carries tags)
+ *   • LEFT  — coloured tag pills + a [+] button to add tags inline
  *   • RIGHT — a small "#N" position badge (always, on every cell)
  *
  * Clicking a tag pill enters "delete mode" — the pill expands to show an ×
  * button. Clicking × removes the tag from cell metadata and re-renders.
- * Clicking anywhere else dismisses delete mode.
  *
- * The position number reflects the cell's 1-based index in the notebook and
- * updates automatically whenever:
- *   • The active cell or notebook changes
- *   • Cells are inserted, deleted, or moved (model.cells.changed signal)
- *   • A periodic 1.5 s fallback fires (catches metadata edits in the panel)
+ * Clicking [+] opens a floating dropdown with:
+ *   • A text input to type/create a new custom tag
+ *   • Tags already used elsewhere in the notebook (quick-add)
+ *   • Built-in preset groups (ML Pipeline, Quality, Report, Status)
+ *   Only tags NOT already applied to the cell are shown.
+ *
+ * Re-renders are suppressed while the dropdown or a pending-delete pill is
+ * open so the user can interact without the DOM being destroyed under them.
  */
 
 import { INotebookTracker } from '@jupyterlab/notebook';
@@ -27,21 +29,203 @@ const TAG_PALETTE = [
   '#06b6d4', '#f97316', '#ec4899', '#14b8a6', '#6366f1',
 ];
 
+const BUILT_IN_PRESETS: { category: string; tags: string[] }[] = [
+  { category: 'ML Pipeline', tags: ['data-loading', 'preprocessing', 'feature-engineering', 'training', 'evaluation', 'inference'] },
+  { category: 'Quality',     tags: ['todo', 'reviewed', 'needs-refactor', 'slow', 'broken', 'tested'] },
+  { category: 'Report',      tags: ['report', 'figure', 'table', 'key-finding', 'report-exclude'] },
+  { category: 'Status',      tags: ['draft', 'stable', 'deprecated', 'sensitive'] },
+];
+
 function tagColor(tag: string): string {
   let h = 0;
   for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
   return TAG_PALETTE[h % TAG_PALETTE.length];
 }
 
+// ── Dropdown state ─────────────────────────────────────────────────────────
+
+let _activeDropdown: HTMLElement | null = null;
+
+function closeDropdown(): void {
+  if (_activeDropdown) {
+    _activeDropdown.remove();
+    _activeDropdown = null;
+  }
+}
+
+function isDropdownOpen(): boolean {
+  return _activeDropdown !== null;
+}
+
+// ── Overlay helpers ────────────────────────────────────────────────────────
+
 /** Remove all existing overlays from the page. */
 function clearOverlays(): void {
   document.querySelectorAll(`.${OVERLAY_CLASS}`).forEach(el => el.remove());
 }
 
-/**
- * Remove a tag from a cell's metadata and trigger a re-render.
- * Operates directly on the JupyterLab cell model.
- */
+/** Collect every unique tag used anywhere in the current notebook. */
+function getAllNotebookTags(tracker: INotebookTracker): string[] {
+  const nb = tracker.currentWidget?.content;
+  if (!nb?.model) return [];
+  const seen = new Set<string>();
+  for (let i = 0; i < nb.model.cells.length; i++) {
+    const t = (nb.model.cells.get(i).metadata['tags'] as string[] | undefined) ?? [];
+    t.forEach(tag => seen.add(tag));
+  }
+  return [...seen].sort();
+}
+
+/** Write a new tags array to a cell model, removing the key when empty. */
+function writeTags(cellModel: any, tags: string[]): void {
+  if (tags.length > 0) {
+    cellModel.setMetadata('tags', tags);
+  } else {
+    try {
+      cellModel.deleteMetadata?.('tags') ?? cellModel.setMetadata('tags', undefined);
+    } catch {
+      cellModel.setMetadata('tags', []);
+    }
+  }
+}
+
+// ── [+] dropdown ───────────────────────────────────────────────────────────
+
+function showAddTagDropdown(
+  anchor: HTMLElement,
+  tracker: INotebookTracker,
+  cellIndex: number,
+  currentTags: string[],
+  refresh: () => void,
+): void {
+  closeDropdown();
+
+  const applyTag = (tag: string) => {
+    const nb = tracker.currentWidget?.content;
+    if (!nb?.model) return;
+    const cm = nb.model.cells.get(cellIndex);
+    if (!cm) return;
+    writeTags(cm, [...currentTags, tag]);
+    closeDropdown();
+    refresh();
+  };
+
+  const rect = anchor.getBoundingClientRect();
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'ds-tag-add-dropdown';
+  // Position just below the + button, left-aligned with it
+  dropdown.style.top  = `${rect.bottom + 3}px`;
+  dropdown.style.left = `${rect.left}px`;
+
+  // ── Custom input ──────────────────────────────────────────────────────────
+  const inputRow = document.createElement('div');
+  inputRow.className = 'ds-tag-add-input-row';
+
+  const input = document.createElement('input');
+  input.className = 'ds-tag-add-input';
+  input.placeholder = 'Type tag name…';
+  input.autocomplete = 'off';
+  input.spellcheck   = false;
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'ds-tag-add-confirm-btn';
+  addBtn.textContent = '+ Add';
+  addBtn.disabled = true;
+
+  const errorMsg = document.createElement('p');
+  errorMsg.className = 'ds-tag-add-error';
+
+  const validateAndApply = () => {
+    const raw = input.value.trim().toLowerCase().replace(/\s+/g, '-');
+    if (!raw) return;
+    if (!/^[a-z0-9][\w\-.]*$/.test(raw)) {
+      errorMsg.textContent = 'Only a-z, 0-9, - or _ allowed.';
+      return;
+    }
+    if (currentTags.includes(raw)) {
+      errorMsg.textContent = 'Tag already on this cell.';
+      return;
+    }
+    applyTag(raw);
+  };
+
+  input.addEventListener('input', () => {
+    const raw = input.value.trim().toLowerCase().replace(/\s+/g, '-');
+    addBtn.disabled = !raw || currentTags.includes(raw);
+    errorMsg.textContent = '';
+  });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); validateAndApply(); }
+    if (e.key === 'Escape') { e.preventDefault(); closeDropdown(); }
+    e.stopPropagation();
+  });
+  addBtn.addEventListener('click', e => { e.stopPropagation(); validateAndApply(); });
+
+  inputRow.appendChild(input);
+  inputRow.appendChild(addBtn);
+  dropdown.appendChild(inputRow);
+  dropdown.appendChild(errorMsg);
+
+  // ── Notebook tags (quick-add) ─────────────────────────────────────────────
+  const notebookTags = getAllNotebookTags(tracker).filter(t => !currentTags.includes(t));
+  if (notebookTags.length > 0) {
+    dropdown.appendChild(buildTagSection('In notebook', notebookTags, applyTag));
+  }
+
+  // ── Preset groups ─────────────────────────────────────────────────────────
+  for (const preset of BUILT_IN_PRESETS) {
+    const available = preset.tags.filter(t => !currentTags.includes(t));
+    if (available.length > 0) {
+      dropdown.appendChild(buildTagSection(preset.category, available, applyTag));
+    }
+  }
+
+  document.body.appendChild(dropdown);
+  _activeDropdown = dropdown;
+
+  // Auto-focus the input so user can type immediately
+  requestAnimationFrame(() => input.focus());
+
+  // Close on outside click
+  const onOutside = (ev: MouseEvent) => {
+    if (!dropdown.contains(ev.target as Node) && ev.target !== anchor) {
+      closeDropdown();
+      document.removeEventListener('mousedown', onOutside, true);
+    }
+  };
+  document.addEventListener('mousedown', onOutside, true);
+}
+
+function buildTagSection(
+  title: string,
+  tags: string[],
+  onSelect: (tag: string) => void,
+): HTMLElement {
+  const section = document.createElement('div');
+  section.className = 'ds-tag-add-section';
+
+  const heading = document.createElement('div');
+  heading.className = 'ds-tag-add-section-title';
+  heading.textContent = title;
+  section.appendChild(heading);
+
+  const chips = document.createElement('div');
+  chips.className = 'ds-tag-add-chips';
+  for (const tag of tags) {
+    const chip = document.createElement('button');
+    chip.className = 'ds-tag-add-chip';
+    chip.textContent = tag;
+    chip.style.setProperty('--pill-color', tagColor(tag));
+    chip.addEventListener('click', e => { e.stopPropagation(); onSelect(tag); });
+    chips.appendChild(chip);
+  }
+  section.appendChild(chips);
+  return section;
+}
+
+// ── Tag deletion helpers ───────────────────────────────────────────────────
+
 function deleteTag(
   tracker: INotebookTracker,
   cellIndex: number,
@@ -50,30 +234,18 @@ function deleteTag(
 ): void {
   const nb = tracker.currentWidget?.content;
   if (!nb?.model) return;
-  const cellModel = nb.model.cells.get(cellIndex);
-  if (!cellModel) return;
-
-  const current = (cellModel.metadata['tags'] as string[] | undefined) ?? [];
-  const updated  = current.filter(t => t !== tagToRemove);
-
-  if (updated.length > 0) {
-    cellModel.setMetadata('tags', updated);
-  } else {
-    // Remove the key entirely when no tags remain
-    try {
-      (cellModel as any).deleteMetadata?.('tags')
-        ?? cellModel.setMetadata('tags', undefined as any);
-    } catch {
-      cellModel.setMetadata('tags', [] as any);
-    }
-  }
+  const cm = nb.model.cells.get(cellIndex);
+  if (!cm) return;
+  const current = (cm.metadata['tags'] as string[] | undefined) ?? [];
+  writeTags(cm, current.filter(t => t !== tagToRemove));
   refresh();
 }
 
-/** Render tag + position overlays for every cell in the current notebook. */
+// ── Main render ────────────────────────────────────────────────────────────
+
 function renderOverlays(tracker: INotebookTracker, refresh: () => void): void {
-  // Don't re-render while the user is interacting with a pending-delete pill —
-  // clearOverlays() would destroy the DOM node before × can be clicked.
+  // Suppress re-render while user is interacting (dropdown open or pill pending)
+  if (isDropdownOpen()) return;
   if (document.querySelector('.ds-cell-tag-pill--pending')) return;
 
   clearOverlays();
@@ -90,80 +262,89 @@ function renderOverlays(tracker: INotebookTracker, refresh: () => void): void {
 
     const tags = (cellModel.metadata['tags'] as string[] | undefined) ?? [];
 
-    // Insert the overlay bar as a sibling BEFORE .jp-Cell-inputWrapper so it
-    // spans the full width of the cell above the code/text area.
     const inputWrapper = cellWidget.node.querySelector('.jp-Cell-inputWrapper');
     if (!inputWrapper) continue;
 
     const bar = document.createElement('div');
     bar.className = OVERLAY_CLASS;
 
-    // ── Left: tag pills (only when the cell has tags) ──────────────────────
-    if (tags.length > 0) {
-      const pillsGroup = document.createElement('span');
-      pillsGroup.className = 'ds-overlay-tags';
+    // ── Left group: existing pills + [+] button ───────────────────────────
+    const leftGroup = document.createElement('span');
+    leftGroup.className = 'ds-overlay-tags';
 
-      for (const tag of tags) {
-        const cellIdx = i; // capture for closure
+    // Existing tag pills
+    for (const tag of tags) {
+      const cellIdx = i;
 
-        const pill = document.createElement('span');
-        pill.className = 'ds-cell-tag-pill';
-        pill.style.setProperty('--pill-color', tagColor(tag));
-        pill.style.pointerEvents = 'auto';
-        pill.style.cursor = 'pointer';
-        pill.title = `Click to remove "${tag}"`;
+      const pill = document.createElement('span');
+      pill.className = 'ds-cell-tag-pill';
+      pill.style.setProperty('--pill-color', tagColor(tag));
+      pill.style.pointerEvents = 'auto';
+      pill.style.cursor = 'pointer';
+      pill.title = `Click to remove "${tag}"`;
 
-        const label = document.createElement('span');
-        label.className = 'ds-cell-tag-pill-label';
-        label.textContent = tag;
+      const label = document.createElement('span');
+      label.className = 'ds-cell-tag-pill-label';
+      label.textContent = tag;
 
-        const removeBtn = document.createElement('span');
-        removeBtn.className = 'ds-cell-tag-pill-remove';
-        removeBtn.textContent = '×';
-        removeBtn.title = `Remove tag "${tag}"`;
+      const removeBtn = document.createElement('span');
+      removeBtn.className = 'ds-cell-tag-pill-remove';
+      removeBtn.textContent = '×';
+      removeBtn.title = `Remove "${tag}"`;
 
-        pill.appendChild(label);
-        pill.appendChild(removeBtn);
+      pill.appendChild(label);
+      pill.appendChild(removeBtn);
 
-        // Click the pill label → toggle "pending delete" state
-        let pending = false;
-        const dismissPending = (e?: Event) => {
-          if (e) e.stopPropagation();
+      let pending = false;
+      pill.addEventListener('click', e => {
+        e.stopPropagation();
+        closeDropdown();
+        if (pending) {
           pending = false;
           pill.classList.remove('ds-cell-tag-pill--pending');
-        };
+        } else {
+          pending = true;
+          pill.classList.add('ds-cell-tag-pill--pending');
+          const onOutside = (ev: MouseEvent) => {
+            if (!pill.contains(ev.target as Node)) {
+              pending = false;
+              pill.classList.remove('ds-cell-tag-pill--pending');
+              document.removeEventListener('click', onOutside, true);
+            }
+          };
+          document.addEventListener('click', onOutside, true);
+        }
+      });
 
-        pill.addEventListener('click', e => {
-          e.stopPropagation(); // don't propagate to cell or document
-          if (pending) {
-            // Second click on pill itself → cancel
-            dismissPending();
-          } else {
-            pending = true;
-            pill.classList.add('ds-cell-tag-pill--pending');
-            // Dismiss if user clicks anywhere outside this pill
-            const onOutside = (ev: MouseEvent) => {
-              if (!pill.contains(ev.target as Node)) {
-                dismissPending();
-                document.removeEventListener('click', onOutside, true);
-              }
-            };
-            document.addEventListener('click', onOutside, true);
-          }
-        });
+      removeBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        // Clear pending state first so the renderOverlays guard does not
+        // suppress the re-render that follows deleteTag → refresh().
+        pending = false;
+        pill.classList.remove('ds-cell-tag-pill--pending');
+        deleteTag(tracker, cellIdx, tag, refresh);
+      });
 
-        removeBtn.addEventListener('click', e => {
-          e.stopPropagation();
-          deleteTag(tracker, cellIdx, tag, refresh);
-        });
-
-        pillsGroup.appendChild(pill);
-      }
-
-      bar.appendChild(pillsGroup);
+      leftGroup.appendChild(pill);
     }
 
-    // ── Right: position badge "#N" ─────────────────────────────────────────
+    // [+] add button — always shown, moves right as pills accumulate
+    const addBtn = document.createElement('button');
+    addBtn.className = 'ds-overlay-add-btn';
+    addBtn.textContent = '+';
+    addBtn.title = 'Add tag';
+    addBtn.style.pointerEvents = 'auto';
+
+    const cellIdx = i;
+    addBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      showAddTagDropdown(addBtn, tracker, cellIdx, [...tags], refresh);
+    });
+
+    leftGroup.appendChild(addBtn);
+    bar.appendChild(leftGroup);
+
+    // ── Right: position badge "#N" ────────────────────────────────────────
     const badge = document.createElement('span');
     badge.className = 'ds-cell-position-badge';
     badge.textContent = `#${i + 1}`;
@@ -173,22 +354,18 @@ function renderOverlays(tracker: INotebookTracker, refresh: () => void): void {
   }
 }
 
-// Track the model-level signal disconnect so we can rewire when the notebook
-// switches.
+// ── Signal wiring ──────────────────────────────────────────────────────────
+
 let _disconnectModelSignal: (() => void) | null = null;
 
-function connectModelSignal(
-  tracker: INotebookTracker,
-  refresh: () => void,
-): void {
+function connectModelSignal(tracker: INotebookTracker, refresh: () => void): void {
   _disconnectModelSignal?.();
   _disconnectModelSignal = null;
 
   const model = tracker.currentWidget?.content?.model;
   if (!model) return;
 
-  const handler = (_: unknown, __: IObservableList.IChangedArgs<unknown>) =>
-    refresh();
+  const handler = (_: unknown, __: IObservableList.IChangedArgs<unknown>) => refresh();
   model.cells.changed.connect(handler);
   _disconnectModelSignal = () => model.cells.changed.disconnect(handler);
 }
@@ -201,8 +378,8 @@ function connectModelSignal(
 export function initCellTagOverlay(tracker: INotebookTracker): () => void {
   const refresh = () => renderOverlays(tracker, refresh);
 
-  // Re-render and rewire the model signal whenever the active notebook changes.
   const onNotebookChanged = () => {
+    closeDropdown();
     connectModelSignal(tracker, refresh);
     refresh();
   };
@@ -210,7 +387,6 @@ export function initCellTagOverlay(tracker: INotebookTracker): () => void {
   tracker.activeCellChanged.connect(refresh);
   tracker.currentChanged.connect(onNotebookChanged);
 
-  // Wire the initial notebook (if one is already open).
   connectModelSignal(tracker, refresh);
 
   const timer = setInterval(refresh, INTERVAL_MS);
@@ -222,6 +398,7 @@ export function initCellTagOverlay(tracker: INotebookTracker): () => void {
     _disconnectModelSignal?.();
     _disconnectModelSignal = null;
     clearInterval(timer);
+    closeDropdown();
     clearOverlays();
   };
 }
