@@ -6032,14 +6032,16 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
   border-radius: 8px;
   flex-shrink: 0;
 }
-.ds-tp-create-header {
+.ds-tp-create-header,
+.ds-tp-library-header {
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--ds-text-dim, #888);
-  margin-bottom: 6px;
 }
+.ds-tp-create-header  { margin-bottom: 6px; }
+.ds-tp-library-header { margin-bottom: -14px; } /* pulls list up slightly, gap handles spacing */
 
 /* Two-column create body */
 .ds-tp-create-body {

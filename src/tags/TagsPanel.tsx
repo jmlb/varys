@@ -351,6 +351,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
       </div>
 
       {/* ── Tag library: grouped list (left) + details (right) ───────────── */}
+      <div className="ds-tp-library-header">Tag Library</div>
       <div className="ds-tp-body">
 
         {/* LEFT — grouped tag library */}
