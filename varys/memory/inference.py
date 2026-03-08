@@ -290,48 +290,77 @@ async def migrate_preferences_llm(
 # Main inference runner — called as background asyncio task
 # ---------------------------------------------------------------------------
 
+def _load_and_detect(root_dir: str, notebook_path: str):
+    """Sync helper — runs in a thread.
+
+    Constructs stores, loads summaries, and runs pattern detection.
+    Returns (patterns, store, pref_store) or None when nothing to do.
+    All disk I/O (mkdir, stat, read) stays in the thread and never touches
+    Tornado's event loop.
+    """
+    from ..context.summary_store import SummaryStore
+    from .preference_store import PreferenceStore
+
+    store     = SummaryStore(root_dir, notebook_path)
+    pref_store = PreferenceStore(root_dir, notebook_path)
+
+    all_summaries_dict = store.get_all_current()
+    all_summaries = [dict(v, cell_id=k) for k, v in all_summaries_dict.items()]
+    if not all_summaries:
+        store.reset_inference_counter()
+        return None
+
+    patterns = detect_patterns(all_summaries)
+    if not patterns:
+        store.reset_inference_counter()
+        return None
+
+    return patterns, store, pref_store
+
+
+def _save_inference_results(
+    store: Any,
+    pref_store: Any,
+    new_entries: List[Dict[str, Any]],
+    pattern_count: int,
+    notebook_path: str,
+) -> None:
+    """Sync helper — runs in a thread.
+
+    Persists generated preference entries and resets the inference counter.
+    """
+    for entry in new_entries:
+        pref_store.upsert(entry, scope="project")
+    log.info(
+        "Varys inference: notebook=%s  patterns=%d  new_prefs=%d",
+        notebook_path, pattern_count, len(new_entries),
+    )
+    store.reset_inference_counter()
+
+
 async def run_inference(root_dir: str, notebook_path: str, settings: dict) -> None:
     """Full inference pipeline: load summaries → detect patterns → generate preferences.
 
-    Reads the SummaryStore for *notebook_path*, runs pattern detection, generates
-    preference entries via LLM (or deterministic fallback), and upserts them into
-    the PreferenceStore.
-
-    Resets the inference counter in the SummaryStore on completion.
+    Disk-heavy phases run in threads via asyncio.to_thread so the Tornado event
+    loop is never blocked.  The LLM call (inherently async) runs on the event
+    loop between the two thread phases.
     """
     try:
-        from ..context.summary_store import SummaryStore
-        from .preference_store import PreferenceStore
-
-        store = SummaryStore(root_dir, notebook_path)
-        pref_store = PreferenceStore(root_dir, notebook_path)
-
-        # Collect all current cell summaries (embed cell_id for pattern detectors)
-        all_summaries_dict = store.get_all_current()
-        all_summaries = [dict(v, cell_id=k) for k, v in all_summaries_dict.items()]
-        if not all_summaries:
-            store.reset_inference_counter()
+        # Phase 1 — load + detect (sync disk I/O + CPU) in a thread
+        result = await asyncio.to_thread(_load_and_detect, root_dir, notebook_path)
+        if result is None:
             return
 
-        # Pattern detection
-        patterns = detect_patterns(all_summaries)
-        if not patterns:
-            store.reset_inference_counter()
-            return
+        patterns, store, pref_store = result
 
-        # Generate preference entries
+        # Phase 2 — LLM preference generation (async, non-blocking)
         new_entries = await _generate_preference_entries(patterns, settings)
 
-        # Upsert into PreferenceStore (project scope for inferred preferences)
-        for entry in new_entries:
-            pref_store.upsert(entry, scope="project")
-
-        log.info(
-            "Varys inference: notebook=%s  patterns=%d  new_prefs=%d",
-            notebook_path, len(patterns), len(new_entries),
+        # Phase 3 — persist results (sync disk I/O) in a thread
+        await asyncio.to_thread(
+            _save_inference_results,
+            store, pref_store, new_entries, len(patterns), notebook_path,
         )
-
-        store.reset_inference_counter()
 
     except Exception as exc:
         log.warning("Varys inference run failed: %s", exc)

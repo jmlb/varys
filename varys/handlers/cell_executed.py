@@ -70,6 +70,33 @@ class CellExecutedHandler(JupyterHandler):
         )
 
 
+# ── Thread-safe sync helpers (called via asyncio.to_thread) ───────────────────
+
+
+def _upsert_to_store(
+    root_dir:       str,
+    notebook_path:  str,
+    cell_id:        str,
+    source:         str,
+    summary:        dict,
+) -> bool:
+    """Construct the SummaryStore and persist *summary*.
+
+    Returns True when the inference counter has reached its threshold and a
+    long-term memory inference run should be scheduled.
+
+    This function is intentionally synchronous — it must be called via
+    ``asyncio.to_thread`` so that its disk I/O (mkdir + stat + read + write)
+    never blocks Tornado's event loop.
+    """
+    from ..context.summary_store import SummaryStore
+    store = SummaryStore(root_dir, notebook_path)
+    written = store.upsert(cell_id, source, summary)
+    if written and store.should_run_inference():
+        return True
+    return False
+
+
 # ── Background coroutine ───────────────────────────────────────────────────────
 
 
@@ -88,11 +115,14 @@ async def _summarize_and_store(
 ) -> None:
     """Build a summary and persist it to the SummaryStore.
 
+    All CPU and disk work is offloaded to a thread via asyncio.to_thread so the
+    Tornado event loop is never blocked — which would otherwise prevent the kernel's
+    execute_reply WebSocket frame from being forwarded to the browser.
+
     After a successful write, checks the inference counter and fires the
     long-term memory inference pipeline when the threshold is reached.
     """
     try:
-        from ..context.summary_store import SummaryStore
         from ..context.summarizer    import (
             build_summary,
             build_markdown_summary_async,
@@ -100,46 +130,45 @@ async def _summarize_and_store(
         )
         from ..llm.factory import create_simple_task_provider
 
-        store = SummaryStore(root_dir, notebook_path)
-
-        # For large markdown cells, try the LLM prose-summary path first.
+        # For large markdown cells, try the LLM prose-summary path first (it is
+        # already async and yields the event loop between network calls).
         if cell_type == "markdown" and len(source) > MARKDOWN_THRESHOLD:
             simple_provider = create_simple_task_provider(settings)
             if simple_provider:
                 summary = await build_markdown_summary_async(source, simple_provider)
             else:
-                summary = build_summary(
-                    cell_id         = cell_id,
-                    source          = source,
-                    cell_type       = cell_type,
-                    output          = output,
-                    execution_count = execution_count,
-                    had_error       = had_error,
-                    error_text      = error_text,
-                    kernel_snapshot = kernel_snapshot,
+                # build_summary is CPU-only; run in thread to avoid blocking.
+                summary = await asyncio.to_thread(
+                    build_summary,
+                    cell_id=cell_id, source=source, cell_type=cell_type,
+                    output=output, execution_count=execution_count,
+                    had_error=had_error, error_text=error_text,
+                    kernel_snapshot=kernel_snapshot,
                 )
         else:
-            summary = build_summary(
-                cell_id         = cell_id,
-                source          = source,
-                cell_type       = cell_type,
-                output          = output,
-                execution_count = execution_count,
-                had_error       = had_error,
-                error_text      = error_text,
-                kernel_snapshot = kernel_snapshot,
+            # build_summary does AST parsing + string work — run in thread.
+            summary = await asyncio.to_thread(
+                build_summary,
+                cell_id=cell_id, source=source, cell_type=cell_type,
+                output=output, execution_count=execution_count,
+                had_error=had_error, error_text=error_text,
+                kernel_snapshot=kernel_snapshot,
             )
-        written = store.upsert(cell_id, source, summary)
-        if written:
-            log.debug(
-                "SummaryStore: upserted cell %s … (notebook: %s)",
-                cell_id[:8], notebook_path,
-            )
-            # Fire long-term memory inference when counter reaches threshold
-            if store.should_run_inference():
-                from ..memory.inference import run_inference
-                asyncio.create_task(run_inference(root_dir, notebook_path, settings))
-                log.debug("Inference pipeline triggered for %s", notebook_path)
+
+        # Persist summary to disk in a thread.
+        # The SummaryStore constructor calls mkdir() on the HDD (expensive seek),
+        # and upsert() does read-modify-write JSON — both must NOT run on the
+        # Tornado event loop or they will block execute_reply forwarding.
+        trigger_inference = await asyncio.to_thread(
+            _upsert_to_store, root_dir, notebook_path, cell_id, source, summary
+        )
+
+        if trigger_inference:
+            from ..memory.inference import run_inference
+            asyncio.create_task(run_inference(root_dir, notebook_path, settings))
+            log.debug("Inference pipeline triggered for %s", notebook_path)
+        else:
+            log.debug("SummaryStore: upserted cell %s … (notebook: %s)", cell_id[:8], notebook_path)
 
     except Exception as exc:
         log.warning(
