@@ -515,70 +515,11 @@ const plugin: JupyterFrontEndPlugin<void> = {
           }
         }
 
-        // Gather a lightweight kernel snapshot: all simple scalar/container
-        // variables in the kernel namespace.  The backend uses this dict to
-        // populate symbol_values and symbol_types for the symbols it extracts
-        // via AST analysis.
-        const kernel = panel.sessionContext.session?.kernel;
-        let kernelSnapshot: Record<string, unknown> = {};
-
-        if (kernel) {
-          const snapshotCode = `
-import json as _dss_j
-_dss_r = {}
-try:
-    _dss_ns = get_ipython().user_ns
-    for _dss_n, _dss_v in list(_dss_ns.items()):
-        if _dss_n.startswith('_'): continue
-        _dss_t = type(_dss_v).__name__
-        try:
-            if isinstance(_dss_v, (int, float, bool)):
-                _dss_r[_dss_n] = {"type": _dss_t, "value": _dss_v}
-            elif isinstance(_dss_v, str) and len(_dss_v) <= 200:
-                _dss_r[_dss_n] = {"type": "str", "value": _dss_v}
-            elif isinstance(_dss_v, (list, tuple)) and len(_dss_v) <= 20:
-                _dss_s = list(_dss_v[:15])
-                if len(_dss_j.dumps(_dss_s, default=str)) <= 500:
-                    _dss_r[_dss_n] = {"type": _dss_t, "sample": _dss_s}
-            elif isinstance(_dss_v, dict) and len(_dss_v) <= 20:
-                _dss_s2 = {str(k): repr(v)[:50] for k, v in list(_dss_v.items())[:10]}
-                _dss_r[_dss_n] = {"type": "dict", "sample": _dss_s2}
-            else:
-                try:
-                    import pandas as _dss_pd
-                    if isinstance(_dss_v, _dss_pd.DataFrame):
-                        _dss_r[_dss_n] = {"type": "dataframe", "shape": list(_dss_v.shape)}
-                        continue
-                except ImportError: pass
-                try:
-                    import numpy as _dss_np
-                    if isinstance(_dss_v, _dss_np.ndarray):
-                        _dss_r[_dss_n] = {"type": "ndarray", "shape": list(_dss_v.shape)}
-                        continue
-                except ImportError: pass
-                _dss_r[_dss_n] = {"type": _dss_t, "repr": repr(_dss_v)[:100]}
-        except Exception: pass
-except Exception: pass
-print(_dss_j.dumps(_dss_r))
-`.trim();
-
-          try {
-            let stdout = '';
-            const future = kernel.requestExecute({
-              code: snapshotCode, silent: true, store_history: false,
-            });
-            future.onIOPub = (msg: any) => {
-              if (msg.header.msg_type === 'stream' && msg.content?.name === 'stdout') {
-                stdout += msg.content.text ?? '';
-              }
-            };
-            await future.done;
-            kernelSnapshot = JSON.parse(stdout.trim() || '{}');
-          } catch {
-            // Snapshot failure is non-fatal — we still send the execution event
-          }
-        }
-
+        // kernel_snapshot (symbol_values / symbol_types) omitted: sending
+        // a requestExecute here queues a second kernel job that blocks any
+        // subsequent cell that Varys (or the user) runs immediately after.
+        // The summary_store still gets source, output, error, and
+        // AST-derived symbols_defined/consumed without a kernel roundtrip.
         apiClient.cellExecuted({
           cell_id:         cellId,
           notebook_path:   notebookPath,
@@ -588,7 +529,7 @@ print(_dss_j.dumps(_dss_r))
           had_error:       hadError,
           error_text:      errorText,
           cell_type:       cellType,
-          kernel_snapshot: kernelSnapshot,
+          kernel_snapshot: {},
         });
       } catch {
         // Non-fatal: SummaryStore update is best-effort
