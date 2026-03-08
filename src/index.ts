@@ -458,13 +458,21 @@ const plugin: JupyterFrontEndPlugin<void> = {
       const panel = notebookTracker.currentWidget;
       if (!panel) return;
 
-      // ── Reproducibility check (existing) ──
+      // ── Reproducibility check ──
+      // Only send cells up to and including the one that just executed —
+      // future cells haven't run yet so there's nothing to analyse there.
       try {
         const ctx = notebookReader.getFullContext();
         if (ctx && ctx.cells.length) {
+          const executedIndex = cell
+            ? panel.content.widgets.findIndex(w => w.model === cell.model)
+            : ctx.cells.length - 1;
+          const cellsToAnalyze = executedIndex >= 0
+            ? ctx.cells.filter(c => c.index <= executedIndex)
+            : ctx.cells;
           const result = await apiClient.analyzeReproducibility({
             notebookPath: ctx.notebookPath ?? '',
-            cells: ctx.cells,
+            cells: cellsToAnalyze,
           });
           reproStore.emit(result.issues);
         }
