@@ -12,6 +12,22 @@ SRC="/media/jmlb/datastore-8tb1/my_ideas/varys"
 source "$VARYSENV/bin/activate"
 cd "$SRC"
 
+# ── Guard: ensure OUR varys is installed (not the unrelated beOn/varys PyPI pkg)
+INSTALLED_AUTHOR=$(pip show varys 2>/dev/null | grep "^Author:" | head -1)
+INSTALLED_URL=$(pip show varys 2>/dev/null | grep "^Home-page:" | head -1)
+if echo "$INSTALLED_URL" | grep -q "beOn"; then
+    echo "==> WARNING: Wrong 'varys' package detected ($INSTALLED_URL). Reinstalling ours..."
+    pip uninstall varys -y
+    pip install -e "$SRC"
+fi
+# Also ensure the extension config is present so JupyterLab actually loads it.
+EXT_CFG="$VARYSENV/etc/jupyter/jupyter_server_config.d/varys.json"
+if [ ! -f "$EXT_CFG" ]; then
+    echo "==> Installing Jupyter server extension config..."
+    mkdir -p "$(dirname "$EXT_CFG")"
+    cp "$SRC/jupyter-config/jupyter_server_config.d/varys.json" "$EXT_CFG"
+fi
+
 echo "==> Compiling TypeScript..."
 npx tsc
 

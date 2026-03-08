@@ -18,11 +18,22 @@ def _jupyter_labextension_paths():
 
 
 def _jupyter_server_extension_points():
-    return [{"module": "varys", "app": DSAssistantExtension}]
+    # Do NOT include "app" here. The ExtensionApp class-based loader path
+    # fails in certain jupyter_server 2.x contexts because the traitlet
+    # validator that creates DSAssistantExtension() runs at registration
+    # time (before the server is fully initialised), and the resulting
+    # instance can be silently dropped, leaving self.app=None.  Using only
+    # "module" forces jupyter_server to call the module-level
+    # _load_jupyter_server_extension below, which is explicit and reliable.
+    return [{"module": "varys", "name": "varys"}]
 
 
-def load_jupyter_server_extension(serverapp):
-    """Load the Jupyter server extension (legacy support)."""
-    extension = DSAssistantExtension()
-    extension.serverapp = serverapp
-    extension.initialize()
+def _load_jupyter_server_extension(serverapp):
+    """Load the Jupyter server extension."""
+    ext = DSAssistantExtension()
+    ext._link_jupyter_server_extension(serverapp)
+    ext.initialize()
+
+
+# Keep the legacy name so older jupyter_server versions (< 2) still work.
+load_jupyter_server_extension = _load_jupyter_server_extension
