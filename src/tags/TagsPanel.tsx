@@ -207,21 +207,13 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
       {/* ── Create Tag form ──────────────────────────────────────────────── */}
       <div className="ds-tp-create-section">
         <div className="ds-tp-create-header">New Tag</div>
-        <div className="ds-tp-create-row1">
-          <input
-            className="ds-tp-name-input"
-            placeholder="tag-value"
-            value={newValue}
-            onChange={e => { setNewValue(e.target.value); setNameErr(''); }}
-            onKeyDown={e => { if (e.key === 'Enter') createTag(); }}
-          />
-          <button
-            className="ds-tp-create-btn"
-            onClick={createTag}
-            disabled={!newValue.trim()}
-          >+ Create</button>
-        </div>
-        <ColorPicker value={newColor} onChange={setNewColor} />
+        <input
+          className="ds-tp-name-input"
+          placeholder="tag-value"
+          value={newValue}
+          onChange={e => { setNewValue(e.target.value); setNameErr(''); }}
+          onKeyDown={e => { if (e.key === 'Enter') createTag(); }}
+        />
         <input
           className="ds-tp-desc-input"
           placeholder="Description (optional)"
@@ -229,7 +221,13 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
           onChange={e => setNewDesc(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') createTag(); }}
         />
+        <ColorPicker value={newColor} onChange={setNewColor} />
         {nameErr && <p className="ds-tp-error">{nameErr}</p>}
+        <button
+          className="ds-tp-create-btn"
+          onClick={createTag}
+          disabled={!newValue.trim()}
+        >+ Create</button>
       </div>
 
       {/* ── Body: tag list (left) + details (right) ──────────────────────── */}
