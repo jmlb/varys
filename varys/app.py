@@ -80,14 +80,16 @@ class DSAssistantExtension(ExtensionApp):
         # Values are provider names matching the .env blocks (e.g. ANTHROPIC).
         # Stored lower-case internally.
         # ----------------------------------------------------------------
-        chat_provider       = os.environ.get("DS_CHAT_PROVIDER", "").upper()
-        completion_provider = os.environ.get("DS_COMPLETION_PROVIDER", "").upper()
+        chat_provider         = os.environ.get("DS_CHAT_PROVIDER", "").upper()
+        completion_provider   = os.environ.get("DS_COMPLETION_PROVIDER", "").upper()
+        simple_tasks_provider = os.environ.get("DS_SIMPLE_TASKS_PROVIDER", "").upper()
 
-        providers_in_use = {chat_provider, completion_provider}
+        providers_in_use = {chat_provider, completion_provider, simple_tasks_provider}
         settings_patch: dict = {
-            "ds_assistant_root_dir":            self.serverapp.root_dir,
-            "ds_assistant_chat_provider":       chat_provider.lower(),
-            "ds_assistant_completion_provider": completion_provider.lower(),
+            "ds_assistant_root_dir":              self.serverapp.root_dir,
+            "ds_assistant_chat_provider":         chat_provider.lower(),
+            "ds_assistant_completion_provider":   completion_provider.lower(),
+            "ds_assistant_simple_tasks_provider": simple_tasks_provider.lower(),
         }
 
         # ----------------------------------------------------------------
@@ -124,13 +126,18 @@ class DSAssistantExtension(ExtensionApp):
         embed_provider = os.environ.get("DS_EMBED_PROVIDER", "").upper()
         settings_patch["ds_assistant_embed_provider"] = embed_provider.lower()
 
-        # Collect {PROVIDER}_{TASK}_MODEL for every provider
+        # Collect {PROVIDER}_{TASK}_MODEL for every provider and task type
         all_providers = {"ANTHROPIC", "OLLAMA", "OPENAI", "GOOGLE", "BEDROCK", "AZURE", "OPENROUTER"}
         for provider in all_providers:
-            for task in ("chat", "completion", "embed"):
+            for task in ("chat", "completion", "embed", "simple_tasks"):
                 env_key  = f"{provider}_{task.upper()}_MODEL"
                 sett_key = f"ds_assistant_{provider.lower()}_{task}_model"
                 settings_patch[sett_key] = os.environ.get(env_key, "")
+
+        # Completion token limit
+        settings_patch["ds_assistant_completion_max_tokens"] = int(
+            os.environ.get("COMPLETION_MAX_TOKENS", "") or "128"
+        )
 
         self.settings.update(settings_patch)
 

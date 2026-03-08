@@ -20,27 +20,32 @@ from tornado.web import authenticated
 
 # Keys exposed to the UI (in display order)
 _ENV_KEYS = [
+    # ── Routing ──────────────────────────────────────────────────────────
     "DS_CHAT_PROVIDER",
     "DS_COMPLETION_PROVIDER",
     "COMPLETION_MAX_TOKENS",
+    "DS_EMBED_PROVIDER",
     "DS_SIMPLE_TASKS_PROVIDER",
-    # Anthropic
+    # ── Anthropic ────────────────────────────────────────────────────────
     "ANTHROPIC_API_KEY",
     "ANTHROPIC_CHAT_MODEL",
     "ANTHROPIC_COMPLETION_MODEL",
     "ANTHROPIC_SIMPLE_TASKS_MODEL",
+    "ANTHROPIC_EMBED_MODEL",
     "ANTHROPIC_EXTENDED_THINKING",
-    # OpenAI
+    # ── OpenAI ───────────────────────────────────────────────────────────
     "OPENAI_API_KEY",
     "OPENAI_CHAT_MODEL",
     "OPENAI_COMPLETION_MODEL",
     "OPENAI_SIMPLE_TASKS_MODEL",
-    # Google
+    "OPENAI_EMBED_MODEL",
+    # ── Google ───────────────────────────────────────────────────────────
     "GOOGLE_API_KEY",
     "GOOGLE_CHAT_MODEL",
     "GOOGLE_COMPLETION_MODEL",
     "GOOGLE_SIMPLE_TASKS_MODEL",
-    # AWS Bedrock
+    "GOOGLE_EMBED_MODEL",
+    # ── AWS Bedrock ──────────────────────────────────────────────────────
     "AWS_PROFILE",
     "AWS_AUTH_REFRESH",
     "AWS_ACCESS_KEY_ID",
@@ -50,26 +55,30 @@ _ENV_KEYS = [
     "BEDROCK_CHAT_MODEL",
     "BEDROCK_COMPLETION_MODEL",
     "BEDROCK_SIMPLE_TASKS_MODEL",
-    # Azure OpenAI
+    "BEDROCK_EMBED_MODEL",
+    # ── Azure OpenAI ─────────────────────────────────────────────────────
     "AZURE_OPENAI_API_KEY",
     "AZURE_OPENAI_ENDPOINT",
     "AZURE_OPENAI_API_VERSION",
     "AZURE_CHAT_MODEL",
     "AZURE_COMPLETION_MODEL",
     "AZURE_SIMPLE_TASKS_MODEL",
-    # Ollama
+    "AZURE_EMBED_MODEL",
+    # ── Ollama ───────────────────────────────────────────────────────────
     "OLLAMA_URL",
     "OLLAMA_CHAT_MODEL",
     "OLLAMA_COMPLETION_MODEL",
     "OLLAMA_SIMPLE_TASKS_MODEL",
-    # OpenRouter
+    "OLLAMA_EMBED_MODEL",
+    # ── OpenRouter ───────────────────────────────────────────────────────
     "OPENROUTER_API_KEY",
     "OPENROUTER_SITE_URL",
     "OPENROUTER_SITE_NAME",
     "OPENROUTER_CHAT_MODEL",
     "OPENROUTER_COMPLETION_MODEL",
     "OPENROUTER_SIMPLE_TASKS_MODEL",
-    # Model zoos (comma-separated lists, one per provider)
+    "OPENROUTER_EMBED_MODEL",
+    # ── Model zoos (comma-separated lists, one per provider) ─────────────
     "ANTHROPIC_MODELS",
     "OPENAI_MODELS",
     "GOOGLE_MODELS",
@@ -97,7 +106,11 @@ def _env_path(settings: dict) -> Path:
 
 
 def _read_env(path: Path) -> dict:
-    """Parse key=value pairs from an .env file."""
+    """Parse key=value pairs from an .env file.
+
+    Consistent with factory._load_varys_env(): strips surrounding quotes and
+    inline comments so the UI never shows raw ``"sk-ant-..."`` values.
+    """
     values: dict = {}
     if not path.exists():
         return values
@@ -110,6 +123,8 @@ def _read_env(path: Path) -> dict:
             key, val = m.group(1), m.group(2).strip()
             # Strip inline comments (value ends at first unquoted #)
             val = re.sub(r"\s+#.*$", "", val)
+            # Strip surrounding quotes (single or double) — same as factory._load_varys_env
+            val = val.strip("\"'")
             values[key] = val
     return values
 
@@ -152,6 +167,7 @@ def _reload_settings(handler: JupyterHandler, env_path: Path) -> None:
     s["ds_assistant_chat_provider"]           = os.environ.get("DS_CHAT_PROVIDER", "").lower()
     s["ds_assistant_completion_provider"]     = os.environ.get("DS_COMPLETION_PROVIDER", "").lower()
     s["ds_assistant_completion_max_tokens"]   = int(os.environ.get("COMPLETION_MAX_TOKENS", "") or "128")
+    s["ds_assistant_embed_provider"]          = os.environ.get("DS_EMBED_PROVIDER", "").lower()
     s["ds_assistant_simple_tasks_provider"]   = os.environ.get("DS_SIMPLE_TASKS_PROVIDER", "").lower()
 
     # Anthropic feature flags (default true — "false" string turns them off)
@@ -178,7 +194,7 @@ def _reload_settings(handler: JupyterHandler, env_path: Path) -> None:
     s["ds_assistant_openrouter_site_name"]       = os.environ.get("OPENROUTER_SITE_NAME", "Varys")
 
     for provider in ("ANTHROPIC", "OPENAI", "GOOGLE", "BEDROCK", "AZURE", "OPENROUTER", "OLLAMA"):
-        for task in ("chat", "completion", "simple_tasks"):
+        for task in ("chat", "completion", "embed", "simple_tasks"):
             s[f"ds_assistant_{provider.lower()}_{task}_model"] = os.environ.get(
                 f"{provider}_{task.upper()}_MODEL", ""
             )
