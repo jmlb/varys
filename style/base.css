@@ -6301,9 +6301,26 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
   color: var(--ds-text-dim, #bbb);
   font-style: italic;
 }
-.ds-tp-details-del-btn {
+/* Action row: Edit + Delete side by side */
+.ds-tp-details-actions {
   margin-top: auto;
-  padding: 2px 5px;
+  display: flex;
+  gap: 4px;
+}
+.ds-tp-details-edit-btn {
+  flex: 1;
+  padding: 3px 5px;
+  border-radius: 5px;
+  border: 1px solid var(--jp-border-color1, #ccc);
+  background: none;
+  color: var(--jp-ui-font-color2, #555);
+  font-size: 8.5px;
+  cursor: pointer;
+  text-align: center;
+}
+.ds-tp-details-edit-btn:hover { background: var(--jp-layout-color2, #e8e8e8); }
+.ds-tp-details-del-btn {
+  padding: 3px 6px;
   border-radius: 5px;
   border: 1px solid rgba(239,68,68,0.35);
   background: rgba(239,68,68,0.06);
@@ -6313,6 +6330,67 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
   text-align: center;
 }
 .ds-tp-details-del-btn:hover { background: rgba(239,68,68,0.15); }
+
+/* Edit mode controls in the details panel */
+.ds-tp-edit-input,
+.ds-tp-edit-select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 3px 6px;
+  border: 1px solid var(--jp-border-color1, #ccc);
+  border-radius: 5px;
+  font-size: 9px;
+  background: var(--jp-layout-color0, #fff);
+  color: var(--jp-ui-font-color1, #111);
+}
+.ds-tp-edit-input:focus,
+.ds-tp-edit-select:focus { outline: none; border-color: var(--jp-brand-color1, #1976d2); }
+.ds-tp-edit-select { cursor: pointer; }
+.ds-tp-edit-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: auto;
+}
+.ds-tp-edit-save-btn {
+  flex: 1;
+  padding: 3px 5px;
+  border: none;
+  border-radius: 5px;
+  background: var(--jp-brand-color1, #1976d2);
+  color: #fff;
+  font-size: 8.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ds-tp-edit-save-btn:hover { background: var(--jp-brand-color0, #1565c0); }
+.ds-tp-edit-cancel-btn {
+  padding: 3px 7px;
+  border: 1px solid var(--jp-border-color1, #ccc);
+  border-radius: 5px;
+  background: none;
+  color: var(--jp-ui-font-color2, #666);
+  font-size: 8.5px;
+  cursor: pointer;
+}
+.ds-tp-edit-cancel-btn:hover { background: var(--jp-layout-color2, #e8e8e8); }
+
+/* Night mode for edit controls */
+.ds-chat-night .ds-tp-details-edit-btn {
+  border-color: #45475a;
+  color: #a6adc8;
+}
+.ds-chat-night .ds-tp-details-edit-btn:hover { background: rgba(255,255,255,0.08); }
+.ds-chat-night .ds-tp-edit-input,
+.ds-chat-night .ds-tp-edit-select {
+  background: #181825;
+  border-color: #45475a;
+  color: #cdd6f4;
+}
+.ds-chat-night .ds-tp-edit-cancel-btn {
+  border-color: #45475a;
+  color: #a6adc8;
+}
+.ds-chat-night .ds-tp-edit-cancel-btn:hover { background: rgba(255,255,255,0.06); }
 
 /* ── Night mode ──────────────────────────────────────────────────────────── */
 .ds-chat-night .ds-tp-create-section {

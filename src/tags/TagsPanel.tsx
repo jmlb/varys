@@ -163,6 +163,12 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
   const [newColor, setNewColor] = useState(TAG_PALETTE[0]);
   const [nameErr,  setNameErr]  = useState('');
 
+  // Edit mode (details panel)
+  const [editMode,  setEditMode]  = useState(false);
+  const [editDesc,  setEditDesc]  = useState('');
+  const [editTopic, setEditTopic] = useState('');
+  const [editColor, setEditColor] = useState(TAG_PALETTE[0]);
+
   // Live JSON preview object for the create form
   const previewJson = JSON.stringify({
     value:       newValue.trim() || '…',
@@ -212,7 +218,33 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
     setCustomTags(updated);
     saveCustomTagsToStorage(updated);
     if (selectedTag === tagValue) setSelectedTag(null);
+    setEditMode(false);
   };
+
+  // ── Edit ──────────────────────────────────────────────────────────────────
+  const beginEdit = (tag: CustomTagDef) => {
+    setEditDesc(tag.description);
+    setEditTopic(tag.topic);
+    setEditColor(tag.color ?? tagColorAuto(tag.value));
+    setEditMode(true);
+  };
+
+  const saveEdit = () => {
+    if (!selectedTag) return;
+    const updated = customTags.map(t =>
+      t.value === selectedTag
+        ? { ...t, description: editDesc.trim(), topic: editTopic, color: editColor }
+        : t
+    );
+    setCustomTags(updated);
+    saveCustomTagsToStorage(updated);
+    setEditMode(false);
+  };
+
+  const cancelEdit = () => setEditMode(false);
+
+  // Exit edit mode whenever selection changes
+  useEffect(() => { setEditMode(false); }, [selectedTag]);
 
   // ── Selected tag meta ─────────────────────────────────────────────────────
   const isCustom = selectedTag ? customTags.some(t => t.value === selectedTag) : false;
@@ -319,34 +351,74 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ notebookTracker }) => {
         <div className="ds-tp-details">
           {selectedTag ? (
             <>
+              {/* Pill always visible */}
               <span
                 className="ds-tp-details-pill"
-                style={{ '--pill-color': selColor } as React.CSSProperties}
+                style={{ '--pill-color': editMode ? editColor : selColor } as React.CSSProperties}
               >{selectedTag}</span>
 
-              <div className="ds-tp-details-color-row">
-                <span className="ds-tp-details-swatch" style={{ background: selColor }} />
-                <span className="ds-tp-details-hex">{selColor}</span>
-              </div>
+              {editMode ? (
+                /* ── Edit mode ──────────────────────────────────────── */
+                <>
+                  <ColorPicker value={editColor} onChange={setEditColor} />
 
-              <div className="ds-tp-details-json">
-                <pre className="ds-tp-details-json-pre">{JSON.stringify(
-                  { value: selectedTag, topic: selTopic, description: selDesc, color: selColor },
-                  null, 2
-                )}</pre>
-              </div>
+                  <input
+                    className="ds-tp-edit-input"
+                    placeholder="Description"
+                    value={editDesc}
+                    onChange={e => setEditDesc(e.target.value)}
+                  />
 
-              {selDesc ? (
-                <p className="ds-tp-details-desc">{selDesc}</p>
+                  <select
+                    className="ds-tp-edit-select"
+                    value={editTopic}
+                    onChange={e => setEditTopic(e.target.value)}
+                  >
+                    <option value="">— Topic —</option>
+                    {BUILT_IN_TOPICS.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+
+                  <div className="ds-tp-edit-actions">
+                    <button className="ds-tp-edit-save-btn"   onClick={saveEdit}>✓ Save</button>
+                    <button className="ds-tp-edit-cancel-btn" onClick={cancelEdit}>✕</button>
+                  </div>
+                </>
               ) : (
-                <p className="ds-tp-details-desc ds-tp-details-desc--empty">No description.</p>
-              )}
+                /* ── View mode ──────────────────────────────────────── */
+                <>
+                  <div className="ds-tp-details-color-row">
+                    <span className="ds-tp-details-swatch" style={{ background: selColor }} />
+                    <span className="ds-tp-details-hex">{selColor}</span>
+                  </div>
 
-              {isCustom && (
-                <button
-                  className="ds-tp-details-del-btn"
-                  onClick={() => deleteCustomTag(selectedTag)}
-                >🗑 Delete</button>
+                  <div className="ds-tp-details-json">
+                    <pre className="ds-tp-details-json-pre">{JSON.stringify(
+                      { value: selectedTag, topic: selTopic, description: selDesc, color: selColor },
+                      null, 2
+                    )}</pre>
+                  </div>
+
+                  {selDesc ? (
+                    <p className="ds-tp-details-desc">{selDesc}</p>
+                  ) : (
+                    <p className="ds-tp-details-desc ds-tp-details-desc--empty">No description.</p>
+                  )}
+
+                  {isCustom && (
+                    <div className="ds-tp-details-actions">
+                      <button
+                        className="ds-tp-details-edit-btn"
+                        onClick={() => beginEdit(customTags.find(t => t.value === selectedTag)!)}
+                      >✎ Edit</button>
+                      <button
+                        className="ds-tp-details-del-btn"
+                        onClick={() => deleteCustomTag(selectedTag)}
+                      >🗑</button>
+                    </div>
+                  )}
+                </>
               )}
             </>
           ) : (
