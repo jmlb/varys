@@ -5,6 +5,10 @@
  *   • LEFT  — coloured tag pills (only when the cell carries tags)
  *   • RIGHT — a small "#N" position badge (always, on every cell)
  *
+ * Clicking a tag pill enters "delete mode" — the pill expands to show an ×
+ * button. Clicking × removes the tag from cell metadata and re-renders.
+ * Clicking anywhere else dismisses delete mode.
+ *
  * The position number reflects the cell's 1-based index in the notebook and
  * updates automatically whenever:
  *   • The active cell or notebook changes
@@ -34,8 +38,40 @@ function clearOverlays(): void {
   document.querySelectorAll(`.${OVERLAY_CLASS}`).forEach(el => el.remove());
 }
 
+/**
+ * Remove a tag from a cell's metadata and trigger a re-render.
+ * Operates directly on the JupyterLab cell model.
+ */
+function deleteTag(
+  tracker: INotebookTracker,
+  cellIndex: number,
+  tagToRemove: string,
+  refresh: () => void,
+): void {
+  const nb = tracker.currentWidget?.content;
+  if (!nb?.model) return;
+  const cellModel = nb.model.cells.get(cellIndex);
+  if (!cellModel) return;
+
+  const current = (cellModel.metadata['tags'] as string[] | undefined) ?? [];
+  const updated  = current.filter(t => t !== tagToRemove);
+
+  if (updated.length > 0) {
+    cellModel.setMetadata('tags', updated);
+  } else {
+    // Remove the key entirely when no tags remain
+    try {
+      (cellModel as any).deleteMetadata?.('tags')
+        ?? cellModel.setMetadata('tags', undefined as any);
+    } catch {
+      cellModel.setMetadata('tags', [] as any);
+    }
+  }
+  refresh();
+}
+
 /** Render tag + position overlays for every cell in the current notebook. */
-function renderOverlays(tracker: INotebookTracker): void {
+function renderOverlays(tracker: INotebookTracker, refresh: () => void): void {
   clearOverlays();
 
   const nb = tracker.currentWidget?.content;
@@ -62,13 +98,64 @@ function renderOverlays(tracker: INotebookTracker): void {
     if (tags.length > 0) {
       const pillsGroup = document.createElement('span');
       pillsGroup.className = 'ds-overlay-tags';
+
       for (const tag of tags) {
+        const cellIdx = i; // capture for closure
+
         const pill = document.createElement('span');
         pill.className = 'ds-cell-tag-pill';
-        pill.textContent = tag;
         pill.style.setProperty('--pill-color', tagColor(tag));
+        pill.style.pointerEvents = 'auto';
+        pill.style.cursor = 'pointer';
+        pill.title = `Click to remove "${tag}"`;
+
+        const label = document.createElement('span');
+        label.className = 'ds-cell-tag-pill-label';
+        label.textContent = tag;
+
+        const removeBtn = document.createElement('span');
+        removeBtn.className = 'ds-cell-tag-pill-remove';
+        removeBtn.textContent = '×';
+        removeBtn.title = `Remove tag "${tag}"`;
+
+        pill.appendChild(label);
+        pill.appendChild(removeBtn);
+
+        // Click the pill label → toggle "pending delete" state
+        let pending = false;
+        const dismissPending = (e?: Event) => {
+          if (e) e.stopPropagation();
+          pending = false;
+          pill.classList.remove('ds-cell-tag-pill--pending');
+        };
+
+        pill.addEventListener('click', e => {
+          e.stopPropagation(); // don't propagate to cell or document
+          if (pending) {
+            // Second click on pill itself → cancel
+            dismissPending();
+          } else {
+            pending = true;
+            pill.classList.add('ds-cell-tag-pill--pending');
+            // Dismiss if user clicks anywhere outside this pill
+            const onOutside = (ev: MouseEvent) => {
+              if (!pill.contains(ev.target as Node)) {
+                dismissPending();
+                document.removeEventListener('click', onOutside, true);
+              }
+            };
+            document.addEventListener('click', onOutside, true);
+          }
+        });
+
+        removeBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          deleteTag(tracker, cellIdx, tag, refresh);
+        });
+
         pillsGroup.appendChild(pill);
       }
+
       bar.appendChild(pillsGroup);
     }
 
@@ -108,7 +195,7 @@ function connectModelSignal(
  * Returns a cleanup function.
  */
 export function initCellTagOverlay(tracker: INotebookTracker): () => void {
-  const refresh = () => renderOverlays(tracker);
+  const refresh = () => renderOverlays(tracker, refresh);
 
   // Re-render and rewire the model signal whenever the active notebook changes.
   const onNotebookChanged = () => {

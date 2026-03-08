@@ -5,6 +5,10 @@
  *   • LEFT  — coloured tag pills (only when the cell carries tags)
  *   • RIGHT — a small "#N" position badge (always, on every cell)
  *
+ * Clicking a tag pill enters "delete mode" — the pill expands to show an ×
+ * button. Clicking × removes the tag from cell metadata and re-renders.
+ * Clicking anywhere else dismisses delete mode.
+ *
  * The position number reflects the cell's 1-based index in the notebook and
  * updates automatically whenever:
  *   • The active cell or notebook changes
