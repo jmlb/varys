@@ -181,6 +181,11 @@ interface Message {
    * 'error_recovery' — renders an image-error recovery prompt with command chips.
    */
   subtype?: 'error_recovery';
+  /**
+   * LLM provider at the time of an image_too_large error (e.g. "anthropic", "openai").
+   * Used by the recovery prompt to show only the relevant resize option.
+   */
+  errorProvider?: string;
 }
 
 // Report generation is triggered only by the explicit /report command.
@@ -213,16 +218,47 @@ function looksAdvisory(message: string, phrases: string[] = _ADVISORY_STARTS): b
 // ImageRecoveryPrompt — compact inline message + dropdown for image errors
 // ---------------------------------------------------------------------------
 interface ImageRecoveryPromptProps {
-  onSelect: (cmd: string) => void;
+  /** The original user message that triggered the error. */
+  originalMessage: string;
+  /** Lowercase provider name ("anthropic", "openai", …). */
+  provider: string;
+  /**
+   * Called with the full pre-filled text: "/<cmd> <originalMessage>".
+   * The parent places this into the textarea so the user just presses Enter.
+   */
+  onFill: (text: string) => void;
 }
 
-const ImageRecoveryPrompt: React.FC<ImageRecoveryPromptProps> = ({ onSelect }) => {
-  const [open, setOpen]           = useState(false);
+const ImageRecoveryPrompt: React.FC<ImageRecoveryPromptProps> = ({
+  originalMessage, provider, onFill,
+}) => {
+  const [open, setOpen]             = useState(false);
   const [showCustom, setShowCustom] = useState(false);
-  const [customDim, setCustomDim] = useState('');
-  const dropRef = useRef<HTMLDivElement>(null);
+  const [customDim, setCustomDim]   = useState('');
+  const [flipUp, setFlipUp]         = useState(false);
+  const dropRef    = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
-  // Close dropdown on outside click
+  // Build provider-aware resize options
+  const resizeOptions: [string, string][] = provider.includes('anthropic')
+    ? [['/resize(7800)', 'Resize to 7800 px']]
+    : provider.includes('openai')
+    ? [['/resize(6000)', 'Resize to 6000 px']]
+    : [['/resize(7800)', 'Resize to 7800 px (Anthropic)'], ['/resize(6000)', 'Resize to 6000 px (OpenAI)']];
+
+  const staticOptions: [string, string][] = [
+    ['/no_figures', 'Exclude all figures'],
+    ...resizeOptions,
+  ];
+
+  // Decide whether to open the menu upward based on available space below
+  useEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setFlipUp(rect.bottom > window.innerHeight * 0.55);
+  }, [open]);
+
+  // Close on outside click
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
@@ -239,7 +275,8 @@ const ImageRecoveryPrompt: React.FC<ImageRecoveryPromptProps> = ({ onSelect }) =
     setOpen(false);
     setShowCustom(false);
     setCustomDim('');
-    onSelect(cmd);
+    // Prefix the original message with the command so pressing Enter re-sends
+    onFill(`${cmd} ${originalMessage}`);
   };
 
   const submitCustom = () => {
@@ -255,18 +292,15 @@ const ImageRecoveryPrompt: React.FC<ImageRecoveryPromptProps> = ({ onSelect }) =
       </span>
       <div className="ds-img-rec-wrap" ref={dropRef}>
         <button
+          ref={triggerRef}
           className={`ds-img-rec-trigger${open ? ' ds-img-rec-trigger--open' : ''}`}
           onClick={() => { setOpen(o => !o); setShowCustom(false); }}
         >
           Choose action <span className="ds-img-rec-caret">{open ? '▲' : '▼'}</span>
         </button>
         {open && (
-          <div className="ds-img-rec-menu">
-            {([
-              ['/no_figures',   'Exclude all figures'],
-              ['/resize(7800)', 'Resize to 7800 px  (Anthropic)'],
-              ['/resize(6000)', 'Resize to 6000 px  (OpenAI)'],
-            ] as [string, string][]).map(([cmd, desc]) => (
+          <div className={`ds-img-rec-menu${flipUp ? ' ds-img-rec-menu--up' : ''}`}>
+            {staticOptions.map(([cmd, desc]) => (
               <button key={cmd} className="ds-img-rec-item" onClick={() => pick(cmd)}>
                 <code className="ds-img-rec-cmd">{cmd}</code>
                 <span className="ds-img-rec-desc">{desc}</span>
@@ -3407,29 +3441,45 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
 
     // ── /resize(DIM) — special pre-check ─────────────────────────────────
     // parseSlashCommand() uses [\w-]+ which doesn't capture parentheses, so
-    // /resize(7800) won't parse as a recognised command without this step.
-    const resizeCmdMatch = rawInput.trim().match(/^\/resize\((\d+)\)$/i);
+    // /resize(7800) and /resize(7800) <message> must be detected here before
+    // the regular slash-command parser runs.
+    //
+    // Two forms:
+    //   /resize(7800)            → set mode, show confirmation, stop
+    //   /resize(7800) <message>  → set mode, then treat <message> as the input
+    const resizeCmdMatch = rawInput.trim().match(/^\/resize\((\d+)\)([\s\S]*)$/i);
+    let slashCommand: string | undefined;
+    let message = '';
+    // _effectiveInput: what the slash-command parser and task flow use.
+    // Normally equals rawInput; for /resize(DIM) <rest> it becomes just <rest>.
+    let _effectiveInput = rawInput;
+
     if (resizeCmdMatch) {
       setInput('');
-      const dim = parseInt(resizeCmdMatch[1], 10);
+      const dim  = parseInt(resizeCmdMatch[1], 10);
+      const rest = resizeCmdMatch[2].trim();
       if (dim < 10) {
         addMessage('system', `❌ Invalid resize dimension: must be ≥ 10 (got **${dim}**). Nothing changed.`);
-      } else {
-        setImageMode({ mode: 'resize', dim });
+        return;
+      }
+      setImageMode({ mode: 'resize', dim });
+      if (!rest) {
         addMessage('system',
           `🔬 Resize mode active — figures will be downscaled to **${dim}px** max before sending.\n\n` +
           `Re-send your message to proceed.`
         );
+        return;
       }
-      return;
+      // Has a trailing message — treat it as a plain message with mode already set
+      message          = rest;
+      _effectiveInput  = rest;
+      // Fall through to disambiguation / task flow below (skip command parsing)
     }
 
     // ── Slash-command parsing ────────────────────────────────────────────
     // If the input starts with a /command, extract it and use the remainder
     // as the actual user message sent to the LLM.
-    const parsed = parseSlashCommand(rawInput);
-    let slashCommand: string | undefined;
-    let message: string;
+    const parsed = resizeCmdMatch ? null : parseSlashCommand(_effectiveInput);
 
     if (parsed) {
       // Check if it is a built-in command
@@ -3466,6 +3516,12 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
           slashCommand = '/chat';
           message      = parsed.rest.trim();
           // Don't return early — fall through to the main task flow below.
+        } else if (parsed.command === '/no_figures' && parsed.rest) {
+          // /no_figures <message>: set strip mode and send the message.
+          // This form is produced by the recovery prompt pre-fill.
+          setImageMode({ mode: 'no_figures' });
+          message = parsed.rest.trim();
+          // Fall through to task flow (no slashCommand — plain message with mode set).
         } else {
           // All other built-ins (including no-arg /ask, /index, /rag)
           handleBuiltinCommand(parsed.command);
@@ -3486,10 +3542,11 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
           return;
         }
         slashCommand = parsed.command;
-        message      = parsed.rest || rawInput;
+        message      = parsed.rest || _effectiveInput;
       }
-    } else {
-      message = rawInput;
+    } else if (!resizeCmdMatch) {
+      // Plain message (no command, no /resize pre-match already set message)
+      message = _effectiveInput;
     }
 
     // Clear command UI state
@@ -3835,7 +3892,8 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
           id: generateId(),
           role: 'system' as const,
           subtype: 'error_recovery' as const,
-          content: 'image_too_large',
+          content: message,               // original user message — used by recovery prompt to pre-fill
+          errorProvider: response.errorProvider ?? '',
           timestamp: new Date(),
         }]);
         return;
@@ -4715,7 +4773,20 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
           >
             {msg.subtype === 'error_recovery' ? (
               /* ── Image dimension error — recovery prompt ─────── */
-              <ImageRecoveryPrompt onSelect={cmd => void handleSend(cmd)} />
+              <ImageRecoveryPrompt
+                originalMessage={msg.content}
+                provider={msg.errorProvider ?? ''}
+                onFill={text => {
+                  setInput(text);
+                  requestAnimationFrame(() => {
+                    if (textareaRef.current) {
+                      textareaRef.current.focus();
+                      const len = textareaRef.current.value.length;
+                      textareaRef.current.setSelectionRange(len, len);
+                    }
+                  });
+                }}
+              />
             ) : msg.role === 'disambiguation' ? (
               /* ── Disambiguation card ───────────────────────────── */
               <DisambiguationCard

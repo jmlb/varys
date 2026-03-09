@@ -262,6 +262,11 @@ export interface TaskResponse {
    */
   errorType?: string;
   /**
+   * LLM provider name when errorType === "image_too_large" (e.g. "anthropic", "openai").
+   * Used by the frontend to show only the relevant resize option.
+   */
+  errorProvider?: string;
+  /**
    * Populated when resize mode was active and at least one image was processed.
    * Frontend uses this to show a post-action confirmation notice.
    */
@@ -386,6 +391,7 @@ export class APIClient {
                 requiresApproval: false,
                 cellInsertionMode: 'chat',
                 errorType: 'image_too_large',
+                errorProvider: (event as any).provider ?? '',
               } as TaskResponse;
             } else if (event.type === 'error') {
               // Surface API-level errors (billing, rate-limit, auth, etc.) as

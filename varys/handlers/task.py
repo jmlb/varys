@@ -1156,9 +1156,12 @@ class TaskHandler(JupyterHandler):
 
             if _is_img_dim:
                 # Return a structured event so the frontend can render the recovery UI.
+                _provider_name = self.settings.get(
+                    "ds_assistant_chat_provider", ""
+                ).lower()
                 self.set_status(200)  # SSE error events must ride on 200
                 self.set_header("Content-Type", "text/event-stream")
-                self.write(f"data: {json.dumps({'type': 'image_too_large', 'error': str(e)})}\n\n")
+                self.write(f"data: {json.dumps({'type': 'image_too_large', 'error': str(e), 'provider': _provider_name})}\n\n")
                 self.finish()
                 return
 

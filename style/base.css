@@ -7230,15 +7230,20 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
   flex-direction: column;
 }
 
+.ds-img-rec-menu--up {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
 .ds-img-rec-item {
   background: none;
   border: none;
   border-bottom: 1px solid var(--jp-border-color2);
-  padding: 7px 11px;
+  padding: 5px 10px;
   cursor: pointer;
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 7px;
   text-align: left;
   width: 100%;
   transition: background 0.1s ease;
@@ -7248,14 +7253,14 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
 
 .ds-img-rec-cmd {
   font-family: var(--jp-code-font-family);
-  font-size: 0.88em;
+  font-size: 0.78em;
   color: var(--jp-ui-font-color0);
   flex-shrink: 0;
 }
 
 .ds-img-rec-desc {
   color: var(--jp-ui-font-color2);
-  font-size: 0.82em;
+  font-size: 0.72em;
 }
 
 /* Custom-dimension input row */
@@ -7268,11 +7273,11 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
 }
 
 .ds-img-rec-dim-input {
-  width: 70px;
+  width: 66px;
   border: 1px solid var(--jp-border-color1);
   border-radius: 3px;
-  padding: 2px 5px;
-  font-size: 0.85em;
+  padding: 2px 4px;
+  font-size: 0.76em;
   background: var(--jp-layout-color0);
   color: var(--jp-ui-font-color0);
 }
@@ -7285,9 +7290,9 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
   background: var(--jp-warn-color2, #fbbf24);
   border: none;
   border-radius: 3px;
-  padding: 2px 8px;
+  padding: 2px 6px;
   cursor: pointer;
-  font-size: 0.82em;
+  font-size: 0.75em;
   color: #111;
   font-weight: 600;
   transition: opacity 0.1s ease;
