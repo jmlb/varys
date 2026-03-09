@@ -517,13 +517,16 @@ class TaskHandler(JupyterHandler):
             try:
                 from ..context.summary_store import SummaryStore
                 from ..context.assembler    import assemble_context as _assemble
-                _store = SummaryStore(root_dir, notebook_path)
+                from ..utils.paths          import nb_base as _nb_base
+                _store   = SummaryStore(root_dir, notebook_path)
+                _nb_base_path = _nb_base(root_dir, notebook_path)
                 _ctx_override = _assemble(
                     user_query             = message,
                     cell_order             = notebook_context.get("cells", []),
                     summary_store          = _store,
                     active_cell_id         = notebook_context.get("activeCellId") or None,
                     focal_cell_full_output = notebook_context.get("focalCellOutput") or None,
+                    nb_base                = _nb_base_path,
                 )
                 # Ensure notebook_context is a mutable copy before patching
                 notebook_context = dict(notebook_context)

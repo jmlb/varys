@@ -21,7 +21,8 @@ Summary object schema (spec §2.3):
     "is_mutation_only": false,
     "is_import_cell":   false,
     "truncated":        false,
-    "deleted":          false
+    "deleted":          false,
+    "tags":             ["important", "skip-execution"]
   }
 """
 from __future__ import annotations
@@ -140,6 +141,7 @@ def build_summary(
     had_error: bool,
     error_text: Optional[str],
     kernel_snapshot: Optional[Dict[str, Any]] = None,
+    tags: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Build a structured summary object for a cell.
 
@@ -155,14 +157,20 @@ def build_summary(
                           the live kernel immediately after this cell ran.  The
                           summarizer uses it to populate symbol_values/symbol_types
                           for names that appear in symbols_defined.
+        tags:             List of cell metadata tags (e.g. ``["important",
+                          "skip-execution"]``).  Defaults to an empty list.
+                          Tags are stored verbatim and never affect the source
+                          hash — use ``SummaryStore.patch_tags()`` to update them
+                          independently of a cell execution event.
     """
+    normalised_tags: List[str] = sorted(set(tags)) if tags else []
     if cell_type == "markdown":
-        return _build_markdown_summary(source)
+        return _build_markdown_summary(source, normalised_tags)
     if cell_type == "raw":
-        return _build_raw_summary(source)
+        return _build_raw_summary(source, normalised_tags)
     return _build_code_summary(
         source, output, execution_count, had_error, error_text,
-        kernel_snapshot or {}
+        kernel_snapshot or {}, normalised_tags
     )
 
 
@@ -176,6 +184,7 @@ def _build_code_summary(
     had_error: bool,
     error_text: Optional[str],
     kernel_snapshot: Dict[str, Any],
+    tags: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     is_import = _is_import_cell(source)
 
@@ -198,6 +207,7 @@ def _build_code_summary(
             "is_import_cell":   True,
             "truncated":        False,
             "deleted":          False,
+            "tags":             tags or [],
         }
 
     defined, consumed = _extract_symbols(source)
@@ -267,10 +277,14 @@ def _build_code_summary(
         "is_import_cell":   False,
         "truncated":        False,
         "deleted":          False,
+        "tags":             tags or [],
     }
 
 
-def _build_markdown_summary(source: str) -> Dict[str, Any]:
+def _build_markdown_summary(
+    source: str,
+    tags: Optional[List[str]] = None,
+) -> Dict[str, Any]:
     truncated = len(source) > MARKDOWN_THRESHOLD
     snippet = _truncate_at_sentence(source, MARKDOWN_THRESHOLD) if truncated else source
     return {
@@ -289,10 +303,14 @@ def _build_markdown_summary(source: str) -> Dict[str, Any]:
         "is_import_cell":   False,
         "truncated":        truncated,
         "deleted":          False,
+        "tags":             tags or [],
     }
 
 
-def _build_raw_summary(source: str) -> Dict[str, Any]:
+def _build_raw_summary(
+    source: str,
+    tags: Optional[List[str]] = None,
+) -> Dict[str, Any]:
     return {
         "cell_type":        "raw",
         "source_snippet":   source[:SNIPPET_CHARS],
@@ -309,6 +327,7 @@ def _build_raw_summary(source: str) -> Dict[str, Any]:
         "is_import_cell":   False,
         "truncated":        False,
         "deleted":          False,
+        "tags":             tags or [],
     }
 
 
@@ -318,6 +337,7 @@ def _build_raw_summary(source: str) -> Dict[str, Any]:
 async def build_markdown_summary_async(
     source: str,
     provider: Any,
+    tags: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Summarise a large markdown cell via the Simple Tasks LLM.
 
@@ -330,9 +350,10 @@ async def build_markdown_summary_async(
     Args:
         source:   Full markdown source text.
         provider: A configured ``BaseLLMProvider`` instance (Simple Tasks model).
+        tags:     Cell metadata tags (passed through to the summary dict).
     """
     if len(source) <= MARKDOWN_THRESHOLD:
-        return _build_markdown_summary(source)
+        return _build_markdown_summary(source, tags)
 
     capped   = source[:LLM_SUMMARY_MAX_INPUT_CHARS]
     user_msg = f"Summarize this Jupyter notebook markdown cell:\n\n{capped}"
@@ -358,6 +379,7 @@ async def build_markdown_summary_async(
             "is_import_cell":   False,
             "truncated":        False,
             "deleted":          False,
+            "tags":             tags or [],
         }
     except Exception as exc:
         _model = getattr(getattr(provider, "_chat_client", None), "model", "?")
@@ -368,7 +390,7 @@ async def build_markdown_summary_async(
             _model,
             exc,
         )
-        return _build_markdown_summary(source)
+        return _build_markdown_summary(source, tags)
 
 
 # ── Utility ────────────────────────────────────────────────────────────────────

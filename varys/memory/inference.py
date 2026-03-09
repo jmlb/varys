@@ -21,6 +21,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 log = logging.getLogger(__name__)
 
+from pathlib import Path
+
 from ..debug_logger import log as dlog  # noqa: E402 (after stdlib imports)
 
 _INFERENCE_TRIGGER_N = 10       # version writes between inference runs
@@ -122,16 +124,7 @@ def detect_patterns(summaries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     p1 = _detect_symbol_value_patterns(summaries)
     p2 = _detect_import_patterns(summaries)
-    patterns = p1 + p2
-
-    dlog("inference", "patterns_detected", {
-        "summary_count":              len(summaries),
-        "symbol_value_pattern_count": len(p1),
-        "import_pattern_count":       len(p2),
-        "patterns":                   patterns,
-    })
-
-    return patterns
+    return p1 + p2
 
 
 # ---------------------------------------------------------------------------
@@ -305,15 +298,17 @@ def _load_and_detect(root_dir: str, notebook_path: str):
     """Sync helper — runs in a thread.
 
     Constructs stores, loads summaries, and runs pattern detection.
-    Returns (patterns, store, pref_store) or None when nothing to do.
+    Returns (patterns, store, pref_store, nb_base) or None when nothing to do.
     All disk I/O (mkdir, stat, read) stays in the thread and never touches
     Tornado's event loop.
     """
     from ..context.summary_store import SummaryStore
+    from ..utils.paths import nb_base as _nb_base
     from .preference_store import PreferenceStore
 
-    store     = SummaryStore(root_dir, notebook_path)
-    pref_store = PreferenceStore(root_dir, notebook_path)
+    nb_base_path = _nb_base(root_dir, notebook_path)
+    store        = SummaryStore(root_dir, notebook_path)
+    pref_store   = PreferenceStore(root_dir, notebook_path)
 
     all_summaries_dict = store.get_all_current()
     all_summaries = [dict(v, cell_id=k) for k, v in all_summaries_dict.items()]
@@ -321,12 +316,22 @@ def _load_and_detect(root_dir: str, notebook_path: str):
         store.reset_inference_counter()
         return None
 
-    patterns = detect_patterns(all_summaries)
+    p1       = _detect_symbol_value_patterns(all_summaries)
+    p2       = _detect_import_patterns(all_summaries)
+    patterns = p1 + p2
+
+    dlog("inference", "patterns_detected", {
+        "summary_count":              len(all_summaries),
+        "symbol_value_pattern_count": len(p1),
+        "import_pattern_count":       len(p2),
+        "patterns":                   patterns,
+    }, nb_base=nb_base_path)
+
     if not patterns:
         store.reset_inference_counter()
         return None
 
-    return patterns, store, pref_store
+    return patterns, store, pref_store, nb_base_path
 
 
 def _save_inference_results(
@@ -335,6 +340,7 @@ def _save_inference_results(
     new_entries: List[Dict[str, Any]],
     pattern_count: int,
     notebook_path: str,
+    nb_base: Optional[Path] = None,
 ) -> None:
     """Sync helper — runs in a thread.
 
@@ -351,7 +357,7 @@ def _save_inference_results(
         "pattern_count":  pattern_count,
         "new_pref_count": len(new_entries),
         "preferences":    new_entries,
-    })
+    }, nb_base=nb_base)
     store.reset_inference_counter()
 
 
@@ -368,7 +374,7 @@ async def run_inference(root_dir: str, notebook_path: str, settings: dict) -> No
         if result is None:
             return
 
-        patterns, store, pref_store = result
+        patterns, store, pref_store, nb_base_path = result
 
         # Phase 2 — LLM preference generation (async, non-blocking)
         new_entries = await _generate_preference_entries(patterns, settings)
@@ -376,7 +382,7 @@ async def run_inference(root_dir: str, notebook_path: str, settings: dict) -> No
         # Phase 3 — persist results (sync disk I/O) in a thread
         await asyncio.to_thread(
             _save_inference_results,
-            store, pref_store, new_entries, len(patterns), notebook_path,
+            store, pref_store, new_entries, len(patterns), notebook_path, nb_base_path,
         )
 
     except Exception as exc:

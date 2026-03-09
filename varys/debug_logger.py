@@ -1,101 +1,102 @@
-"""Central debug logging for Varys — single entry point for all feature instrumentation.
+"""Notebook-local structured event logger for Varys feature instrumentation.
+
+All logs are written to the ``.jupyter-assistant`` directory that is
+**co-located with the notebook** — the same folder that holds chats, memory,
+RAG files and skills.  No global log directory or environment variable is
+required.
+
+Log location
+------------
+  <nb_base>/logs/<feature>/YYYY-MM-DD.jsonl
+
+  e.g.  experiments/.jupyter-assistant/logs/assembler/2026-03-03.jsonl
+        experiments/.jupyter-assistant/logs/inference/2026-03-03.jsonl
+
+Each line is one JSON record::
+
+    {
+      "ts":      "2026-03-03T12:00:00.123456+00:00",
+      "feature": "assembler",
+      "event":   "context_built",
+      ... <event-specific payload keys> ...
+    }
 
 Usage
 -----
     from varys.debug_logger import log
 
-    log("scorer", "pruning_decision", {"query": "...", "kept": 3, "dismissed": 2})
-
-All calls are no-ops when ``DEBUG_LOG=false`` (the default).  When enabled,
-records are written as newline-delimited JSON to::
-
-    DEBUG_LOG_DIR/<feature>/YYYY-MM-DD.jsonl
-
-Configuration (via ~/.jupyter/varys.env)
------------------------------------------
-    DEBUG_LOG=true              # master switch
-    DEBUG_LOG_DIR=~/.jupyter/varys_logs   # root directory for all logs
+    log("assembler", "context_built", {"cells_before": 8, "cells_after": 3},
+        nb_base=path_to_dot_jupyter_assistant)
 
 Design
 ------
-- **Lazy initialisation**: config is read from ``os.environ`` on the *first*
-  ``log()`` call, not at import time.  This avoids a cold-import race with
-  ``app.py``'s startup parsing of ``varys.env``.
-- **Thread-safe**: a module-level ``threading.Lock`` serialises all writes.
-  Each record is a single ``json.dumps`` + newline, appended atomically.
-- **Zero-overhead fast path**: after the first call, ``_enabled=False`` is
-  checked without acquiring the lock, so disabled logging costs one boolean
-  comparison per call.
+- **Always-on**: writing is unconditional when ``nb_base`` is supplied.  No
+  ``DEBUG_LOG`` env-var gate is needed — logs live with the notebook so the
+  user can inspect or delete them freely.
+- **Silent no-op**: when ``nb_base`` is ``None`` the call returns immediately
+  with zero I/O.  This preserves backward compatibility for call sites that
+  don't yet have notebook context (e.g. startup code).
+- **Thread-safe**: a per-directory ``threading.Lock`` serialises appends
+  within the same process.  Concurrent kernels targeting different notebooks
+  write to different files so there is no cross-notebook contention.
+- **Non-fatal**: every I/O error is caught and emitted at WARNING level; the
+  caller's execution path is never interrupted.
+- **Rotation**: one file per calendar day (UTC).
 """
 from __future__ import annotations
 
 import json
 import logging
-import os
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 _log = logging.getLogger(__name__)
 
-# ── Module-level state (all protected by _lock) ───────────────────────────────
-
-_lock:        threading.Lock = threading.Lock()
-_initialized: bool           = False
-_enabled:     bool           = False
-_log_dir:     Path | None    = None
+# Per-directory write locks (keyed by absolute directory path string).
+_locks: Dict[str, threading.Lock] = {}
+_locks_guard = threading.Lock()
 
 
-def _init() -> None:
-    """Read ``DEBUG_LOG`` / ``DEBUG_LOG_DIR`` from ``os.environ`` and cache.
-
-    Called exactly once — the caller must hold ``_lock``.
-    """
-    global _initialized, _enabled, _log_dir
-
-    raw = os.environ.get("DEBUG_LOG", "false").strip().lower()
-    _enabled = raw in ("1", "true", "yes", "on")
-
-    if _enabled:
-        raw_dir = os.environ.get("DEBUG_LOG_DIR", "~/.jupyter/varys_logs")
-        _log_dir = Path(raw_dir).expanduser().resolve()
-        _log.info("debug_logger: enabled — writing to %s", _log_dir)
-    else:
-        _log_dir = None
-        _log.debug("debug_logger: disabled (DEBUG_LOG=%r)", raw)
-
-    _initialized = True
+def _get_lock(directory: Path) -> threading.Lock:
+    key = str(directory)
+    with _locks_guard:
+        if key not in _locks:
+            _locks[key] = threading.Lock()
+        return _locks[key]
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
 
 
-def log(feature: str, event: str, payload: Dict[str, Any]) -> None:
-    """Write one structured debug log record.
+def log(
+    feature: str,
+    event: str,
+    payload: Dict[str, Any],
+    nb_base: Optional[Path] = None,
+) -> None:
+    """Write one structured log record to the notebook's .jupyter-assistant folder.
 
     Args:
-        feature: Logical subsystem name (e.g. ``"scorer"``, ``"assembler"``,
-                 ``"inference"``).  Determines the output subdirectory:
-                 ``DEBUG_LOG_DIR/<feature>/YYYY-MM-DD.jsonl``.
-        event:   Short event identifier (e.g. ``"pruning_decision"``).
-        payload: Arbitrary JSON-serialisable dict with event-specific data.
-                 Non-serialisable values are coerced to strings via
-                 ``json.dumps(default=str)``.
-
-    Returns immediately without any I/O when ``DEBUG_LOG`` is false or unset.
+        feature:  Logical subsystem name (e.g. ``"assembler"``, ``"inference"``).
+                  Determines the output subdirectory:
+                  ``<nb_base>/logs/<feature>/YYYY-MM-DD.jsonl``.
+        event:    Short event identifier (e.g. ``"context_built"``).
+        payload:  Arbitrary JSON-serialisable dict with event-specific data.
+                  Non-serialisable values are coerced to strings.
+        nb_base:  Path to the notebook's ``.jupyter-assistant`` directory
+                  (from ``utils.paths.nb_base()``).  Pass ``None`` to skip
+                  logging (silent no-op).
     """
-    # Fast path — skip lock acquisition once we know logging is disabled.
-    if _initialized and not _enabled:
+    if nb_base is None:
         return
 
-    with _lock:
-        if not _initialized:
-            _init()
-        if not _enabled:
-            return
+    try:
+        log_dir = nb_base / "logs" / feature
+        lock    = _get_lock(log_dir)
+        now     = datetime.now(timezone.utc)
 
-        now = datetime.now(timezone.utc)
         record: Dict[str, Any] = {
             "ts":      now.isoformat(),
             "feature": feature,
@@ -103,11 +104,11 @@ def log(feature: str, event: str, payload: Dict[str, Any]) -> None:
             **payload,
         }
 
-        try:
-            feat_dir = _log_dir / feature  # type: ignore[operator]
-            feat_dir.mkdir(parents=True, exist_ok=True)
-            day_file = feat_dir / f"{now.strftime('%Y-%m-%d')}.jsonl"
+        with lock:
+            log_dir.mkdir(parents=True, exist_ok=True)
+            day_file = log_dir / f"{now.strftime('%Y-%m-%d')}.jsonl"
             with day_file.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(record, default=str) + "\n")
-        except Exception as exc:
-            _log.warning("debug_logger: could not write log record — %s", exc)
+
+    except Exception as exc:
+        _log.warning("debug_logger: could not write log record — %s", exc)

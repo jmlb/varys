@@ -14,7 +14,12 @@ JSON schema:
         "version":   1,
         "hash":      "<sha256[:16]>",
         "timestamp": "<ISO-8601>",
-        "summary":   { ... },
+        "summary":   {
+          "cell_type":        "code | markdown | raw",
+          "tags":             ["important", "skip-execution"],
+          "tags_updated_at":  "<ISO-8601 | null>",
+          ...
+        },
         "deleted":   false
       },
       ...
@@ -195,6 +200,46 @@ class SummaryStore:
         if versions:
             versions[-1]["deleted"] = False
             self._save(data)
+
+    def patch_tags(self, cell_id: str, tags: List[str]) -> bool:
+        """Update ``tags`` in the latest version's summary without creating a new version.
+
+        Tags are cell metadata (``cell.metadata.tags`` in the notebook JSON) —
+        they are independent of source content and must NOT trigger a version
+        bump or change the source hash.  This method patches the ``summary``
+        dict in-place on the current (last) version entry.
+
+        Args:
+            cell_id: Stable JupyterLab cell UUID.
+            tags:    New complete list of tags for the cell.  Duplicates are
+                     removed and the list is sorted for deterministic storage.
+                     Pass ``[]`` to clear all tags.
+
+        Returns:
+            True  — tags were different from the stored value and the file was saved.
+            False — tags were already identical (no-op, no write performed).
+
+        If the cell has no existing entry in the store the call is a no-op
+        (returns False) — tags will be captured on the next execution event.
+        """
+        data = self._load()
+        versions: List[Dict] = data.get(cell_id, [])
+        if not versions:
+            return False
+
+        latest  = versions[-1]
+        summary = latest.get("summary")
+        if not isinstance(summary, dict):
+            return False
+
+        normalised = sorted(set(tags))
+        if summary.get("tags") == normalised:
+            return False
+
+        summary["tags"]            = normalised
+        summary["tags_updated_at"] = self._now()
+        self._save(data)
+        return True
 
     def get_version_history(self, cell_id: str) -> List[Dict]:
         """Return all version snapshots for a cell.

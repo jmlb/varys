@@ -15,7 +15,8 @@ Expected request body:
     "had_error":        false,
     "error_text":       null,
     "cell_type":        "code",
-    "kernel_snapshot":  { "var_name": {"type": "int", "value": 42}, ... }
+    "kernel_snapshot":  { "var_name": {"type": "int", "value": 42}, ... },
+    "tags":             ["important", "skip-execution"]
   }
 """
 import asyncio
@@ -65,6 +66,7 @@ class CellExecutedHandler(JupyterHandler):
                 error_text      = body.get("error_text") or None,
                 cell_type       = body.get("cell_type", "code"),
                 kernel_snapshot = body.get("kernel_snapshot") or {},
+                tags            = body.get("tags") or [],
                 settings        = dict(self.settings),
             )
         )
@@ -111,6 +113,7 @@ async def _summarize_and_store(
     error_text:      "str | None",
     cell_type:       str,
     kernel_snapshot: dict,
+    tags:            list,
     settings:        dict,
 ) -> None:
     """Build a summary and persist it to the SummaryStore.
@@ -135,7 +138,7 @@ async def _summarize_and_store(
         if cell_type == "markdown" and len(source) > MARKDOWN_THRESHOLD:
             simple_provider = create_simple_task_provider(settings)
             if simple_provider:
-                summary = await build_markdown_summary_async(source, simple_provider)
+                summary = await build_markdown_summary_async(source, simple_provider, tags=tags)
             else:
                 # build_summary is CPU-only; run in thread to avoid blocking.
                 summary = await asyncio.to_thread(
@@ -143,7 +146,7 @@ async def _summarize_and_store(
                     cell_id=cell_id, source=source, cell_type=cell_type,
                     output=output, execution_count=execution_count,
                     had_error=had_error, error_text=error_text,
-                    kernel_snapshot=kernel_snapshot,
+                    kernel_snapshot=kernel_snapshot, tags=tags,
                 )
         else:
             # build_summary does AST parsing + string work — run in thread.
@@ -152,7 +155,7 @@ async def _summarize_and_store(
                 cell_id=cell_id, source=source, cell_type=cell_type,
                 output=output, execution_count=execution_count,
                 had_error=had_error, error_text=error_text,
-                kernel_snapshot=kernel_snapshot,
+                kernel_snapshot=kernel_snapshot, tags=tags,
             )
 
         # Persist summary to disk in a thread.
