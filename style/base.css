@@ -1769,12 +1769,14 @@
 }
 .ds-reasoning-menu {
   position: absolute;
-  top: calc(100% + 4px);
+  /* Open upward — chip is at top of the input area, so downward would clip */
+  bottom: calc(100% + 4px);
+  top: auto;
   left: 0;
   z-index: 120;
-  min-width: 170px;
-  background: var(--jp-layout-color1, #fff);
-  border: 1px solid var(--jp-border-color2, #d0d4e0);
+  min-width: 180px;
+  background: var(--ds-surface, var(--jp-layout-color1, #fff));
+  border: 1px solid var(--ds-border, var(--jp-border-color2, #d0d4e0));
   border-radius: 7px;
   box-shadow: 0 4px 14px rgba(0,0,0,0.12);
   padding: 4px;
@@ -1797,7 +1799,7 @@
   transition: background 0.1s;
 }
 .ds-reasoning-item:hover {
-  background: var(--jp-layout-color2, rgba(0,0,0,0.05));
+  background: var(--ds-surface2, rgba(0,0,0,0.05));
 }
 .ds-reasoning-item-label {
   font-size: 11px;
@@ -1808,24 +1810,26 @@
 .ds-reasoning-item-sub {
   font-size: 10px;
   font-family: var(--jp-ui-font-family, sans-serif);
-  opacity: 0.6;
+  color: var(--ds-text-dim, #5a5f72);
   line-height: 1.3;
 }
 /* Off */
 .ds-reasoning-item--off .ds-reasoning-item-label { color: var(--ds-chip-off-text, #737796); }
-/* CoT — blue */
-.ds-reasoning-item--cot .ds-reasoning-item-label { color: #2563eb; }
-/* Sequential — purple */
-.ds-reasoning-item--seq .ds-reasoning-item-label { color: #7c3aed; }
-/* Active row gets a light tint matching its colour */
+/* CoT — blue (light / dark variants) */
+.ds-chat-day  .ds-reasoning-item--cot .ds-reasoning-item-label { color: #2563eb; }
+.ds-chat-night .ds-reasoning-item--cot .ds-reasoning-item-label { color: #60a5fa; }
+/* Sequential — purple (light / dark variants) */
+.ds-chat-day  .ds-reasoning-item--seq .ds-reasoning-item-label { color: #7c3aed; }
+.ds-chat-night .ds-reasoning-item--seq .ds-reasoning-item-label { color: #a78bfa; }
+/* Active row gets a tint matching its colour */
 .ds-reasoning-item--active.ds-reasoning-item--off {
-  background: var(--jp-layout-color2, rgba(0,0,0,0.05));
+  background: var(--ds-surface2, rgba(0,0,0,0.05));
 }
 .ds-reasoning-item--active.ds-reasoning-item--cot {
-  background: rgba(37, 99, 235, 0.08);
+  background: rgba(37, 99, 235, 0.09);
 }
 .ds-reasoning-item--active.ds-reasoning-item--seq {
-  background: rgba(99, 60, 180, 0.08);
+  background: rgba(99, 60, 180, 0.09);
 }
 
 /* ── Sequential Thinking chip ──────────────────────────────────────────── */
@@ -1946,20 +1950,16 @@
   background: rgba(96, 165, 250, 0.1);
 }
 .ds-chat-night .ds-reasoning-menu {
-  background: var(--jp-layout-color2, #2a2d3e);
-  border-color: var(--jp-border-color1, #3a3d52);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  /* --ds-surface2 is a slightly lighter dark surface defined in the night palette */
+  background: var(--ds-surface2, #28283a);
+  border-color: var(--ds-border, #35354a);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.45);
 }
 .ds-chat-night .ds-reasoning-item:hover {
   background: rgba(255,255,255,0.07);
 }
-.ds-chat-night .ds-reasoning-item--off .ds-reasoning-item-label { color: #8b8fa8; }
-.ds-chat-night .ds-reasoning-item--cot .ds-reasoning-item-label { color: #60a5fa; }
-.ds-chat-night .ds-reasoning-item--seq .ds-reasoning-item-label { color: #a78bfa; }
-.ds-chat-night .ds-reasoning-item-sub { color: #8b8fa8; opacity: 0.8; }
-.ds-chat-night .ds-reasoning-item--active.ds-reasoning-item--off  { background: rgba(255,255,255,0.05); }
-.ds-chat-night .ds-reasoning-item--active.ds-reasoning-item--cot  { background: rgba(96, 165, 250, 0.12); }
-.ds-chat-night .ds-reasoning-item--active.ds-reasoning-item--seq  { background: rgba(167,139,250, 0.12); }
+.ds-chat-night .ds-reasoning-item--active.ds-reasoning-item--cot { background: rgba(96, 165, 250, 0.13); }
+.ds-chat-night .ds-reasoning-item--active.ds-reasoning-item--seq { background: rgba(167,139,250, 0.13); }
 .ds-chat-night .ds-thinking-section {
   border-color: rgba(167, 139, 250, 0.25);
   background: rgba(167, 139, 250, 0.05);
