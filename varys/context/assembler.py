@@ -1,14 +1,26 @@
 """Context assembler — composes the LLM context from summaries + full-fidelity cells.
 
-Implements spec §3 (Context Assembly Rule) and the serialisation formats from §3.4.
+Unified assembly flow (single path for all queries)
+----------------------------------------------------
+1. Determine *visible* cells: active notebook cells up to the active-cell
+   boundary (same window as the @-mention autocomplete).
+2. Detect the *focal* cell (the one the query is explicitly about), if any.
+3. Score every visible cell via ``score_cells``.
+4. Prune: keep cells whose normalised score >= SCORER_MIN_SCORE_THRESHOLD.
+   The focal cell is always pinned (never pruned regardless of score).
+   Floor override: if survivors < SCORER_MIN_CELLS, promote the top-ranked
+   dismissed cells until the floor is met.
+5. Sort survivors to notebook order.
+6. Render: focal cell → full source + full output; every other survivor →
+   compact summary block.
+7. Optionally append one explicitly-referenced *downstream* cell (past the
+   active-cell boundary) when the query contains "cell N" pointing beyond it.
+8. Write the full scoring + pruning decision to the assembler log.
 
 Integration pattern
 -------------------
 task.py calls ``assemble_context()`` and stores the result in
-``notebook_context['_cell_context_override']``.  ``build_notebook_context()``
-in context_utils.py then uses that pre-built string in place of the old
-truncation loop.  All other parts of the prompt (header, selection, @variables,
-DataFrames, selectedOutput) remain unchanged.
+``notebook_context['_cell_context_override']``.
 """
 from __future__ import annotations
 
@@ -93,80 +105,140 @@ def assemble_context(
                                  notebookContext.focalCellOutput).  Falls back to
                                  the cell dict's ``output`` field when absent.
         nb_base:                 Path to the notebook's ``.jupyter-assistant``
-                                 directory (from ``utils.paths.nb_base()``).
-                                 When provided, scorer results are persisted to
-                                 ``<nb_base>/logs/scorer/YYYY-MM-DD.jsonl``.
-                                 Pass ``None`` to skip persistent logging.
+                                 directory.  When provided, the scoring + pruning
+                                 decision is persisted to the assembler log.
 
     Returns:
-        A multi-line string describing all cells, ready to be embedded as the
-        cell-context block in the system prompt.
+        A multi-line string describing the relevant cells, ready to be embedded
+        as the cell-context block in the system prompt.
     """
-    norm = _normalize_cells(cell_order)
+    norm   = _normalize_cells(cell_order)
     active = [c for c in norm if not _is_deleted(c["cell_id"], summary_store)]
 
     if not active:
         return "(no cells in notebook)"
 
-    focal_id = detect_focal_cell(user_query, active_cell_id, active, summary_store)
     active_ids = {c["cell_id"] for c in active}
 
-    # No-focal path: score and render only cells up to the active cell so the
-    # LLM sees the same reachable-symbol window as the @-mention autocomplete.
-    # Falls back to the full list when no active cell is known.
-    if focal_id is None or focal_id not in active_ids:
-        cutoff_idx: Optional[int] = None
-        if active_cell_id and active_cell_id in active_ids:
-            active_idx = next(i for i, c in enumerate(active) if c["cell_id"] == active_cell_id)
-            visible    = active[: active_idx + 1]
-            # 1-based notebook position of the cutoff cell for the log
-            cutoff_idx = (active[active_idx].get("index") or active_idx) + 1
+    # ── Step 1: visible window (cells up to active-cell boundary) ─────────────
+    cutoff_cell_idx: Optional[int] = None
+    if active_cell_id and active_cell_id in active_ids:
+        aidx            = next(i for i, c in enumerate(active) if c["cell_id"] == active_cell_id)
+        visible         = active[: aidx + 1]
+        cutoff_cell_idx = (active[aidx].get("index") or aidx) + 1   # 1-based
+    else:
+        visible = active
+
+    # ── Step 2: detect focal cell (rendering hint only — not a routing fork) ──
+    focal_id  = detect_focal_cell(user_query, active_cell_id, visible, summary_store)
+    focal_cid = focal_id if (focal_id and focal_id in {c["cell_id"] for c in visible}) else None
+
+    # ── Step 3: score every visible cell ─────────────────────────────────────
+    threshold, min_cells = _read_pruning_config()
+    summaries = summary_store.get_all_current()
+    ranked    = score_cells(visible, summaries, user_query)
+
+    # ── Step 4: prune — focal cell is always pinned ───────────────────────────
+    kept:      List[Dict[str, Any]] = []
+    dismissed: List[Dict[str, Any]] = []
+    for cell in ranked:
+        pinned = cell.get("cell_id", "") == focal_cid
+        if pinned or cell["_score"] >= threshold:
+            kept.append({**cell, "_floor_override": False, "_pinned": pinned})
         else:
-            visible = active
-        return _build_all_summaries(
-            visible, summary_store, user_query,
-            nb_base=nb_base, cutoff_cell_idx=cutoff_idx,
-        )
+            dismissed.append(cell)
 
-    focal_idx = next(i for i, c in enumerate(active) if c["cell_id"] == focal_id)
+    floor_triggered = False
+    while len(kept) < min_cells and dismissed:
+        promoted = dismissed.pop(0)   # dismissed is score-descending
+        kept.append({**promoted, "_floor_override": True, "_pinned": False})
+        floor_triggered = True
+
+    kept_ids = {c.get("cell_id", "") for c in kept}
+
+    # ── Step 5: sort survivors to notebook order ──────────────────────────────
+    survivors = sorted(kept, key=lambda c: c.get("index", 0))
+
+    # ── Step 6: render ────────────────────────────────────────────────────────
     parts: List[str] = []
-    cells_in_prompt: List[int] = []
+    for cell in survivors:
+        if cell.get("cell_id") == focal_cid:
+            parts.append(_format_focal_cell(cell, focal_cell_full_output))
+        else:
+            parts.append(_format_summary_cell(cell, summary_store))
 
-    # Pre-focal → compact summary blocks
-    for cell in active[:focal_idx]:
-        parts.append(_format_summary_cell(cell, summary_store))
-        cells_in_prompt.append(cell.get("index", 0) + 1)  # 1-based
-
-    # Focal cell → full source + full output
-    parts.append(_format_focal_cell(active[focal_idx], focal_cell_full_output))
-    cells_in_prompt.append(active[focal_idx].get("index", focal_idx) + 1)
-
-    # Post-focal cells are omitted, EXCEPT if the query explicitly references one
+    # ── Step 7: optional downstream ref (beyond visible window) ──────────────
     downstream_ref = None
-    if focal_idx + 1 < len(active):
-        downstream_ref = _find_downstream_ref(user_query, active[focal_idx + 1:])
-        if downstream_ref:
-            parts.append(
-                f"(downstream cell referenced in query)\n"
-                + _format_summary_cell(downstream_ref, summary_store)
-            )
-            cells_in_prompt.append(downstream_ref.get("index", 0) + 1)
+    if focal_cid:
+        focal_list_idx = next(
+            (i for i, c in enumerate(active) if c["cell_id"] == focal_cid), -1
+        )
+        if focal_list_idx + 1 < len(active):
+            downstream_ref = _find_downstream_ref(user_query, active[focal_list_idx + 1:])
+            if downstream_ref and downstream_ref.get("cell_id") not in kept_ids:
+                parts.append(
+                    "(downstream cell referenced in query)\n"
+                    + _format_summary_cell(downstream_ref, summary_store)
+                )
 
     context = "\n".join(parts)
 
-    # Active-cell cutoff (1-based): index of the deepest visible cell
-    cutoff = (active[focal_idx].get("index", focal_idx) + 1) if downstream_ref is None \
-             else (downstream_ref.get("index", 0) + 1)
+    # ── Step 8: log ───────────────────────────────────────────────────────────
+    all_cells_log = sorted(kept + dismissed, key=lambda c: c.get("index", 0))
+    cell_rows: List[Dict[str, Any]] = []
+    for cell in all_cells_log:
+        bd      = cell.get("_score_breakdown", {})
+        raw_idx = cell.get("index")
+        cell_rows.append({
+            "cell_idx":        (raw_idx + 1) if isinstance(raw_idx, int) else None,
+            "cell_id":         cell.get("cell_id", ""),
+            "in_prompt":       cell.get("cell_id", "") in kept_ids,
+            "pinned":          cell.get("_pinned", False),
+            "floor_override":  cell.get("_floor_override", False),
+            "relevance_score": round(cell.get("_score", 0.0), 6),
+            "feature_scores": {
+                "at_ref":     round(bd.get("at_ref",    0.0), 4),
+                "recency":    round(bd.get("recency",   0.0), 4),
+                "error":      round(bd.get("error",     0.0), 4),
+                "fan_out":    round(bd.get("fan_out",   0.0), 4),
+                "import":     round(bd.get("import",    0.0), 4),
+                "dead":       round(bd.get("dead",      0.0), 4),
+                "raw":        round(bd.get("raw",       0.0), 4),
+                "normalized": round(bd.get("normalized", 0.0), 6),
+            },
+        })
+
+    cells_in_prompt = [r["cell_idx"] for r in cell_rows if r["in_prompt"]]
+    if downstream_ref:
+        dr_idx = downstream_ref.get("index")
+        if isinstance(dr_idx, int):
+            cells_in_prompt.append(dr_idx + 1)
 
     dlog("assembler", "context_built", {
-        "path":            "focal",
         "query":           user_query[:200],
-        "focal_cell_idx":  active[focal_idx].get("index", focal_idx) + 1,  # 1-based
-        "cutoff_cell_idx": cutoff,
-        "total_cells":     len(active),
+        "focal_cell_idx":  (next((c.get("index", 0) + 1 for c in visible
+                                  if c.get("cell_id") == focal_cid), None)),
+        "cutoff_cell_idx": cutoff_cell_idx,
+        "threshold":       threshold,
+        "total_cells":     len(ranked),
+        "kept_count":      len(kept),
+        "dismissed_count": len(dismissed),
+        "floor_triggered": floor_triggered,
         "cells_in_prompt": cells_in_prompt,
         "estimated_chars": len(context),
+        "cells":           cell_rows,
     }, nb_base=nb_base)
+
+    if nb_base is not None:
+        write_scorer_log(
+            nb_base=nb_base,
+            query=user_query,
+            ranked_cells=kept + dismissed,
+            kept_ids=kept_ids,
+            threshold=threshold,
+            floor_triggered=floor_triggered,
+            cutoff_cell_idx=cutoff_cell_idx,
+        )
 
     return context
 
@@ -265,11 +337,14 @@ def _format_focal_cell(
     return "\n".join(lines)
 
 
+# ── Config helper ─────────────────────────────────────────────────────────────
+
+
 def _read_pruning_config() -> tuple[float, int]:
     """Read SCORER_MIN_SCORE_THRESHOLD and SCORER_MIN_CELLS from os.environ.
 
-    Values are already validated on startup by app.py, so we only apply
-    safe defaults here for callers that bypass the extension (e.g. tests).
+    Values are validated on startup by app.py; these defaults are only a
+    safety net for callers that bypass the extension (e.g. tests).
     """
     try:
         threshold = float(os.environ.get("SCORER_MIN_SCORE_THRESHOLD", "0.3") or "0.3")
@@ -284,106 +359,6 @@ def _read_pruning_config() -> tuple[float, int]:
         min_cells = 2
 
     return threshold, min_cells
-
-
-def _build_all_summaries(
-    active_cells: List[Dict[str, Any]],
-    store: SummaryStore,
-    user_query: str,
-    nb_base: Optional[Path] = None,
-    cutoff_cell_idx: Optional[int] = None,
-) -> str:
-    """No-focal path: score, prune, and render cells in notebook order.
-
-    Pruning logic:
-    1. Score all visible cells via ``score_cells``.
-    2. Keep cells whose ``_score >= SCORER_MIN_SCORE_THRESHOLD``.
-    3. Floor override: if survivors < SCORER_MIN_CELLS, promote the
-       top-ranked dismissed cells (by score) until the floor is met,
-       tagging them with ``_floor_override=True``.
-    4. Sort survivors back to notebook order for rendering.
-    5. Log the pruning decision via ``debug_logger`` and persist to
-       ``<nb_base>/logs/scorer/YYYY-MM-DD.jsonl`` when ``nb_base`` is given.
-    """
-    threshold, min_cells = _read_pruning_config()
-    summaries = store.get_all_current()
-
-    # score_cells returns cells sorted descending by _score
-    ranked = score_cells(active_cells, summaries, user_query)
-
-    kept:      List[Dict[str, Any]] = []
-    dismissed: List[Dict[str, Any]] = []
-    for cell in ranked:
-        if cell["_score"] >= threshold:
-            kept.append({**cell, "_floor_override": False})
-        else:
-            dismissed.append(cell)
-
-    # Floor: promote top-scoring dismissed cells until min_cells is met
-    floor_triggered = False
-    while len(kept) < min_cells and dismissed:
-        # dismissed is already in score-descending order (ranked sort)
-        promoted = dismissed.pop(0)
-        kept.append({**promoted, "_floor_override": True})
-        floor_triggered = True
-
-    kept_ids = {c.get("cell_id", "") for c in kept}
-
-    if nb_base is not None:
-        write_scorer_log(
-            nb_base=nb_base,
-            query=user_query,
-            ranked_cells=kept + dismissed,
-            kept_ids=kept_ids,
-            threshold=threshold,
-            floor_triggered=floor_triggered,
-            cutoff_cell_idx=cutoff_cell_idx,
-        )
-
-    # Sort survivors back to notebook order
-    survivors = sorted(kept, key=lambda c: c["index"])
-
-    context = "\n".join(_format_summary_cell(cell, store) for cell in survivors)
-
-    # Build per-cell detail rows (notebook order, same schema as scorer_log)
-    all_cells_log = sorted(kept + dismissed, key=lambda c: c.get("index", 0))
-    cell_rows = []
-    for cell in all_cells_log:
-        bd = cell.get("_score_breakdown", {})
-        raw_idx = cell.get("index")
-        cell_rows.append({
-            "cell_idx":        (raw_idx + 1) if isinstance(raw_idx, int) else None,
-            "cell_id":         cell.get("cell_id", ""),
-            "in_prompt":       cell.get("cell_id", "") in kept_ids,
-            "floor_override":  cell.get("_floor_override", False),
-            "relevance_score": round(cell.get("_score", 0.0), 6),
-            "feature_scores": {
-                "at_ref":     round(bd.get("at_ref",    0.0), 4),
-                "recency":    round(bd.get("recency",   0.0), 4),
-                "error":      round(bd.get("error",     0.0), 4),
-                "fan_out":    round(bd.get("fan_out",   0.0), 4),
-                "import":     round(bd.get("import",    0.0), 4),
-                "dead":       round(bd.get("dead",      0.0), 4),
-                "raw":        round(bd.get("raw",       0.0), 4),
-                "normalized": round(bd.get("normalized", 0.0), 6),
-            },
-        })
-
-    dlog("assembler", "context_built", {
-        "path":            "no_focal",
-        "query":           user_query[:200],
-        "cutoff_cell_idx": cutoff_cell_idx,
-        "threshold":       threshold,
-        "total_cells":     len(ranked),
-        "kept_count":      len(kept),
-        "dismissed_count": len(dismissed),
-        "floor_triggered": floor_triggered,
-        "cells_in_prompt": [r["cell_idx"] for r in cell_rows if r["in_prompt"]],
-        "estimated_chars": len(context),
-        "cells":           cell_rows,
-    }, nb_base=nb_base)
-
-    return context
 
 
 # ── Utility helpers ────────────────────────────────────────────────────────────
