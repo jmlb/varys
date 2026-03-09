@@ -951,7 +951,7 @@ class TaskHandler(JupyterHandler):
                             + "\n\nThink through step by step what notebook cell operations are needed to fulfil this request."
                         )
                         plan_system = (
-                            provider.build_system_prompt(skills, memory)
+                            provider.build_system_prompt(skills, memory, reasoning_mode=reasoning_mode)
                             if hasattr(provider, "build_system_prompt")
                             else ""
                         )
@@ -983,7 +983,7 @@ class TaskHandler(JupyterHandler):
                                 and isinstance(aclient_for_loop, _CC2)):
                             # Agentic loop: external tools + create_operation_plan
                             from ..llm.client import _build_system_prompt_shared as _bsp
-                            plan_system_prompt = _bsp(skills, memory)
+                            plan_system_prompt = _bsp(skills, memory, reasoning_mode=reasoning_mode)
                             if cot_enabled:
                                 plan_system_prompt += _COT_SYSTEM_SUFFIX
                             # Inject MCP tool awareness so the LLM uses tools
@@ -1030,6 +1030,7 @@ class TaskHandler(JupyterHandler):
                                 on_json_delta=_on_json_delta,
                                 on_thought=_on_plan_thought,
                                 chat_history=chat_history,
+                                reasoning_mode=reasoning_mode,
                             )
                     finally:
                         plan_done.set()

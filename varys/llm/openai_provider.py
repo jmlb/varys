@@ -97,9 +97,10 @@ class OpenAIProvider(BaseLLMProvider):
         memory: str,
         operation_id: Optional[str] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
+        reasoning_mode: str = "off",
     ) -> Dict[str, Any]:
         op_id = operation_id or f"op_{uuid.uuid4().hex[:8]}"
-        system = _build_system_prompt_shared(skills, memory)
+        system = _build_system_prompt_shared(skills, memory, reasoning_mode=reasoning_mode)
         user_msg = _build_context(user_message, notebook_context)
 
         content: List[Any] = [{"type": "text", "text": user_msg}]
@@ -203,10 +204,11 @@ class OpenAIProvider(BaseLLMProvider):
         on_json_delta: Optional[Callable[[str], Awaitable[None]]] = None,
         on_thought: Optional[Callable[[str], Awaitable[None]]] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
+        reasoning_mode: str = "off",
     ) -> Dict[str, Any]:
         """Stream plan_task with tool-call JSON deltas via on_json_delta."""
         op_id = operation_id or f"op_{uuid.uuid4().hex[:8]}"
-        system = _build_system_prompt_shared(skills, memory)
+        system = _build_system_prompt_shared(skills, memory, reasoning_mode=reasoning_mode)
 
         content: List[Any] = [{"type": "text", "text": _build_context(user_message, notebook_context)}]
         if self.has_vision():

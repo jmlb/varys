@@ -199,8 +199,8 @@ class BedrockProvider(BaseLLMProvider):
                 return await loop.run_in_executor(None, fn)
             raise
 
-    def _build_system(self, skills: List[Dict[str, str]], memory: str) -> str:
-        return _build_system_prompt_shared(skills, memory)
+    def _build_system(self, skills: List[Dict[str, str]], memory: str, reasoning_mode: str = "off") -> str:
+        return _build_system_prompt_shared(skills, memory, reasoning_mode=reasoning_mode)
 
     async def plan_task(
         self,
@@ -210,10 +210,11 @@ class BedrockProvider(BaseLLMProvider):
         memory: str,
         operation_id: Optional[str] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
+        reasoning_mode: str = "off",
     ) -> Dict[str, Any]:
         await self._ensure_credentials()
         op_id = operation_id or f"op_{uuid.uuid4().hex[:8]}"
-        system = self._build_system(skills, memory)
+        system = self._build_system(skills, memory, reasoning_mode=reasoning_mode)
         user_msg = _build_context(user_message, notebook_context)
 
         content: List[Dict[str, Any]] = [{"text": user_msg}]

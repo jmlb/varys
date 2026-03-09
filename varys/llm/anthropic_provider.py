@@ -220,6 +220,7 @@ class AnthropicProvider(BaseLLMProvider):
         on_json_delta: Optional[Callable[[str], Awaitable[None]]] = None,
         on_thought: Optional[Callable[[str], Awaitable[None]]] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
+        reasoning_mode: str = "off",
     ) -> Dict[str, Any]:
         result = await self._chat_client.stream_plan_task(
             user_message=user_message,
@@ -231,6 +232,7 @@ class AnthropicProvider(BaseLLMProvider):
             on_json_delta=on_json_delta,
             on_thought=on_thought,
             chat_history=chat_history,
+            reasoning_mode=reasoning_mode,
         )
         self.last_usage = self._chat_client.last_usage
         return result
@@ -248,9 +250,10 @@ class AnthropicProvider(BaseLLMProvider):
         self,
         skills: List[Dict[str, str]],
         memory: str,
+        reasoning_mode: str = "off",
     ) -> str:
         """Return the full system prompt for cell-op planning (used by the thought loop)."""
-        return self._chat_client._build_system_prompt(skills, memory)
+        return self._chat_client._build_system_prompt(skills, memory, reasoning_mode=reasoning_mode)
 
     def has_vision(self) -> bool:
         """All Claude 3+ models support vision."""

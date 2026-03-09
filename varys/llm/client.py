@@ -111,6 +111,44 @@ When a SELECTED TEXT block is present and the user says things like
 - The new content field must contain the FULL cell source with only
   the selected portion replaced
 
+{handholding_section}
+## Important Rules
+1. Be precise with cell indices based on the notebook context provided
+2. Use the skills context to inform code style and approach
+3. Check memory for any declined suggestions before proposing them
+4. For EDA tasks, create comprehensive visualization code
+5. For README tasks, follow the readme_gen skill template EXACTLY — every section,
+   every emoji, the Quick Info table. Do not invent a different format.
+6. When SELECTED TEXT is present, always prefer operating on the selection
+   rather than the whole cell unless the user explicitly says otherwise
+
+## Streaming Feedback — MANDATORY
+ALWAYS write 1–3 sentences BEFORE calling create_operation_plan.
+Describe exactly what you are about to do in plain English.
+
+Examples:
+  "I'll read your notebook, then create a markdown README cell at the top that
+   summarises the data loading, EDA, and modelling workflow."
+  "I'll consolidate the three duplicate import blocks into a single cell at #1."
+  "I'll replace train_logistic_regression and train_logistic_regression_tuned in
+   #5 with MLPClassifier equivalents, keeping all other functions unchanged."
+
+Rules:
+- NEVER call create_operation_plan without writing at least one sentence first.
+- Keep the explanation concise (1–3 sentences maximum).
+- Do NOT include code in this preamble — just describe the plan in prose.
+- This text is streamed live to the user; it is their only feedback while waiting.
+- ALWAYS refer to cells as #N in your preamble (e.g. "#6", "#7", "#12").
+  NEVER use "pos:N", "cell index N", "position N", "cell at index N", or any
+  other variant — #N is the one and only format for cell references.
+"""
+
+# ---------------------------------------------------------------------------
+# Handholding rules — explicit step-by-step guidance that compensates for
+# shallow one-shot reasoning.  Omitted when a reasoning mode (CoT or
+# Sequential) is active because the model reasons through these naturally.
+# ---------------------------------------------------------------------------
+_HANDHOLDING_RULES = """\
 ## CRITICAL — `modify` steps must preserve the entire cell
 
 When you write a `modify` step, the `content` field **must be the complete final
@@ -180,16 +218,6 @@ Procedure:
 - Correct plan: `run_cell #1` → `run_cell #6` → `run_cell #7` (or re-run #7).
   WRONG plan: `run_cell #6` → `run_cell #7` (glob/os still missing).
 
-## Important Rules
-1. Be precise with cell indices based on the notebook context provided
-2. Use the skills context to inform code style and approach
-3. Check memory for any declined suggestions before proposing them
-4. For EDA tasks, create comprehensive visualization code
-5. For README tasks, follow the readme_gen skill template EXACTLY — every section,
-   every emoji, the Quick Info table. Do not invent a different format.
-6. When SELECTED TEXT is present, always prefer operating on the selection
-   rather than the whole cell unless the user explicitly says otherwise
-
 ## CRITICAL — When to include steps in the tool call
 
 **You MUST include at least one step whenever the user asks you to modify, create,
@@ -212,25 +240,6 @@ If a request is purely conversational (no code change requested) and you genuine
 have no cell operations to perform, explain why in the `summary` field and include
 steps: []. But this should be rare.
 
-## Streaming Feedback — MANDATORY
-ALWAYS write 1–3 sentences BEFORE calling create_operation_plan.
-Describe exactly what you are about to do in plain English.
-
-Examples:
-  "I'll read your notebook, then create a markdown README cell at the top that
-   summarises the data loading, EDA, and modelling workflow."
-  "I'll consolidate the three duplicate import blocks into a single cell at #1."
-  "I'll replace train_logistic_regression and train_logistic_regression_tuned in
-   #5 with MLPClassifier equivalents, keeping all other functions unchanged."
-
-Rules:
-- NEVER call create_operation_plan without writing at least one sentence first.
-- Keep the explanation concise (1–3 sentences maximum).
-- Do NOT include code in this preamble — just describe the plan in prose.
-- This text is streamed live to the user; it is their only feedback while waiting.
-- ALWAYS refer to cells as #N in your preamble (e.g. "#6", "#7", "#12").
-  NEVER use "pos:N", "cell index N", "position N", "cell at index N", or any
-  other variant — #N is the one and only format for cell references.
 """
 
 # Fallback persona used when the 'varys' skill is not enabled.
@@ -243,6 +252,7 @@ _DEFAULT_PERSONA = (
 def _build_system_prompt_shared(
     skills: List[Dict[str, str]],
     memory: str,
+    reasoning_mode: str = "off",
 ) -> str:
     """Shared system-prompt builder used by all providers.
 
@@ -250,6 +260,10 @@ def _build_system_prompt_shared(
     the default intro at the top of the system prompt and is NOT repeated in
     the skills section.  All other enabled skills are injected under
     ## Skills Context as normal.
+
+    When reasoning_mode is 'cot' or 'sequential' the explicit handholding
+    rules (dependency chain procedure, modify-preserve checklist, red-flag
+    phrases) are omitted — the model reasons through those naturally.
     """
     # Separate the varys persona skill from domain skills
     persona_section = _DEFAULT_PERSONA
@@ -267,11 +281,13 @@ def _build_system_prompt_shared(
         skills_section = "No specific skills loaded."
 
     memory_section = memory.strip() or "No memory/preferences recorded yet."
+    handholding_section = "" if reasoning_mode != "off" else _HANDHOLDING_RULES
 
     return SYSTEM_PROMPT_TEMPLATE.format(
         persona_section=persona_section,
         skills_section=skills_section,
         memory_section=memory_section,
+        handholding_section=handholding_section,
     )
 
 
@@ -572,6 +588,7 @@ class ClaudeClient:
         on_json_delta: Optional[Callable[[str], Awaitable[None]]] = None,
         on_thought: Optional[Callable[[str], Awaitable[None]]] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
+        reasoning_mode: str = "off",
     ) -> Dict[str, Any]:
         """Stream pre-tool explanation text AND tool-call JSON deltas.
 
@@ -586,7 +603,7 @@ class ClaudeClient:
         if not self.api_key or not self._aclient:
             return self._fallback_response(user_message, operation_id)
 
-        system_prompt = self._build_system_prompt(skills, memory)
+        system_prompt = self._build_system_prompt(skills, memory, reasoning_mode=reasoning_mode)
         content_blocks = self._build_content_blocks(user_message, notebook_context)
         messages = self._prepend_history(chat_history, content_blocks)
 
@@ -706,7 +723,8 @@ class ClaudeClient:
     def _build_system_prompt(
         self,
         skills: List[Dict[str, str]],
-        memory: str
+        memory: str,
+        reasoning_mode: str = "off",
     ) -> str:
         """Build the system prompt with skills and memory.
 
@@ -714,7 +732,7 @@ class ClaudeClient:
         the default persona intro at the top of the system prompt.  All other
         skills are injected under ## Skills Context as usual.
         """
-        return _build_system_prompt_shared(skills, memory)
+        return _build_system_prompt_shared(skills, memory, reasoning_mode=reasoning_mode)
 
     def _build_user_message(
         self,

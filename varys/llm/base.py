@@ -34,6 +34,7 @@ class BaseLLMProvider(ABC):
         memory: str,
         operation_id: Optional[str] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
+        reasoning_mode: str = "off",
     ) -> Dict[str, Any]:
         """
         Analyse the user request and return an operation plan.
@@ -103,6 +104,7 @@ class BaseLLMProvider(ABC):
         on_json_delta: Optional[Callable[[str], Awaitable[None]]] = None,
         on_thought: Optional[Callable[[str], Awaitable[None]]] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
+        reasoning_mode: str = "off",
     ) -> Dict[str, Any]:
         """Like plan_task but streams pre-tool text AND tool-call JSON deltas.
 
@@ -121,6 +123,7 @@ class BaseLLMProvider(ABC):
             memory=memory,
             operation_id=operation_id,
             chat_history=chat_history,
+            reasoning_mode=reasoning_mode,
         )
 
     def has_vision(self) -> bool:
@@ -142,6 +145,7 @@ class BaseLLMProvider(ABC):
         self,
         skills: "List[Dict[str, str]]",
         memory: str,
+        reasoning_mode: str = "off",
     ) -> str:
         """Return the system prompt used for cell-op planning.
 
@@ -151,3 +155,4 @@ class BaseLLMProvider(ABC):
         raise NotImplementedError(
             f"{type(self).__name__} does not implement build_system_prompt()"
         )
+

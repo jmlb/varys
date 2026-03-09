@@ -137,6 +137,7 @@ class OllamaProvider(BaseLLMProvider):
         memory: str,
         operation_id: Optional[str] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
+        reasoning_mode: str = "off",
     ) -> Dict[str, Any]:
         op_id = operation_id or f"op_{uuid.uuid4().hex[:8]}"
         system_prompt = self._build_system_prompt(skills, memory)
