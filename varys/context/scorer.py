@@ -16,6 +16,19 @@ Signal weights (spec §4):
   MEDIUM ( 4) — symbol defined here consumed by N downstream cells (×N)
   LOW    ( 1) — import cell (low information content for query relevance)
   PENALTY(-2) — symbol no longer alive in kernel (×dead_count)
+
+Normalization — min-max over theoretical bounds:
+  SCORE_MAX =  W_AT_REF + W_RECENT_EXEC + W_HAS_ERROR
+             + W_FAN_OUT × _FAN_OUT_CAP + W_IMPORT       = +67
+  SCORE_MIN =  W_DEAD_SYMBOL × _DEAD_SYM_CAP             = −20
+  SCORE_RANGE = 67 − (−20)                               =  87
+
+  normalized = clip(score + 20, 0, 87) / 87  ∈ [0, 1]
+
+  Fan-out and dead-symbol terms are unbounded in theory; scores that
+  exceed the caps are clipped to [0, 1] rather than rejected.
+  Both ``_score`` (normalised, for pruning) and ``_raw_score`` (float,
+  for debugging) are attached to every cell dict.
 """
 from __future__ import annotations
 
@@ -30,6 +43,27 @@ W_HAS_ERROR   =  8
 W_FAN_OUT     =  4  # per downstream consumer cell
 W_IMPORT      =  1
 W_DEAD_SYMBOL = -2  # per dead symbol
+
+# ── Normalisation constants ────────────────────────────────────────────────────
+
+# Caps for the two unbounded terms (fan-out, dead symbols).
+# Scores beyond these caps are clipped rather than rejected.
+_FAN_OUT_CAP  = 10   # max downstream cells credited
+_DEAD_SYM_CAP = 10   # max dead symbols penalised
+
+SCORE_MAX   = (W_AT_REF + W_RECENT_EXEC + W_HAS_ERROR
+               + W_FAN_OUT * _FAN_OUT_CAP + W_IMPORT)   # = 67
+SCORE_MIN   = W_DEAD_SYMBOL * _DEAD_SYM_CAP             # = -20
+SCORE_RANGE = SCORE_MAX - SCORE_MIN                      # = 87
+
+
+def _normalize(raw: float) -> float:
+    """Map a raw score to [0, 1] via min-max normalisation.
+
+    Clips out-of-range values so that unusual notebooks (very high fan-out,
+    many dead symbols) never produce scores outside [0, 1].
+    """
+    return max(0.0, min(1.0, (raw - SCORE_MIN) / SCORE_RANGE))
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
@@ -51,8 +85,11 @@ def score_cells(
                            Pass None to skip the dead-symbol penalty.
 
     Returns:
-        The same cell_order list, each element augmented with a ``_score`` key,
-        sorted descending by score.  Cells without a summary entry score 0.
+        The same cell_order list, each element augmented with:
+          ``_score``     — normalised relevance in [0, 1] (used for pruning)
+          ``_raw_score`` — un-normalised float (useful for debugging)
+        Sorted descending by ``_score``.  Cells without a summary entry
+        score 0 raw → 0.23 normalised (SCORE_MIN shift moves 0 upward).
 
     Note:
         Cells always appear in notebook order in the rendered prompt.
@@ -73,39 +110,37 @@ def score_cells(
     for cell in cell_order:
         cell_id = cell.get("cell_id", "")
         summary = summaries.get(cell_id)
-        score   = 0
+        raw     = 0.0
 
         if summary:
             defined = set(summary.get("symbols_defined", []))
             ec      = summary.get("execution_count") or 0
 
-            # @variable reference in user query — proportional to specificity:
-            # +10 × (matched / total_defined) so a 1-symbol cell that matches
-            # outscores an 8-symbol cell where only one name happens to match.
+            # @variable reference — proportional to specificity
             matched = at_refs & defined
             if matched and defined:
-                score += W_AT_REF * len(matched) / len(defined)
+                raw += W_AT_REF * len(matched) / len(defined)
 
             # Recency: proportional 0 → W_RECENT_EXEC
-            score += int(W_RECENT_EXEC * ec / max_ec)
+            raw += int(W_RECENT_EXEC * ec / max_ec)
 
             # Error bonus
             if summary.get("had_error"):
-                score += W_HAS_ERROR
+                raw += W_HAS_ERROR
 
             # Fan-out bonus (how many downstream cells consume this cell's symbols)
-            score += W_FAN_OUT * fan_out.get(cell_id, 0)
+            raw += W_FAN_OUT * fan_out.get(cell_id, 0)
 
             # Import cell: low signal
             if summary.get("is_import_cell"):
-                score += W_IMPORT
+                raw += W_IMPORT
 
-            # Dead symbol penalty
+            # Dead symbol penalty (only when kernel_live_names is supplied)
             if live_set is not None:
                 dead_count = sum(1 for n in defined if n not in live_set)
-                score += W_DEAD_SYMBOL * dead_count
+                raw += W_DEAD_SYMBOL * dead_count
 
-        scored.append({**cell, "_score": score})
+        scored.append({**cell, "_raw_score": raw, "_score": _normalize(raw)})
 
     # Stable sort descending (notebook order preserved for equal scores)
     scored.sort(key=lambda c: c["_score"], reverse=True)
