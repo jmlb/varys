@@ -4790,6 +4790,21 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                       {msg.role === 'user' && msg.contextChip && (
                         <ContextChipBubble chip={msg.contextChip} />
                       )}
+                      {msg.role === 'user' && !isLoading && msg.id !== editingMsgId && (
+                        <button
+                          className="ds-user-copy-btn"
+                          aria-label="Copy message"
+                          onClick={e => {
+                            e.stopPropagation();
+                            void navigator.clipboard.writeText((msg.content ?? '').trim());
+                          }}
+                        >
+                          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="5" y="5" width="8" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.5"/>
+                            <path d="M3 11V3a1 1 0 0 1 1-1h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                          </svg>
+                        </button>
+                      )}
                       {isStreaming && (
                         <span className="ds-typing-cursor" aria-hidden="true"><span /></span>
                       )}
