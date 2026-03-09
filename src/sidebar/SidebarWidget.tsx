@@ -210,6 +210,108 @@ function looksAdvisory(message: string, phrases: string[] = _ADVISORY_STARTS): b
 }
 
 // ---------------------------------------------------------------------------
+// ImageRecoveryPrompt — compact inline message + dropdown for image errors
+// ---------------------------------------------------------------------------
+interface ImageRecoveryPromptProps {
+  onSelect: (cmd: string) => void;
+}
+
+const ImageRecoveryPrompt: React.FC<ImageRecoveryPromptProps> = ({ onSelect }) => {
+  const [open, setOpen]           = useState(false);
+  const [showCustom, setShowCustom] = useState(false);
+  const [customDim, setCustomDim] = useState('');
+  const dropRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (dropRef.current && !dropRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setShowCustom(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const pick = (cmd: string) => {
+    setOpen(false);
+    setShowCustom(false);
+    setCustomDim('');
+    onSelect(cmd);
+  };
+
+  const submitCustom = () => {
+    const d = parseInt(customDim, 10);
+    if (isNaN(d) || d < 10) return;
+    pick(`/resize(${d})`);
+  };
+
+  return (
+    <div className="ds-img-rec">
+      <span className="ds-img-rec-msg">
+        ⚠️ One or more figures exceed the provider's image size limit.
+      </span>
+      <div className="ds-img-rec-wrap" ref={dropRef}>
+        <button
+          className={`ds-img-rec-trigger${open ? ' ds-img-rec-trigger--open' : ''}`}
+          onClick={() => { setOpen(o => !o); setShowCustom(false); }}
+        >
+          Choose action <span className="ds-img-rec-caret">{open ? '▲' : '▼'}</span>
+        </button>
+        {open && (
+          <div className="ds-img-rec-menu">
+            {([
+              ['/no_figures',   'Exclude all figures'],
+              ['/resize(7800)', 'Resize to 7800 px  (Anthropic)'],
+              ['/resize(6000)', 'Resize to 6000 px  (OpenAI)'],
+            ] as [string, string][]).map(([cmd, desc]) => (
+              <button key={cmd} className="ds-img-rec-item" onClick={() => pick(cmd)}>
+                <code className="ds-img-rec-cmd">{cmd}</code>
+                <span className="ds-img-rec-desc">{desc}</span>
+              </button>
+            ))}
+            {/* Custom dimension row */}
+            {!showCustom ? (
+              <button className="ds-img-rec-item" onClick={() => setShowCustom(true)}>
+                <code className="ds-img-rec-cmd">/resize(…)</code>
+                <span className="ds-img-rec-desc">Custom dimension</span>
+              </button>
+            ) : (
+              <div className="ds-img-rec-custom">
+                <code className="ds-img-rec-cmd">/resize(</code>
+                <input
+                  className="ds-img-rec-dim-input"
+                  type="number"
+                  min={10}
+                  placeholder="e.g. 4000"
+                  value={customDim}
+                  autoFocus
+                  onChange={e => setCustomDim(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') submitCustom();
+                    if (e.key === 'Escape') { setShowCustom(false); setCustomDim(''); }
+                  }}
+                />
+                <code className="ds-img-rec-cmd">)</code>
+                <button
+                  className="ds-img-rec-ok"
+                  onClick={submitCustom}
+                  disabled={!customDim || parseInt(customDim, 10) < 10}
+                >
+                  OK
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
 // DisambiguationCard — shown when a plain message looks like a question/
 // discussion but the user hasn't specified whether they want a chat answer
 // or a notebook cell.
@@ -4613,35 +4715,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
           >
             {msg.subtype === 'error_recovery' ? (
               /* ── Image dimension error — recovery prompt ─────── */
-              <div className="ds-image-recovery-prompt">
-                <div className="ds-image-recovery-title">
-                  ⚠️ One or more figures in this notebook exceed the provider's image size limit.
-                </div>
-                <div className="ds-image-recovery-body">
-                  Choose how to handle figures, then re-send your message:
-                </div>
-                <div className="ds-image-recovery-chips">
-                  {[
-                    { label: '/no_figures', desc: 'Exclude all figures' },
-                    { label: '/resize(7800)', desc: 'Resize to 7800px (Anthropic)' },
-                    { label: '/resize(6000)', desc: 'Resize to 6000px (OpenAI)' },
-                  ].map(({ label, desc }) => (
-                    <button
-                      key={label}
-                      className="ds-image-recovery-chip"
-                      title={desc}
-                      onClick={() => {
-                        void handleSend(label);
-                      }}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                <div className="ds-image-recovery-hint">
-                  Or type <code>/resize(DIM)</code> with any dimension ≥ 10.
-                </div>
-              </div>
+              <ImageRecoveryPrompt onSelect={cmd => void handleSend(cmd)} />
             ) : msg.role === 'disambiguation' ? (
               /* ── Disambiguation card ───────────────────────────── */
               <DisambiguationCard
