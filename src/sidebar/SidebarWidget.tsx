@@ -2735,6 +2735,19 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
   const reasoningModeRef = useRef(reasoningMode);
   useEffect(() => { reasoningModeRef.current = reasoningMode; }, [reasoningMode]);
 
+  const [reasoningDropdownOpen, setReasoningDropdownOpen] = useState(false);
+  const reasoningDropdownRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!reasoningDropdownOpen) return;
+    const close = (e: MouseEvent) => {
+      if (reasoningDropdownRef.current && !reasoningDropdownRef.current.contains(e.target as Node)) {
+        setReasoningDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [reasoningDropdownOpen]);
+
   // Chat window theme toggle: 'day' (light) or 'night' (dark), persisted in
   // localStorage so it survives JupyterLab restarts independently of the
   // global IDE theme.
@@ -4848,31 +4861,49 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
               <span className="ds-nb-ctx-sign">{notebookAware ? '×' : '+'}</span>
               notebook
             </button>
-            <button
-              className={`ds-thinking-chip${
-                reasoningMode === 'sequential' ? ' ds-thinking-chip--on'
-                : reasoningMode === 'cot'      ? ' ds-thinking-chip--cot'
-                :                                ' ds-thinking-chip--off'
-              }`}
-              onClick={() => {
-                const next = REASONING_CYCLE[(REASONING_CYCLE.indexOf(reasoningMode) + 1) % REASONING_CYCLE.length];
-                setReasoningMode(next);
-                try { localStorage.setItem('ds-varys-reasoning-mode', next); } catch { /* ignore */ }
-              }}
-              data-tip={
-                reasoningMode === 'sequential'
-                  ? 'Sequential reasoning ON (multi-step, 🧠 panel) — click for CoT.'
-                  : reasoningMode === 'cot'
-                  ? 'Chain-of-Thought ON (1 API call, steps inline) — click to disable.'
-                  : 'No reasoning — click for CoT, click again for Sequential.'
-              }
-              aria-label={`Reasoning mode: ${reasoningMode}`}
-            >
-              🧠{' '}
-              {reasoningMode === 'sequential' ? 'Sequential'
-                : reasoningMode === 'cot'     ? 'CoT'
-                :                               'Reasoning: off'}
-            </button>
+            <div className="ds-reasoning-dropdown" ref={reasoningDropdownRef}>
+              <button
+                className={`ds-thinking-chip${
+                  reasoningMode === 'sequential' ? ' ds-thinking-chip--on'
+                  : reasoningMode === 'cot'      ? ' ds-thinking-chip--cot'
+                  :                                ' ds-thinking-chip--off'
+                }`}
+                onClick={() => setReasoningDropdownOpen(v => !v)}
+                aria-label={`Reasoning mode: ${reasoningMode}`}
+                aria-haspopup="listbox"
+                aria-expanded={reasoningDropdownOpen}
+              >
+                🧠{' '}
+                {reasoningMode === 'sequential' ? 'Sequential'
+                  : reasoningMode === 'cot'     ? 'CoT'
+                  :                               'Reasoning'}
+                <span className="ds-reasoning-chevron">{reasoningDropdownOpen ? '▴' : '▾'}</span>
+              </button>
+              {reasoningDropdownOpen && (
+                <div className="ds-reasoning-menu" role="listbox">
+                  {([
+                    { value: 'off',        label: 'Off',        sub: 'No reasoning',                   mod: '' },
+                    { value: 'cot',        label: 'CoT',        sub: '1 call · steps inline',          mod: 'cot' },
+                    { value: 'sequential', label: 'Sequential', sub: 'Multi-step · 🧠 panel',          mod: 'seq' },
+                  ] as { value: ReasoningMode; label: string; sub: string; mod: string }[]).map(opt => (
+                    <button
+                      key={opt.value}
+                      role="option"
+                      aria-selected={reasoningMode === opt.value}
+                      className={`ds-reasoning-item ds-reasoning-item--${opt.mod || 'off'}${reasoningMode === opt.value ? ' ds-reasoning-item--active' : ''}`}
+                      onClick={() => {
+                        setReasoningMode(opt.value);
+                        try { localStorage.setItem('ds-varys-reasoning-mode', opt.value); } catch { /* ignore */ }
+                        setReasoningDropdownOpen(false);
+                      }}
+                    >
+                      <span className="ds-reasoning-item-label">{opt.label}</span>
+                      <span className="ds-reasoning-item-sub">{opt.sub}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <textarea
             ref={textareaRef}
