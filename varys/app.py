@@ -141,6 +141,41 @@ class DSAssistantExtension(ExtensionApp):
             os.environ.get("COMPLETION_MAX_TOKENS", "") or "128"
         )
 
+        # ----------------------------------------------------------------
+        # Debug logging
+        # ----------------------------------------------------------------
+        raw_debug = os.environ.get("DEBUG_LOG", "false").strip().lower()
+        settings_patch["ds_assistant_debug_log"] = raw_debug in ("1", "true", "yes", "on")
+        settings_patch["ds_assistant_debug_log_dir"] = os.environ.get(
+            "DEBUG_LOG_DIR", "~/.jupyter/varys_logs"
+        )
+
+        # ----------------------------------------------------------------
+        # Scorer / pruning parameters — validated on startup
+        # ----------------------------------------------------------------
+        try:
+            scorer_min_cells = int(os.environ.get("SCORER_MIN_CELLS", "2") or "2")
+        except ValueError as exc:
+            raise ValueError(
+                f"Varys: SCORER_MIN_CELLS must be an integer — {exc}"
+            ) from exc
+
+        raw_threshold = os.environ.get("SCORER_MIN_SCORE_THRESHOLD", "0.3") or "0.3"
+        try:
+            scorer_threshold = float(raw_threshold)
+        except ValueError as exc:
+            raise ValueError(
+                f"Varys: SCORER_MIN_SCORE_THRESHOLD must be a float — {exc}"
+            ) from exc
+        if not (0.0 <= scorer_threshold <= 1.0):
+            raise ValueError(
+                f"Varys: SCORER_MIN_SCORE_THRESHOLD={scorer_threshold!r} is outside [0, 1]. "
+                "Fix the value in ~/.jupyter/varys.env and restart JupyterLab."
+            )
+
+        settings_patch["ds_assistant_scorer_min_cells"] = scorer_min_cells
+        settings_patch["ds_assistant_scorer_min_score_threshold"] = scorer_threshold
+
         self.settings.update(settings_patch)
 
         self.log.info(

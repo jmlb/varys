@@ -86,14 +86,17 @@ def score_cells(
 
     Returns:
         The same cell_order list, each element augmented with:
-          ``_score``     — normalised relevance in [0, 1] (used for pruning)
-          ``_raw_score`` — un-normalised float (useful for debugging)
+          ``_score``          — normalised relevance in [0, 1] (used for pruning)
+          ``_raw_score``      — un-normalised float (useful for debugging)
+          ``_score_breakdown`` — dict with individual feature contributions:
+                                  at_ref, recency, error, fan_out, import, dead,
+                                  raw (= _raw_score), normalized (= _score)
         Sorted descending by ``_score``.  Cells without a summary entry
         score 0 raw → 0.23 normalised (SCORE_MIN shift moves 0 upward).
 
     Note:
         Cells always appear in notebook order in the rendered prompt.
-        This ranking drives pruning decisions only (budget cap TBD).
+        This ranking drives pruning decisions only.
     """
     at_refs = _parse_at_refs(user_query)
     fan_out = _compute_fan_out(cell_order, summaries)
@@ -110,7 +113,16 @@ def score_cells(
     for cell in cell_order:
         cell_id = cell.get("cell_id", "")
         summary = summaries.get(cell_id)
-        raw     = 0.0
+
+        # Per-cell feature contributions — populated below
+        bd: Dict[str, float] = {
+            "at_ref":  0.0,
+            "recency": 0.0,
+            "error":   0.0,
+            "fan_out": 0.0,
+            "import":  0.0,
+            "dead":    0.0,
+        }
 
         if summary:
             defined = set(summary.get("symbols_defined", []))
@@ -119,28 +131,33 @@ def score_cells(
             # @variable reference — proportional to specificity
             matched = at_refs & defined
             if matched and defined:
-                raw += W_AT_REF * len(matched) / len(defined)
+                bd["at_ref"] = W_AT_REF * len(matched) / len(defined)
 
             # Recency: proportional 0 → W_RECENT_EXEC
-            raw += int(W_RECENT_EXEC * ec / max_ec)
+            bd["recency"] = int(W_RECENT_EXEC * ec / max_ec)
 
             # Error bonus
             if summary.get("had_error"):
-                raw += W_HAS_ERROR
+                bd["error"] = W_HAS_ERROR
 
             # Fan-out bonus (how many downstream cells consume this cell's symbols)
-            raw += W_FAN_OUT * fan_out.get(cell_id, 0)
+            bd["fan_out"] = W_FAN_OUT * fan_out.get(cell_id, 0)
 
             # Import cell: low signal
             if summary.get("is_import_cell"):
-                raw += W_IMPORT
+                bd["import"] = W_IMPORT
 
             # Dead symbol penalty (only when kernel_live_names is supplied)
             if live_set is not None:
                 dead_count = sum(1 for n in defined if n not in live_set)
-                raw += W_DEAD_SYMBOL * dead_count
+                bd["dead"] = W_DEAD_SYMBOL * dead_count
 
-        scored.append({**cell, "_raw_score": raw, "_score": _normalize(raw)})
+        raw = sum(bd.values())
+        norm = _normalize(raw)
+        bd["raw"]        = raw
+        bd["normalized"] = norm
+
+        scored.append({**cell, "_raw_score": raw, "_score": norm, "_score_breakdown": bd})
 
     # Stable sort descending (notebook order preserved for equal scores)
     scored.sort(key=lambda c: c["_score"], reverse=True)

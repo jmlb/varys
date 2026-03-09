@@ -21,6 +21,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 log = logging.getLogger(__name__)
 
+from ..debug_logger import log as dlog  # noqa: E402 (after stdlib imports)
+
 _INFERENCE_TRIGGER_N = 10       # version writes between inference runs
 
 
@@ -120,7 +122,16 @@ def detect_patterns(summaries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     p1 = _detect_symbol_value_patterns(summaries)
     p2 = _detect_import_patterns(summaries)
-    return p1 + p2
+    patterns = p1 + p2
+
+    dlog("inference", "patterns_detected", {
+        "summary_count":              len(summaries),
+        "symbol_value_pattern_count": len(p1),
+        "import_pattern_count":       len(p2),
+        "patterns":                   patterns,
+    })
+
+    return patterns
 
 
 # ---------------------------------------------------------------------------
@@ -335,6 +346,12 @@ def _save_inference_results(
         "Varys inference: notebook=%s  patterns=%d  new_prefs=%d",
         notebook_path, pattern_count, len(new_entries),
     )
+    dlog("inference", "preferences_emitted", {
+        "notebook_path":  notebook_path,
+        "pattern_count":  pattern_count,
+        "new_pref_count": len(new_entries),
+        "preferences":    new_entries,
+    })
     store.reset_inference_counter()
 
 

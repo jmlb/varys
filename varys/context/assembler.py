@@ -12,11 +12,13 @@ DataFrames, selectedOutput) remain unchanged.
 """
 from __future__ import annotations
 
+import os
 import re
 from typing import Any, Dict, List, Optional
 
 from .summary_store import SummaryStore
 from .scorer import score_cells
+from ..debug_logger import log as dlog
 
 # ── Focal cell detection ───────────────────────────────────────────────────────
 
@@ -131,7 +133,17 @@ def assemble_context(
                 + _format_summary_cell(downstream_ref, summary_store)
             )
 
-    return "\n".join(parts)
+    context = "\n".join(parts)
+
+    dlog("assembler", "context_built", {
+        "path":            "focal",
+        "focal_index":     active[focal_idx].get("index"),
+        "cells_before":    len(active),
+        "cells_after":     len(parts),
+        "estimated_chars": len(context),
+    })
+
+    return context
 
 
 # ── Serialisation helpers (spec §3.4) ─────────────────────────────────────────
@@ -228,25 +240,103 @@ def _format_focal_cell(
     return "\n".join(lines)
 
 
+def _read_pruning_config() -> tuple[float, int]:
+    """Read SCORER_MIN_SCORE_THRESHOLD and SCORER_MIN_CELLS from os.environ.
+
+    Values are already validated on startup by app.py, so we only apply
+    safe defaults here for callers that bypass the extension (e.g. tests).
+    """
+    try:
+        threshold = float(os.environ.get("SCORER_MIN_SCORE_THRESHOLD", "0.3") or "0.3")
+        threshold = max(0.0, min(1.0, threshold))
+    except ValueError:
+        threshold = 0.3
+
+    try:
+        min_cells = int(os.environ.get("SCORER_MIN_CELLS", "2") or "2")
+        min_cells = max(0, min_cells)
+    except ValueError:
+        min_cells = 2
+
+    return threshold, min_cells
+
+
 def _build_all_summaries(
     active_cells: List[Dict[str, Any]],
     store: SummaryStore,
     user_query: str,
 ) -> str:
-    """No-focal path: all active cells as summary blocks.
+    """No-focal path: score, prune, and render cells in notebook order.
 
-    The scorer ranks cells, but we always render in notebook order.
+    Pruning logic:
+    1. Score all visible cells via ``score_cells``.
+    2. Keep cells whose ``_score >= SCORER_MIN_SCORE_THRESHOLD``.
+    3. Floor override: if survivors < SCORER_MIN_CELLS, promote the
+       top-ranked dismissed cells (by score) until the floor is met,
+       tagging them with ``_floor_override=True``.
+    4. Sort survivors back to notebook order for rendering.
+    5. Log the pruning decision via ``debug_logger``.
     """
+    threshold, min_cells = _read_pruning_config()
     summaries = store.get_all_current()
-    # Score for potential future pruning (no budget cap applied yet)
-    score_cells(active_cells, summaries, user_query)
 
-    # Always render in notebook order regardless of scores
-    parts = [
-        _format_summary_cell(cell, store)
-        for cell in sorted(active_cells, key=lambda c: c["index"])
-    ]
-    return "\n".join(parts)
+    # score_cells returns cells sorted descending by _score
+    ranked = score_cells(active_cells, summaries, user_query)
+
+    kept:      List[Dict[str, Any]] = []
+    dismissed: List[Dict[str, Any]] = []
+    for cell in ranked:
+        if cell["_score"] >= threshold:
+            kept.append({**cell, "_floor_override": False})
+        else:
+            dismissed.append(cell)
+
+    # Floor: promote top-scoring dismissed cells until min_cells is met
+    floor_triggered = False
+    while len(kept) < min_cells and dismissed:
+        # dismissed is already in score-descending order (ranked sort)
+        promoted = dismissed.pop(0)
+        kept.append({**promoted, "_floor_override": True})
+        floor_triggered = True
+
+    # ── Scorer pruning log ────────────────────────────────────────────────────
+    kept_ids = {c.get("cell_id", "") for c in kept}
+    cell_entries = []
+    for cell in kept + dismissed:
+        cell_entries.append({
+            "index":           cell.get("index"),
+            "cell_id":         cell.get("cell_id", "")[:8],  # abbreviated
+            "score_breakdown": cell.get("_score_breakdown", {}),
+            "kept":            cell.get("cell_id", "") in kept_ids,
+            "floor_override":  cell.get("_floor_override", False),
+        })
+
+    dlog("scorer", "pruning_decision", {
+        "query":           user_query[:200],
+        "threshold":       threshold,
+        "min_cells":       min_cells,
+        "total":           len(ranked),
+        "kept_count":      len(kept),
+        "dismissed_count": len(dismissed),
+        "floor_triggered": floor_triggered,
+        "cells":           cell_entries,
+    })
+
+    # Sort survivors back to notebook order
+    survivors = sorted(kept, key=lambda c: c["index"])
+
+    context = "\n".join(_format_summary_cell(cell, store) for cell in survivors)
+
+    # ── Assembler context_built log ───────────────────────────────────────────
+    dlog("assembler", "context_built", {
+        "path":           "no_focal",
+        "focal_index":    None,
+        "cells_before":   len(ranked),
+        "cells_after":    len(survivors),
+        "estimated_chars": len(context),
+    })
+
+    return context
 
 
 # ── Utility helpers ────────────────────────────────────────────────────────────
