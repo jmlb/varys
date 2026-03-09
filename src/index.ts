@@ -556,6 +556,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
         if (args.type === 'remove') {
           for (const removedCell of (args.oldValues ?? [])) {
+            if (!removedCell) continue;
             const cellId: string =
               (removedCell as any).id ??
               (removedCell as any).sharedModel?.id ?? '';
@@ -565,6 +566,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
           }
         } else if (args.type === 'add') {
           for (const addedCell of (args.newValues ?? [])) {
+            if (!addedCell) continue;
             const cellId: string =
               (addedCell as any).id ??
               (addedCell as any).sharedModel?.id ?? '';

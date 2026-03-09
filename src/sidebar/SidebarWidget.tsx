@@ -223,10 +223,11 @@ interface ImageRecoveryPromptProps {
   /** Lowercase provider name ("anthropic", "openai", …). */
   provider: string;
   /**
-   * Called with the full pre-filled text: "/<cmd> <originalMessage>".
-   * The parent places this into the textarea so the user just presses Enter.
+   * Called with (cmd, originalMessage) when the user picks an option.
+   * cmd  — the command string, e.g. "/no_figures" or "/resize(7800)"
+   * originalMessage — the user's original message text
    */
-  onFill: (text: string) => void;
+  onFill: (cmd: string, originalMessage: string) => void;
 }
 
 const ImageRecoveryPrompt: React.FC<ImageRecoveryPromptProps> = ({
@@ -275,8 +276,7 @@ const ImageRecoveryPrompt: React.FC<ImageRecoveryPromptProps> = ({
     setOpen(false);
     setShowCustom(false);
     setCustomDim('');
-    // Prefix the original message with the command so pressing Enter re-sends
-    onFill(`${cmd} ${originalMessage}`);
+    onFill(cmd, originalMessage);
   };
 
   const submitCustom = () => {
@@ -4776,13 +4776,21 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
               <ImageRecoveryPrompt
                 originalMessage={msg.content}
                 provider={msg.errorProvider ?? ''}
-                onFill={text => {
-                  setInput(text);
+                onFill={(cmd, originalMsg) => {
+                  // Apply image mode immediately (reliable — does not depend on
+                  // the user pressing Enter on a pre-filled textarea).
+                  const resizeMatch = cmd.match(/^\/resize\((\d+)\)$/);
+                  if (resizeMatch) {
+                    setImageMode({ mode: 'resize', dim: parseInt(resizeMatch[1], 10) });
+                  } else if (cmd === '/no_figures') {
+                    setImageMode({ mode: 'no_figures' });
+                  }
+                  // Pre-fill textarea with just the original message so the
+                  // user only has to press Enter to re-send with the new mode.
+                  setInput(originalMsg);
                   requestAnimationFrame(() => {
                     if (textareaRef.current) {
                       textareaRef.current.focus();
-                      const len = textareaRef.current.value.length;
-                      textareaRef.current.setSelectionRange(len, len);
                     }
                   });
                 }}
