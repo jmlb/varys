@@ -8,7 +8,9 @@ applied yet.  When the budget-policy spec arrives, pruning is a one-liner:
   keep   = ranked[:budget]          # prune to budget
 
 Signal weights (spec §4):
-  HIGH   (10) — symbol referenced in user query via @var
+  HIGH   (10) — @var hit: 10 × (matched / total_defined) — proportional
+                to specificity; a 1-symbol cell that matches scores 10,
+                an 8-symbol cell with 1 match scores 1.25
   HIGH   ( 8) — cell executed most recently (highest execution_count)
   HIGH   ( 8) — cell produced an error on last run
   MEDIUM ( 4) — symbol defined here consumed by N downstream cells (×N)
@@ -77,9 +79,12 @@ def score_cells(
             defined = set(summary.get("symbols_defined", []))
             ec      = summary.get("execution_count") or 0
 
-            # @variable reference in user query
-            if at_refs & defined:
-                score += W_AT_REF
+            # @variable reference in user query — proportional to specificity:
+            # +10 × (matched / total_defined) so a 1-symbol cell that matches
+            # outscores an 8-symbol cell where only one name happens to match.
+            matched = at_refs & defined
+            if matched and defined:
+                score += W_AT_REF * len(matched) / len(defined)
 
             # Recency: proportional 0 → W_RECENT_EXEC
             score += int(W_RECENT_EXEC * ec / max_ec)
