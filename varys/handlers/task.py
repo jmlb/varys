@@ -201,6 +201,30 @@ async def _rag_augment(
 
 
 # ---------------------------------------------------------------------------
+# Chain-of-Thought reasoning suffix — appended to any system prompt when the
+# user has selected CoT mode from the reasoning chip (single API call, steps
+# appear inline in the response).
+# ---------------------------------------------------------------------------
+
+_COT_SYSTEM_SUFFIX = """
+
+## Reasoning Mode: Chain-of-Thought (active)
+
+For every non-trivial request, work through the problem step by step **before**
+giving your final answer.  Use this format for each step:
+
+**Step N — [short action title]**
+> *Reasoning:* ...
+> *Confidence:* high / medium / low
+> *Needs revision:* yes / no
+
+If a step needs revision, add a `> *Revision:*` line before continuing.
+
+Separate your final answer with a `---` divider.
+Skip the step structure only for simple, one-line factual questions.
+"""
+
+# ---------------------------------------------------------------------------
 # Advisory (chat-mode) prompt — used when a skill declares
 # cell_insertion_mode: chat.  The LLM responds with free-form markdown
 # instead of a cell-operation JSON plan.
@@ -471,7 +495,9 @@ class TaskHandler(JupyterHandler):
         # 'auto' = skill/heuristic decides (default)
         # 'doc'  = always write cells regardless of skill defaults
         user_cell_mode   = body.get("cellMode", "auto")  # 'chat' | 'auto' | 'doc'
-        thinking_enabled = bool(body.get("thinkingEnabled", False))
+        reasoning_mode   = body.get("reasoningMode", "off")   # 'off' | 'cot' | 'sequential'
+        cot_enabled      = reasoning_mode == "cot"
+        sequential_enabled = reasoning_mode == "sequential"
 
         if not message:
             self.set_status(400)
@@ -677,6 +703,8 @@ class TaskHandler(JupyterHandler):
 
             if cell_insertion_mode == "chat":
                 system = _build_advisory_system(skills, memory)
+                if cot_enabled:
+                    system += _COT_SYSTEM_SUFFIX
                 user   = _build_advisory_user(message, notebook_context)
 
                 if stream_requested:
@@ -709,7 +737,7 @@ class TaskHandler(JupyterHandler):
 
                     # ── MCP Sequential Thinking loop (chip ON) ────────────────
                     final_user = user
-                    if thinking_enabled and getattr(provider, "has_sequential_thinking", lambda: False)():
+                    if sequential_enabled and getattr(provider, "has_sequential_thinking", lambda: False)():
                         mcp_thoughts = await provider.run_sequential_thinking_loop(
                             user=user,
                             system=system,
@@ -917,7 +945,7 @@ class TaskHandler(JupyterHandler):
                     # so the LLM reasons about what operations are needed before
                     # the heavier full-context final call.
                     final_message = message
-                    if thinking_enabled and getattr(provider, "has_sequential_thinking", lambda: False)():
+                    if sequential_enabled and getattr(provider, "has_sequential_thinking", lambda: False)():
                         thought_user = (
                             build_notebook_context(message, notebook_context)
                             + "\n\nThink through step by step what notebook cell operations are needed to fulfil this request."
@@ -956,6 +984,8 @@ class TaskHandler(JupyterHandler):
                             # Agentic loop: external tools + create_operation_plan
                             from ..llm.client import _build_system_prompt_shared as _bsp
                             plan_system_prompt = _bsp(skills, memory)
+                            if cot_enabled:
+                                plan_system_prompt += _COT_SYSTEM_SUFFIX
                             # Inject MCP tool awareness so the LLM uses tools
                             # instead of refusing to access external resources.
                             ext_tools_plan = mcp_manager.get_all_tools()

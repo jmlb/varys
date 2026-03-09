@@ -2711,12 +2711,19 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
   const [showRepro,    setShowRepro]         = useState(false);
   const [showTags,     setShowTags]          = useState(false);
 
-  // Sequential thinking toggle — persisted in localStorage, default OFF.
-  const [thinkingEnabled, setThinkingEnabled] = useState<boolean>(() => {
+  // Reasoning mode chip: 'off' | 'cot' | 'sequential'
+  // 'cot'       = Chain-of-Thought system prompt injection, 1 API call, steps inline
+  // 'sequential' = MCP sequential thinking loop, N API calls, 🧠 panel
+  type ReasoningMode = 'off' | 'cot' | 'sequential';
+  const REASONING_CYCLE: ReasoningMode[] = ['off', 'cot', 'sequential'];
+  const [reasoningMode, setReasoningMode] = useState<ReasoningMode>(() => {
     try {
-      return localStorage.getItem('ds-varys-thinking') === 'true';
+      const stored = localStorage.getItem('ds-varys-reasoning-mode') as ReasoningMode | null;
+      // Migrate legacy boolean flag
+      if (!stored && localStorage.getItem('ds-varys-thinking') === 'true') return 'sequential';
+      return REASONING_CYCLE.includes(stored as ReasoningMode) ? (stored as ReasoningMode) : 'off';
     } catch {
-      return false;
+      return 'off';
     }
   });
   // Tracks which message IDs have their thinking section collapsed (true = collapsed)
@@ -2725,8 +2732,8 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     setThinkCollapsed(prev => new Map(prev).set(id, !prev.get(id)));
   // Ref mirrors state so async callbacks (handleSend) always read the live value
   // even if captured in a stale closure.
-  const thinkingEnabledRef = useRef(thinkingEnabled);
-  useEffect(() => { thinkingEnabledRef.current = thinkingEnabled; }, [thinkingEnabled]);
+  const reasoningModeRef = useRef(reasoningMode);
+  useEffect(() => { reasoningModeRef.current = reasoningMode; }, [reasoningMode]);
 
   // Chat window theme toggle: 'day' (light) or 'night' (dark), persisted in
   // localStorage so it survives JupyterLab restarts independently of the
@@ -3548,7 +3555,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
           variables: resolvedVariables,
           ...(slashCommand ? { command: slashCommand } : {}),
           cellMode: notebookAware ? cellMode : 'chat',
-          thinkingEnabled: thinkingEnabledRef.current || undefined,
+          ...(reasoningModeRef.current !== 'off' ? { reasoningMode: reasoningModeRef.current } : {}),
         },
         // onChunk — explanation text Claude emits before the tool call
         (chunk: string) => {
@@ -4842,18 +4849,29 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
               notebook
             </button>
             <button
-              className={`ds-thinking-chip${thinkingEnabled ? ' ds-thinking-chip--on' : ' ds-thinking-chip--off'}`}
+              className={`ds-thinking-chip${
+                reasoningMode === 'sequential' ? ' ds-thinking-chip--on'
+                : reasoningMode === 'cot'      ? ' ds-thinking-chip--cot'
+                :                                ' ds-thinking-chip--off'
+              }`}
               onClick={() => {
-                const next = !thinkingEnabled;
-                setThinkingEnabled(next);
-                try { localStorage.setItem('ds-varys-thinking', String(next)); } catch { /* ignore */ }
+                const next = REASONING_CYCLE[(REASONING_CYCLE.indexOf(reasoningMode) + 1) % REASONING_CYCLE.length];
+                setReasoningMode(next);
+                try { localStorage.setItem('ds-varys-reasoning-mode', next); } catch { /* ignore */ }
               }}
-              data-tip={thinkingEnabled
-                ? 'Sequential reasoning ON — click to disable.'
-                : 'Sequential reasoning OFF — click to enable.'}
-              aria-label={thinkingEnabled ? 'Sequential reasoning enabled' : 'Sequential reasoning disabled'}
+              data-tip={
+                reasoningMode === 'sequential'
+                  ? 'Sequential reasoning ON (multi-step, 🧠 panel) — click for CoT.'
+                  : reasoningMode === 'cot'
+                  ? 'Chain-of-Thought ON (1 API call, steps inline) — click to disable.'
+                  : 'No reasoning — click for CoT, click again for Sequential.'
+              }
+              aria-label={`Reasoning mode: ${reasoningMode}`}
             >
-              🧠 Reasoning: {thinkingEnabled ? 'on' : 'off'}
+              🧠{' '}
+              {reasoningMode === 'sequential' ? 'Sequential'
+                : reasoningMode === 'cot'     ? 'CoT'
+                :                               'Reasoning: off'}
             </button>
           </div>
           <textarea
