@@ -819,14 +819,27 @@ export class APIClient {
   }
 
   /**
-   * Fetch all symbol names defined in the current notebook from the SummaryStore.
-   * Used to populate the @-mention autocomplete dropdown.
+   * Fetch symbol names visible at the current cursor position.
+   *
+   * cellIds should be the ordered list of cell UUIDs from the notebook,
+   * pre-sliced to cells at or before the active cell index.  The backend
+   * returns only symbols defined in those cells (last definition wins).
+   * Pass an empty array to fall back to all symbols in the notebook.
    * Returns [] on any error so callers never need to handle exceptions.
    */
-  async fetchSymbols(notebookPath: string): Promise<{ name: string; vtype: string }[]> {
+  async fetchSymbols(
+    notebookPath: string,
+    cellIds: string[] = [],
+  ): Promise<{ name: string; vtype: string }[]> {
     try {
-      const qs = new URLSearchParams({ notebook_path: notebookPath }).toString();
-      const r  = await fetch(`${this.baseUrl}/symbols?${qs}`);
+      const r = await fetch(`${this.baseUrl}/symbols`, {
+        method:  'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-XSRFToken':  this.getXSRFToken(),
+        },
+        body: JSON.stringify({ notebook_path: notebookPath, cell_ids: cellIds }),
+      });
       if (!r.ok) return [];
       const data = await r.json();
       return Array.isArray(data.symbols) ? data.symbols : [];

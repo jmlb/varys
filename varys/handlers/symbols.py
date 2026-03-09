@@ -1,12 +1,23 @@
-"""GET /varys/symbols — return all symbols defined in the current notebook.
+"""POST /varys/symbols — return symbols defined in cells up to the active cell.
 
-Used by the frontend @-mention autocomplete to suggest variable names as the
-user types.  Reads the SummaryStore and returns a flat, deduplicated list of
-symbol names with their last-known type string and the 1-based cell position
-where they were most recently defined.
+Used by the frontend @-mention autocomplete.  The frontend sends the notebook
+cell UUIDs *in notebook order, pre-filtered to cells at or before the active
+cell*, so only variables that are reachable at the current cursor position are
+suggested.
 
-Query parameters:
-  notebook_path  — relative path to the notebook (required)
+Request body (JSON):
+  {
+    "notebook_path": "relative/path/to/notebook.ipynb",
+    "cell_ids":      ["<uuid1>", "<uuid2>", ...]   // ordered, already sliced
+  }
+
+When ``cell_ids`` is empty or omitted the handler falls back to the full
+store order (all cells), preserving the original GET behaviour.
+
+Response:
+  { "symbols": [{"name": "df", "vtype": "DataFrame(1000, 5)"}, ...] }
+
+Symbol order: notebook order, last definition wins for duplicate names.
 """
 import json
 import logging
@@ -21,10 +32,18 @@ class SymbolsHandler(JupyterHandler):
     """Return live symbol names for @-mention autocomplete."""
 
     @authenticated
-    def get(self) -> None:
+    def post(self) -> None:
         self.set_header("Content-Type", "application/json")
 
-        notebook_path = self.get_argument("notebook_path", "")
+        try:
+            body: dict = json.loads(self.request.body.decode())
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            self.finish(json.dumps({"symbols": []}))
+            return
+
+        notebook_path = body.get("notebook_path", "")
+        cell_ids: list[str] = body.get("cell_ids") or []
+
         if not notebook_path:
             self.finish(json.dumps({"symbols": []}))
             return
@@ -32,17 +51,19 @@ class SymbolsHandler(JupyterHandler):
         root_dir = self.settings.get("ds_assistant_root_dir", ".")
         try:
             from ..context.summary_store import SummaryStore
-            store    = SummaryStore(root_dir, notebook_path)
-            current  = store.get_all_current()   # {cell_id: summary}
+            store   = SummaryStore(root_dir, notebook_path)
+            current = store.get_all_current()   # {cell_id: summary}
 
-            # Build {name → (type_str, cell_id)} — last definition wins
-            # We need notebook order, but get_all_current() gives us a dict
-            # keyed by cell UUID.  We re-read the raw store to get insertion
-            # order (JSON dicts preserve insertion order in Python 3.7+).
-            raw_order = [k for k in store._load().keys() if k != "_meta"]
+            # Order to iterate: caller-supplied (already ≤ active cell) or
+            # full store insertion order as fallback.
+            if cell_ids:
+                ordered = cell_ids
+            else:
+                ordered = [k for k in store._load().keys() if k != "_meta"]
 
+            # Walk in order; last definition of each name wins.
             name_to_info: dict[str, dict] = {}
-            for cell_id in raw_order:
+            for cell_id in ordered:
                 summary = current.get(cell_id)
                 if not summary:
                     continue
@@ -53,8 +74,7 @@ class SymbolsHandler(JupyterHandler):
                         "vtype": sym_types.get(name, ""),
                     }
 
-            symbols = list(name_to_info.values())
-            self.finish(json.dumps({"symbols": symbols}))
+            self.finish(json.dumps({"symbols": list(name_to_info.values())}))
 
         except Exception as exc:
             log.debug("SymbolsHandler error: %s", exc)

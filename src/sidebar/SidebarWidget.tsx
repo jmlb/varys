@@ -4989,10 +4989,17 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                 setAtAnchorPos(anchor);
                 setAtQuery(atMatch[1]);
                 setAtFocusIdx(0);
-                // Fetch symbols lazily (re-fetch each time anchor opens so list stays fresh)
-                const nbPath = notebookReader.getFullContext()?.notebookPath ?? '';
+                // Fetch symbols visible at the active cell (cells ≤ activeCellIndex).
+                // Re-fetch each time the anchor opens so the list stays fresh.
+                const ctx = notebookReader.getFullContext();
+                const nbPath = ctx?.notebookPath ?? '';
                 if (nbPath) {
-                  apiClient.fetchSymbols(nbPath).then(syms => setAtSymbols(syms)).catch(() => {/* ignore */});
+                  const activeIdx = ctx?.activeCellIndex ?? -1;
+                  const cellIds = (ctx?.cells ?? [])
+                    .filter((_, i) => activeIdx < 0 || i <= activeIdx)
+                    .map(c => c.cellId ?? '')
+                    .filter(Boolean);
+                  apiClient.fetchSymbols(nbPath, cellIds).then(syms => setAtSymbols(syms)).catch(() => {/* ignore */});
                 }
               } else if (before.endsWith('@')) {
                 // User just typed '@' with nothing after it yet
@@ -5000,9 +5007,15 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                 setAtAnchorPos(anchor);
                 setAtQuery('');
                 setAtFocusIdx(0);
-                const nbPath = notebookReader.getFullContext()?.notebookPath ?? '';
+                const ctx = notebookReader.getFullContext();
+                const nbPath = ctx?.notebookPath ?? '';
                 if (nbPath) {
-                  apiClient.fetchSymbols(nbPath).then(syms => setAtSymbols(syms)).catch(() => {/* ignore */});
+                  const activeIdx = ctx?.activeCellIndex ?? -1;
+                  const cellIds = (ctx?.cells ?? [])
+                    .filter((_, i) => activeIdx < 0 || i <= activeIdx)
+                    .map(c => c.cellId ?? '')
+                    .filter(Boolean);
+                  apiClient.fetchSymbols(nbPath, cellIds).then(syms => setAtSymbols(syms)).catch(() => {/* ignore */});
                 }
               } else {
                 setAtAnchorPos(-1);

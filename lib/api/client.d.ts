@@ -411,11 +411,15 @@ export declare class APIClient {
     }>;
     removeMCPServer(name: string): Promise<void>;
     /**
-     * Fetch all symbol names defined in the current notebook from the SummaryStore.
-     * Used to populate the @-mention autocomplete dropdown.
+     * Fetch symbol names visible at the current cursor position.
+     *
+     * cellIds should be the ordered list of cell UUIDs from the notebook,
+     * pre-sliced to cells at or before the active cell index.  The backend
+     * returns only symbols defined in those cells (last definition wins).
+     * Pass an empty array to fall back to all symbols in the notebook.
      * Returns [] on any error so callers never need to handle exceptions.
      */
-    fetchSymbols(notebookPath: string): Promise<{
+    fetchSymbols(notebookPath: string, cellIds?: string[]): Promise<{
         name: string;
         vtype: string;
     }[]>;
