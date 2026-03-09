@@ -130,15 +130,19 @@ def assemble_context(
 
     focal_idx = next(i for i, c in enumerate(active) if c["cell_id"] == focal_id)
     parts: List[str] = []
+    cells_in_prompt: List[int] = []
 
     # Pre-focal → compact summary blocks
     for cell in active[:focal_idx]:
         parts.append(_format_summary_cell(cell, summary_store))
+        cells_in_prompt.append(cell.get("index", 0) + 1)  # 1-based
 
     # Focal cell → full source + full output
     parts.append(_format_focal_cell(active[focal_idx], focal_cell_full_output))
+    cells_in_prompt.append(active[focal_idx].get("index", focal_idx) + 1)
 
     # Post-focal cells are omitted, EXCEPT if the query explicitly references one
+    downstream_ref = None
     if focal_idx + 1 < len(active):
         downstream_ref = _find_downstream_ref(user_query, active[focal_idx + 1:])
         if downstream_ref:
@@ -146,14 +150,21 @@ def assemble_context(
                 f"(downstream cell referenced in query)\n"
                 + _format_summary_cell(downstream_ref, summary_store)
             )
+            cells_in_prompt.append(downstream_ref.get("index", 0) + 1)
 
     context = "\n".join(parts)
 
+    # Active-cell cutoff (1-based): index of the deepest visible cell
+    cutoff = (active[focal_idx].get("index", focal_idx) + 1) if downstream_ref is None \
+             else (downstream_ref.get("index", 0) + 1)
+
     dlog("assembler", "context_built", {
         "path":            "focal",
-        "focal_index":     active[focal_idx].get("index"),
-        "cells_before":    len(active),
-        "cells_after":     len(parts),
+        "query":           user_query[:200],
+        "focal_cell_idx":  active[focal_idx].get("index", focal_idx) + 1,  # 1-based
+        "cutoff_cell_idx": cutoff,
+        "total_cells":     len(active),
+        "cells_in_prompt": cells_in_prompt,
         "estimated_chars": len(context),
     }, nb_base=nb_base)
 
@@ -334,12 +345,42 @@ def _build_all_summaries(
 
     context = "\n".join(_format_summary_cell(cell, store) for cell in survivors)
 
+    # Build per-cell detail rows (notebook order, same schema as scorer_log)
+    all_cells_log = sorted(kept + dismissed, key=lambda c: c.get("index", 0))
+    cell_rows = []
+    for cell in all_cells_log:
+        bd = cell.get("_score_breakdown", {})
+        raw_idx = cell.get("index")
+        cell_rows.append({
+            "cell_idx":        (raw_idx + 1) if isinstance(raw_idx, int) else None,
+            "cell_id":         cell.get("cell_id", ""),
+            "in_prompt":       cell.get("cell_id", "") in kept_ids,
+            "floor_override":  cell.get("_floor_override", False),
+            "relevance_score": round(cell.get("_score", 0.0), 6),
+            "feature_scores": {
+                "at_ref":     round(bd.get("at_ref",    0.0), 4),
+                "recency":    round(bd.get("recency",   0.0), 4),
+                "error":      round(bd.get("error",     0.0), 4),
+                "fan_out":    round(bd.get("fan_out",   0.0), 4),
+                "import":     round(bd.get("import",    0.0), 4),
+                "dead":       round(bd.get("dead",      0.0), 4),
+                "raw":        round(bd.get("raw",       0.0), 4),
+                "normalized": round(bd.get("normalized", 0.0), 6),
+            },
+        })
+
     dlog("assembler", "context_built", {
-        "path":           "no_focal",
-        "focal_index":    None,
-        "cells_before":   len(ranked),
-        "cells_after":    len(survivors),
+        "path":            "no_focal",
+        "query":           user_query[:200],
+        "cutoff_cell_idx": cutoff_cell_idx,
+        "threshold":       threshold,
+        "total_cells":     len(ranked),
+        "kept_count":      len(kept),
+        "dismissed_count": len(dismissed),
+        "floor_triggered": floor_triggered,
+        "cells_in_prompt": [r["cell_idx"] for r in cell_rows if r["in_prompt"]],
         "estimated_chars": len(context),
+        "cells":           cell_rows,
     }, nb_base=nb_base)
 
     return context
