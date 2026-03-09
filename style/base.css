@@ -160,8 +160,11 @@
   z-index: 2;
 }
 .ds-assistant-message-user:hover .ds-user-copy-btn {
-  opacity: 1;
+  opacity: 0.35;
   pointer-events: auto;
+}
+.ds-user-copy-btn:hover {
+  opacity: 1;
 }
 
 /* Code blocks inside user bubbles: darker background + wrap instead of scroll */
