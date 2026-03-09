@@ -7160,3 +7160,124 @@ body[data-jp-theme-light="false"] .ds-tag-add-input::placeholder {
 }
 .ds-chat-night .ds-disambig-btn-body strong { color: #cdd6f4; }
 .ds-chat-night .ds-disambig-btn-body code   { color: #7f849c; }
+
+/* ----------------------------------------------------------
+   Image error recovery prompt
+   ---------------------------------------------------------- */
+
+.ds-image-recovery-prompt {
+  background: var(--jp-warn-color3, #fef9c3);
+  border: 1px solid var(--jp-warn-color1, #eab308);
+  border-left: 4px solid var(--jp-warn-color1, #eab308);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.82em;
+}
+
+.ds-image-recovery-title {
+  font-weight: 600;
+  color: var(--jp-ui-font-color0, #111);
+}
+
+.ds-image-recovery-body {
+  color: var(--jp-ui-font-color1);
+}
+
+.ds-image-recovery-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ds-image-recovery-chip {
+  background: var(--jp-layout-color1);
+  border: 1px solid var(--jp-warn-color1, #eab308);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 0.85em;
+  font-family: var(--jp-code-font-family);
+  cursor: pointer;
+  color: var(--jp-ui-font-color0);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.ds-image-recovery-chip:hover {
+  background: var(--jp-warn-color3, #fef9c3);
+  border-color: #ca8a04;
+}
+
+.ds-image-recovery-hint {
+  color: var(--jp-ui-font-color2);
+  font-size: 0.9em;
+}
+
+.ds-image-recovery-hint code {
+  background: var(--jp-layout-color2);
+  border-radius: 3px;
+  padding: 0 3px;
+  font-family: var(--jp-code-font-family);
+}
+
+/* Night mode */
+.ds-chat-night .ds-image-recovery-prompt {
+  background: #2d2a1a;
+  border-color: #92400e;
+  border-left-color: #f59e0b;
+}
+.ds-chat-night .ds-image-recovery-title { color: #fde68a; }
+.ds-chat-night .ds-image-recovery-body  { color: #d4a17a; }
+.ds-chat-night .ds-image-recovery-chip {
+  background: #1e1a10;
+  border-color: #78350f;
+  color: #fde68a;
+}
+.ds-chat-night .ds-image-recovery-chip:hover {
+  background: #292108;
+  border-color: #f59e0b;
+}
+.ds-chat-night .ds-image-recovery-hint { color: #a8956b; }
+
+/* ----------------------------------------------------------
+   Image mode badge (input area indicator)
+   ---------------------------------------------------------- */
+
+.ds-image-mode-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--jp-layout-color2);
+  border: 1px solid var(--jp-border-color2);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 0.78em;
+  color: var(--jp-ui-font-color1);
+  margin-bottom: 2px;
+}
+
+.ds-image-mode-icon {
+  flex-shrink: 0;
+}
+
+.ds-image-mode-label {
+  font-family: var(--jp-code-font-family);
+  font-size: 0.9em;
+  flex: 1;
+}
+
+.ds-image-mode-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--jp-ui-font-color2);
+  padding: 0 2px;
+  font-size: 0.9em;
+  line-height: 1;
+  transition: color 0.1s ease;
+}
+
+.ds-image-mode-clear:hover {
+  color: var(--jp-error-color1, #dc2626);
+}

@@ -155,6 +155,8 @@ BUILTIN_COMMANDS: Dict[str, str] = {
     "/rag":          "Show knowledge-base status (indexed files, total chunks)",
     "/newnotebook":  "Create a new notebook from a template skill",
     "/clear":        "Start a new chat thread",
+    "/no_figures":   "Exclude all notebook figures/plots from the next messages sent to the LLM",
+    "/resize":       "Downscale figures before sending — /resize(DIM) sets the max pixel dimension (e.g. /resize(7800))",
 }
 
 

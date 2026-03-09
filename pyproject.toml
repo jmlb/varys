@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "varys"
-version = "0.3.0"
+version = "0.4.0"
 description = "Varys — your DS assistant for Jupyter Notebook"
 license = "MIT"
 requires-python = ">=3.9"
@@ -31,8 +31,9 @@ ollama    = ["httpx"]
 bedrock   = ["boto3"]
 rag       = ["chromadb"]
 mcp       = ["mcp>=1.0"]
-# Install all LLM providers + RAG + MCP at once
-all = ["anthropic", "openai", "httpx", "boto3", "chromadb", "mcp>=1.0"]
+images    = ["Pillow>=10.0"]
+# Install all LLM providers + RAG + MCP + image processing at once
+all = ["anthropic", "openai", "httpx", "boto3", "chromadb", "mcp>=1.0", "Pillow>=10.0"]
 
 [project.urls]
 Homepage = "https://github.com/jmlb/varys"

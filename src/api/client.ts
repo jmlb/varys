@@ -142,6 +142,14 @@ export interface ResolvedVariable {
   summary: Record<string, any>;
 }
 
+/**
+ * Active image mode set by /no_figures or /resize(DIM).
+ * Persisted in localStorage per notebook and included in every request until cleared.
+ */
+export type ImageMode =
+  | { mode: 'no_figures' }
+  | { mode: 'resize'; dim: number };
+
 export interface TaskRequest {
   message: string;
   notebookContext: NotebookContext;
@@ -178,6 +186,12 @@ export interface TaskRequest {
    * separate 'thought' SSE events and returned in response.thoughts.
    */
   thinkingEnabled?: boolean;
+  /**
+   * Active image mode for this request.
+   * Set by /no_figures (strips all figures) or /resize(DIM) (downscales figures).
+   * Persisted per notebook in localStorage; included on every request until changed.
+   */
+  imageMode?: ImageMode;
 }
 
 /** One step in a composite pipeline skill. */
@@ -242,6 +256,19 @@ export interface TaskResponse {
   }>;
   /** Token usage for this response (input + output). */
   tokenUsage?: TokenUsage;
+  /**
+   * Set when the backend detected an image-too-large API error.
+   * Value is "image_too_large".  Frontend renders the recovery prompt.
+   */
+  errorType?: string;
+  /**
+   * Populated when resize mode was active and at least one image was processed.
+   * Frontend uses this to show a post-action confirmation notice.
+   */
+  imageResizeInfo?: {
+    count: number;
+    warnings: string[];
+  };
 }
 
 
@@ -350,6 +377,16 @@ export class APIClient {
               onJsonDelta?.(event.text as string);
             } else if (event.type === 'done') {
               lastDone = event as TaskResponse;
+            } else if (event.type === 'image_too_large') {
+              // Image dimension error — return as structured response so the
+              // caller can render the recovery prompt instead of a plain error.
+              lastDone = {
+                operationId: 'image_error',
+                steps: [],
+                requiresApproval: false,
+                cellInsertionMode: 'chat',
+                errorType: 'image_too_large',
+              } as TaskResponse;
             } else if (event.type === 'error') {
               // Surface API-level errors (billing, rate-limit, auth, etc.) as
               // a real throw so the caller shows the actual message to the user

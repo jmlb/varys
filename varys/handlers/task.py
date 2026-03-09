@@ -483,9 +483,30 @@ class TaskHandler(JupyterHandler):
         force_auto_mode  = bool(body.get("forceAutoMode", False))
         # @variable_name references resolved by VariableResolver in the frontend
         variables        = body.get("variables", [])
-        if variables:
+        # Active image mode set by /no_figures or /resize(DIM).
+        # {"mode": "no_figures"} or {"mode": "resize", "dim": <int>} or None.
+        image_mode       = body.get("imageMode") or None
+
+        # Apply image mode to notebook_context before anything else reads cells.
+        # Always work on a mutable copy so we never mutate the original.
+        if variables or image_mode:
             notebook_context = dict(notebook_context)
+            if "cells" in notebook_context:
+                notebook_context["cells"] = [dict(c) for c in notebook_context["cells"]]
+        if variables:
             notebook_context["variables"] = variables
+
+        _image_resize_count: int = 0
+        _image_resize_warnings: list = []
+        if image_mode:
+            try:
+                from ..image_processing import apply_image_mode as _apply_img
+                _image_resize_count, _image_resize_warnings = _apply_img(
+                    notebook_context, image_mode
+                )
+            except Exception as _img_exc:  # noqa: BLE001
+                log.warning("image_mode application failed: %s", _img_exc)
+
         # Slash command typed by the user (e.g. "/eda").  The frontend strips the
         # command prefix from the message before sending, so ``message`` here
         # already contains only the free-text portion of the user input.
@@ -1107,6 +1128,13 @@ class TaskHandler(JupyterHandler):
             if warnings:
                 response["warnings"] = warnings
 
+            # Attach resize feedback so the frontend can show a confirmation notice.
+            if _image_resize_count > 0 or _image_resize_warnings:
+                response["imageResizeInfo"] = {
+                    "count":    _image_resize_count,
+                    "warnings": _image_resize_warnings,
+                }
+
             # If we already opened an SSE stream (for the progress event),
             # send the final payload as a "done" event rather than raw JSON.
             content_type = self._headers.get("Content-Type", "")
@@ -1119,6 +1147,21 @@ class TaskHandler(JupyterHandler):
 
         except Exception as e:
             self.log.error(f"Varys task error: {traceback.format_exc()}")
+            # Check for image dimension errors before sending a generic error response.
+            try:
+                from ..image_processing import is_image_dimension_error as _is_img_err
+                _is_img_dim = _is_img_err(e)
+            except Exception:  # noqa: BLE001
+                _is_img_dim = False
+
+            if _is_img_dim:
+                # Return a structured event so the frontend can render the recovery UI.
+                self.set_status(200)  # SSE error events must ride on 200
+                self.set_header("Content-Type", "text/event-stream")
+                self.write(f"data: {json.dumps({'type': 'image_too_large', 'error': str(e)})}\n\n")
+                self.finish()
+                return
+
             self.set_status(500)
             if stream_requested:
                 # For SSE responses already started, send error as final event

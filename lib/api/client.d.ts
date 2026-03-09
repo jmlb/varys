@@ -125,6 +125,16 @@ export interface ResolvedVariable {
     expr: string;
     summary: Record<string, any>;
 }
+/**
+ * Active image mode set by /no_figures or /resize(DIM).
+ * Persisted in localStorage per notebook and included in every request until cleared.
+ */
+export type ImageMode = {
+    mode: 'no_figures';
+} | {
+    mode: 'resize';
+    dim: number;
+};
 export interface TaskRequest {
     message: string;
     notebookContext: NotebookContext;
@@ -161,6 +171,12 @@ export interface TaskRequest {
      * separate 'thought' SSE events and returned in response.thoughts.
      */
     thinkingEnabled?: boolean;
+    /**
+     * Active image mode for this request.
+     * Set by /no_figures (strips all figures) or /resize(DIM) (downscales figures).
+     * Persisted per notebook in localStorage; included on every request until changed.
+     */
+    imageMode?: ImageMode;
 }
 /** One step in a composite pipeline skill. */
 export interface CompositeStep {
@@ -222,6 +238,19 @@ export interface TaskResponse {
     }>;
     /** Token usage for this response (input + output). */
     tokenUsage?: TokenUsage;
+    /**
+     * Set when the backend detected an image-too-large API error.
+     * Value is "image_too_large".  Frontend renders the recovery prompt.
+     */
+    errorType?: string;
+    /**
+     * Populated when resize mode was active and at least one image was processed.
+     * Frontend uses this to show a post-action confirmation notice.
+     */
+    imageResizeInfo?: {
+        count: number;
+        warnings: string[];
+    };
 }
 export interface CompletionRequest {
     prefix: string;

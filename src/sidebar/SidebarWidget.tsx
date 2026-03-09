@@ -8,7 +8,7 @@ import { ReactWidget } from '@jupyterlab/apputils';
 import { INotebookTracker } from '@jupyterlab/notebook';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { APIClient, TaskResponse, OperationStep, ChatTurn, CompositeStep, ResolvedVariable, ChatThread, SlashCommand } from '../api/client';
+import { APIClient, TaskResponse, OperationStep, ChatTurn, CompositeStep, ResolvedVariable, ChatThread, SlashCommand, ImageMode } from '../api/client';
 import { NotebookReader } from '../context/NotebookReader';
 import { VariableResolver, parseVariableRefs } from '../context/VariableResolver';
 import { CellEditor } from '../editor/CellEditor';
@@ -176,6 +176,11 @@ interface Message {
    * Rendered as a collapsible section above the main answer in the bubble.
    */
   thoughts?: string;
+  /**
+   * Optional subtype for system messages that require specialised rendering.
+   * 'error_recovery' — renders an image-error recovery prompt with command chips.
+   */
+  subtype?: 'error_recovery';
 }
 
 // Report generation is triggered only by the explicit /report command.
@@ -2748,6 +2753,23 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     return () => document.removeEventListener('mousedown', close);
   }, [reasoningDropdownOpen]);
 
+  // ── Image mode — per-notebook, persisted in localStorage ──────────────────
+  // Set by /no_figures (strip all figures) or /resize(DIM) (downscale figures).
+  // Sent with every task request until changed.
+  const _imageModeKey = (path: string) => `ds-varys-image-mode:${path || '_default'}`;
+  const [imageMode, setImageModeState] = useState<ImageMode | null>(null);
+  const imageModeRef = useRef<ImageMode | null>(null);
+
+  const setImageMode = (mode: ImageMode | null) => {
+    imageModeRef.current = mode;
+    setImageModeState(mode);
+    try {
+      const k = _imageModeKey(currentNotebookPathRef.current);
+      if (mode) localStorage.setItem(k, JSON.stringify(mode));
+      else localStorage.removeItem(k);
+    } catch { /* ignore */ }
+  };
+
   // Chat window theme toggle: 'day' (light) or 'night' (dark), persisted in
   // localStorage so it survives JupyterLab restarts independently of the
   // global IDE theme.
@@ -2896,6 +2918,20 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
   useEffect(() => { threadsRef.current = threads; },               [threads]);
   useEffect(() => { currentThreadIdRef.current = currentThreadId; }, [currentThreadId]);
   useEffect(() => { currentNotebookPathRef.current = currentNotebookPath; }, [currentNotebookPath]);
+
+  // Restore image mode when the active notebook changes.
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(_imageModeKey(currentNotebookPath));
+      const m: ImageMode | null = stored ? JSON.parse(stored) : null;
+      imageModeRef.current = m;
+      setImageModeState(m);
+    } catch {
+      imageModeRef.current = null;
+      setImageModeState(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentNotebookPath]);
 
   // ── Thread persistence helpers ─────────────────────────────────────────────
 
@@ -3267,6 +3303,25 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     // user's typed text (without the hidden prefix).
     const bubbleDisplay = displayText ?? (prefix ? typedText : undefined);
 
+    // ── /resize(DIM) — special pre-check ─────────────────────────────────
+    // parseSlashCommand() uses [\w-]+ which doesn't capture parentheses, so
+    // /resize(7800) won't parse as a recognised command without this step.
+    const resizeCmdMatch = rawInput.trim().match(/^\/resize\((\d+)\)$/i);
+    if (resizeCmdMatch) {
+      setInput('');
+      const dim = parseInt(resizeCmdMatch[1], 10);
+      if (dim < 10) {
+        addMessage('system', `❌ Invalid resize dimension: must be ≥ 10 (got **${dim}**). Nothing changed.`);
+      } else {
+        setImageMode({ mode: 'resize', dim });
+        addMessage('system',
+          `🔬 Resize mode active — figures will be downscaled to **${dim}px** max before sending.\n\n` +
+          `Re-send your message to proceed.`
+        );
+      }
+      return;
+    }
+
     // ── Slash-command parsing ────────────────────────────────────────────
     // If the input starts with a /command, extract it and use the remainder
     // as the actual user message sent to the LLM.
@@ -3580,6 +3635,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
           ...(slashCommand ? { command: slashCommand } : {}),
           cellMode: notebookAware ? cellMode : 'chat',
           ...(reasoningModeRef.current !== 'off' ? { reasoningMode: reasoningModeRef.current } : {}),
+          ...(imageModeRef.current ? { imageMode: imageModeRef.current } : {}),
         },
         // onChunk — explanation text Claude emits before the tool call
         (chunk: string) => {
@@ -3665,6 +3721,32 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
         for (const w of response.warnings) {
           addMessage('warning', w);
         }
+      }
+
+      // ── Image dimension error — render recovery prompt ────────────────
+      if (response.errorType === 'image_too_large') {
+        // Remove the empty streaming bubble (if any) before adding the prompt
+        if (streamMsgId) {
+          setMessages(prev => prev.filter(m => m.id !== streamMsgId));
+        }
+        setMessages(prev => [...prev, {
+          id: generateId(),
+          role: 'system' as const,
+          subtype: 'error_recovery' as const,
+          content: 'image_too_large',
+          timestamp: new Date(),
+        }]);
+        return;
+      }
+
+      // ── Post-action feedback after resize ─────────────────────────────
+      if (response.imageResizeInfo && response.imageResizeInfo.count > 0) {
+        const { count, warnings: imgWarnings } = response.imageResizeInfo;
+        let feedback = `🔬 **${count} figure${count !== 1 ? 's' : ''} resized** before sending. Originals in the notebook are unchanged.`;
+        if (imgWarnings && imgWarnings.length > 0) {
+          feedback += '\n\n⚠️ Skipped:\n' + imgWarnings.map(w => `- ${w}`).join('\n');
+        }
+        addMessage('system', feedback);
       }
 
       // ── Composite pipeline mode ──────────────────────────────────────
@@ -4233,6 +4315,23 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
         addMessage('system', 'New notebook creation is not yet implemented. Coming soon!');
         break;
 
+      case '/no_figures':
+        setImageMode({ mode: 'no_figures' });
+        addMessage('system',
+          '🚫 **No-figures mode active** — all notebook plots will be excluded from messages sent to the LLM.\n\n' +
+          'Re-send your message to proceed. Type `/resize(DIM)` to switch to resize mode, or type `/no_figures` again to clear.'
+        );
+        break;
+
+      case '/resize':
+        // /resize without parentheses — show usage hint
+        addMessage('system',
+          '### 🔬 Resize mode\n\n' +
+          'Use `/resize(DIM)` where DIM is the maximum pixel dimension (positive integer ≥ 10).\n\n' +
+          '**Examples:** `/resize(7800)` (Anthropic limit) · `/resize(6000)` (OpenAI limit)'
+        );
+        break;
+
       default:
         addMessage('system', `Unknown command: ${cmd}`);
     }
@@ -4440,7 +4539,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     <div className={`ds-assistant-sidebar ds-chat-${chatTheme}`}>
       {/* Header */}
       <div className="ds-assistant-header">
-        <span className="ds-assistant-title"><span className="ds-varys-spider">🕷️</span> Varys <span className="ds-varys-version">v0.3.0</span></span>
+        <span className="ds-assistant-title"><span className="ds-varys-spider">🕷️</span> Varys <span className="ds-varys-version">v0.4.0</span></span>
         <button
           className="ds-tags-panel-btn"
           onClick={() => setShowTags(true)}
@@ -4512,7 +4611,38 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
               msg.role === 'user' && msg.id === editingMsgId ? 'ds-assistant-message-user--editing' : '',
             ].filter(Boolean).join(' ')}
           >
-            {msg.role === 'disambiguation' ? (
+            {msg.subtype === 'error_recovery' ? (
+              /* ── Image dimension error — recovery prompt ─────── */
+              <div className="ds-image-recovery-prompt">
+                <div className="ds-image-recovery-title">
+                  ⚠️ One or more figures in this notebook exceed the provider's image size limit.
+                </div>
+                <div className="ds-image-recovery-body">
+                  Choose how to handle figures, then re-send your message:
+                </div>
+                <div className="ds-image-recovery-chips">
+                  {[
+                    { label: '/no_figures', desc: 'Exclude all figures' },
+                    { label: '/resize(7800)', desc: 'Resize to 7800px (Anthropic)' },
+                    { label: '/resize(6000)', desc: 'Resize to 6000px (OpenAI)' },
+                  ].map(({ label, desc }) => (
+                    <button
+                      key={label}
+                      className="ds-image-recovery-chip"
+                      title={desc}
+                      onClick={() => {
+                        void handleSend(label);
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="ds-image-recovery-hint">
+                  Or type <code>/resize(DIM)</code> with any dimension ≥ 10.
+                </div>
+              </div>
+            ) : msg.role === 'disambiguation' ? (
               /* ── Disambiguation card ───────────────────────────── */
               <DisambiguationCard
                 originalMessage={msg.content}
@@ -4864,16 +4994,28 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
             commands={commands}
             query={input}
             onSelect={cmd => {
-              if (cmd.type === 'builtin') {
+              if (cmd.command === '/resize') {
+                // Place cursor inside the parentheses so the user types the number directly
+                setInput('/resize(');
+                setShowCmdPopup(false);
+                requestAnimationFrame(() => {
+                  const el = textareaRef.current;
+                  if (el) {
+                    el.focus();
+                    el.setSelectionRange(el.value.length, el.value.length);
+                  }
+                });
+              } else if (cmd.type === 'builtin') {
                 // Handle built-ins immediately without going to the backend
                 handleBuiltinCommand(cmd.command);
                 setInput('');
+                setShowCmdPopup(false);
               } else {
                 // Fill the input with the command prefix so the user can add args
                 setInput(cmd.command + ' ');
                 setActiveCommand(cmd);
+                setShowCmdPopup(false);
               }
-              setShowCmdPopup(false);
             }}
             onClose={() => setShowCmdPopup(false)}
           />
@@ -4913,6 +5055,26 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
             {chipExpanded && (
               <pre className="ds-ctx-chip-preview">{contextChip.preview}</pre>
             )}
+          </div>
+        )}
+        {/* Image mode indicator — shown when /no_figures or /resize(DIM) is active */}
+        {imageMode && (
+          <div className="ds-image-mode-badge">
+            <span className="ds-image-mode-icon">{imageMode.mode === 'no_figures' ? '🚫' : '🔬'}</span>
+            <span className="ds-image-mode-label">
+              {imageMode.mode === 'no_figures'
+                ? 'no figures'
+                : `resize(${(imageMode as { mode: 'resize'; dim: number }).dim}px)`}
+            </span>
+            <button
+              className="ds-image-mode-clear"
+              onClick={() => {
+                setImageMode(null);
+                addMessage('system', '✓ Image mode cleared — figures will be sent as normal.');
+              }}
+              title="Clear image mode"
+              aria-label="Clear image mode"
+            >✕</button>
           </div>
         )}
         {/* @notebook chip + textarea share a relative wrapper so the chip
