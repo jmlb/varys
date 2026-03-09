@@ -360,6 +360,9 @@ const plugin: JupyterFrontEndPlugin<void> = {
       const doInject = async () => {
         const kernel = session.session?.kernel;
         if (!kernel) return;
+        // DIAGNOSTIC: skip the actual kernel.requestExecute — if cells run
+        // fast with this guard, magic injection is the root cause.
+        if (true) return;
 
         // Resolve the server URL and token from JupyterLab's own service
         // manager so we don't rely on env vars that may not be set in the
@@ -378,7 +381,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
         ].join('\n');
 
         try {
-          const future = kernel.requestExecute({
+          const future = kernel!.requestExecute({
             code,
             silent: false,
             store_history: false,

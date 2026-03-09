@@ -3403,7 +3403,7 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
     // chat isn't cluttered with large code blocks.
     addMessageWithChip('user', rawInput, bubbleDisplay, chip ?? undefined);
     setIsLoading(true);
-    setProgressText('Reading notebook context...');
+    setProgressText('Preparing…');
 
     let progressTimer: ReturnType<typeof setInterval> | undefined;
 
