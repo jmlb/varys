@@ -54,8 +54,10 @@ export interface CellInfo {
   executionCount?: number | null;
   /** Plain-text representation of the cell output (stdout + text/plain), capped at 2000 chars. */
   output?: string | null;
-  /** Base64-encoded PNG image from the cell output (plots/figures), if present. */
+  /** Base64-encoded image from the cell output (plots/figures), if present. */
   imageOutput?: string | null;
+  /** MIME type of imageOutput, e.g. "image/png" or "image/jpeg". */
+  imageOutputMime?: string | null;
   /** Stable nbformat cell_id UUID — survives cell moves/insertions. First 8 hex chars used as display tag. */
   cellId?: string;
 }

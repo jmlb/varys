@@ -91,9 +91,11 @@ class GoogleProvider(BaseLLMProvider):
                 if img:
                     idx = cell.get("index")
                     label = f"#{idx + 1}" if isinstance(idx, int) else "#?"
+                    raw_mime = cell.get("imageOutputMime") or "image/png"
+                    mime = raw_mime if raw_mime in ("image/png", "image/jpeg", "image/webp", "image/gif") else "image/png"
                     parts.append(f"[Plot from cell {label}:]")
                     parts.append(gtypes.Part.from_data(
-                        mime_type="image/png",
+                        mime_type=mime,
                         data=base64.b64decode(img),
                     ))
 

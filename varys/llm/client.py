@@ -452,8 +452,10 @@ class ClaudeClient:
             if img:
                 cell_idx = cell.get("index")
                 label_c = f"#{cell_idx + 1}" if isinstance(cell_idx, int) else "#?"
+                raw_mime = cell.get("imageOutputMime") or "image/png"
+                media_type = raw_mime if raw_mime in ("image/png", "image/jpeg", "image/webp", "image/gif") else "image/png"
                 blocks.append({"type": "text", "text": f"[Visualization output from cell {label_c}:]"})
-                blocks.append({"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img}})
+                blocks.append({"type": "image", "source": {"type": "base64", "media_type": media_type, "data": img}})
 
         return blocks
 

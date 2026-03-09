@@ -110,10 +110,12 @@ class OpenAIProvider(BaseLLMProvider):
                 if img:
                     idx = cell.get("index")
                     label = f"#{idx + 1}" if isinstance(idx, int) else "#?"
+                    raw_mime = cell.get("imageOutputMime") or "image/png"
+                    mime = raw_mime if raw_mime in ("image/png", "image/jpeg", "image/webp", "image/gif") else "image/png"
                     content.append({"type": "text", "text": f"[Plot from cell {label}:]"})
                     content.append({
                         "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{img}"},
+                        "image_url": {"url": f"data:{mime};base64,{img}"},
                     })
 
         messages = self._build_messages(content, chat_history)
@@ -217,8 +219,10 @@ class OpenAIProvider(BaseLLMProvider):
                 if img:
                     idx = cell.get("index")
                     label = f"#{idx + 1}" if isinstance(idx, int) else "#?"
+                    raw_mime = cell.get("imageOutputMime") or "image/png"
+                    mime = raw_mime if raw_mime in ("image/png", "image/jpeg", "image/webp", "image/gif") else "image/png"
                     content.append({"type": "text", "text": f"[Plot from cell {label}:]"})
-                    content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img}"}})
+                    content.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{img}"}})
 
         messages = self._build_messages(content, chat_history)
         accumulated_args = ""

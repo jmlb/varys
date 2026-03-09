@@ -46,6 +46,7 @@ export class NotebookReader {
         (model as any).sharedModel?.id ??
         undefined;
 
+      const imgInfo = model.type === 'code' ? this._extractImage(model) : null;
       cells.push({
         index,
         type: model.type as 'code' | 'markdown',
@@ -55,7 +56,8 @@ export class NotebookReader {
             ? (model as any).executionCount ?? null
             : null,
         output: model.type === 'code' ? this._extractOutput(model) : null,
-        imageOutput: model.type === 'code' ? this._extractImage(model) : null,
+        imageOutput: imgInfo ? imgInfo.data : null,
+        imageOutputMime: imgInfo ? imgInfo.mime : null,
         cellId,
       });
     });
@@ -237,19 +239,30 @@ export class NotebookReader {
    * Extracts the first image/png output from a code cell, returned as a
    * base64 string (no data-URI prefix).  Returns null if no image present.
    */
-  private _extractImage(model: any): string | null {
+  private _extractImage(model: any): { data: string; mime: string } | null {
     const outputs = model.outputs;
     if (!outputs || outputs.length === 0) return null;
+
+    // Preferred formats in order: PNG is lossless and most common for plots;
+    // JPEG and WEBP are also supported by both Anthropic and OpenAI vision APIs.
+    const IMAGE_MIMES = [
+      'image/png',
+      'image/jpeg',
+      'image/webp',
+      'image/gif',
+    ] as const;
 
     for (let i = 0; i < outputs.length; i++) {
       const output = outputs.get ? outputs.get(i) : outputs[i];
       if (!output) continue;
       const data = output.data ?? {};
-      const png = data['image/png'];
-      if (png) {
-        // Strip data URI prefix if present, return raw base64
-        const raw = Array.isArray(png) ? png.join('') : String(png);
-        return raw.replace(/^data:image\/png;base64,/, '').trim();
+
+      for (const mime of IMAGE_MIMES) {
+        const raw_val = data[mime];
+        if (!raw_val) continue;
+        const raw = Array.isArray(raw_val) ? raw_val.join('') : String(raw_val);
+        // Strip any data-URI prefix (data:image/png;base64,...) before storing
+        return { data: raw.replace(/^data:[^;]+;base64,/, '').trim(), mime };
       }
     }
     return null;

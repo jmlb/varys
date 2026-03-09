@@ -224,10 +224,12 @@ class BedrockProvider(BaseLLMProvider):
                 if img:
                     idx = cell.get("index")
                     label = f"#{idx + 1}" if isinstance(idx, int) else "#?"
+                    raw_mime = cell.get("imageOutputMime") or "image/png"
+                    fmt = "jpeg" if "jpeg" in raw_mime else ("webp" if "webp" in raw_mime else ("gif" if "gif" in raw_mime else "png"))
                     content.append({"text": f"[Plot from cell {label}:]"})
                     content.append({
                         "image": {
-                            "format": "png",
+                            "format": fmt,
                             "source": {"bytes": base64.b64decode(img)},
                         }
                     })
