@@ -101,9 +101,16 @@ def assemble_context(
     focal_id = detect_focal_cell(user_query, active_cell_id, active, summary_store)
     active_ids = {c["cell_id"] for c in active}
 
-    # No-focal path: return all cells as summaries (ranked, but order preserved)
+    # No-focal path: score and render only cells up to the active cell so the
+    # LLM sees the same reachable-symbol window as the @-mention autocomplete.
+    # Falls back to the full list when no active cell is known.
     if focal_id is None or focal_id not in active_ids:
-        return _build_all_summaries(active, summary_store, user_query)
+        if active_cell_id and active_cell_id in active_ids:
+            active_idx = next(i for i, c in enumerate(active) if c["cell_id"] == active_cell_id)
+            visible = active[: active_idx + 1]
+        else:
+            visible = active
+        return _build_all_summaries(visible, summary_store, user_query)
 
     focal_idx = next(i for i, c in enumerate(active) if c["cell_id"] == focal_id)
     parts: List[str] = []
