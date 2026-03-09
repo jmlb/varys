@@ -163,7 +163,7 @@
   opacity: 0.35;
   pointer-events: auto;
 }
-.ds-user-copy-btn:hover {
+.ds-assistant-message-user:hover .ds-user-copy-btn:hover {
   opacity: 1;
 }
 
