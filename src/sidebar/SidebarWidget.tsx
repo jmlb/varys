@@ -4657,34 +4657,42 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                   return (
                     <div className={`ds-msg-collapsible-wrap${collapsed ? ' ds-msg-collapsed' : ''}`}>
                       {/* Reasoning trace — streams live, always visible above the answer */}
-                      {msg.role === 'assistant' && msg.thoughts && (
-                        <div className={`ds-thinking-section${isStreaming ? ' ds-thinking-section--active' : ''}`}>
-                          <button
-                            className="ds-thinking-header"
-                            onClick={() => toggleThinkCollapsed(msg.id)}
-                            title={thinkCollapsed.get(msg.id) ? 'Show reasoning' : 'Hide reasoning'}
-                          >
-                            <span className="ds-thinking-icon">🧠</span>
-                            <span className="ds-thinking-label">
-                              {isStreaming ? 'Reasoning…' : 'Reasoning'}
-                            </span>
-                            <span className="ds-thinking-chevron">
-                              {thinkCollapsed.get(msg.id) ? '▸' : '▾'}
-                            </span>
-                          </button>
-                          {!thinkCollapsed.get(msg.id) && (
-                            <div
-                              className="ds-thinking-body"
-                              ref={el => {
-                                if (el) thinkingBodyRefs.current.set(msg.id, el);
-                                else thinkingBodyRefs.current.delete(msg.id);
-                              }}
+                      {msg.role === 'assistant' && msg.thoughts && (() => {
+                        // While streaming: locked open (full height).
+                        // When done: collapsed by default; user can click to expand.
+                        const thinkIsCollapsed = isStreaming
+                          ? false
+                          : (thinkCollapsed.get(msg.id) ?? true);
+                        return (
+                          <div className={`ds-thinking-section${isStreaming ? ' ds-thinking-section--active' : ''}`}>
+                            <button
+                              className="ds-thinking-header"
+                              onClick={() => { if (!isStreaming) toggleThinkCollapsed(msg.id); }}
+                              title={isStreaming ? 'Reasoning…' : (thinkIsCollapsed ? 'Show reasoning' : 'Hide reasoning')}
+                              style={isStreaming ? { cursor: 'default' } : undefined}
                             >
-                              {msg.thoughts}
-                            </div>
-                          )}
-                        </div>
-                      )}
+                              <span className="ds-thinking-icon">🧠</span>
+                              <span className="ds-thinking-label">
+                                {isStreaming ? 'Reasoning…' : 'Reasoning'}
+                              </span>
+                              <span className="ds-thinking-chevron">
+                                {thinkIsCollapsed ? '▸' : '▾'}
+                              </span>
+                            </button>
+                            {!thinkIsCollapsed && (
+                              <div
+                                className="ds-thinking-body"
+                                ref={el => {
+                                  if (el) thinkingBodyRefs.current.set(msg.id, el);
+                                  else thinkingBodyRefs.current.delete(msg.id);
+                                }}
+                              >
+                                {msg.thoughts}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                       {msg.role === 'user' ? (
                         <div
                           className={`ds-assistant-message-content ds-markdown${!isLoading ? ' ds-user-editable' : ''}`}
