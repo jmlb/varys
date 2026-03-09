@@ -30,6 +30,7 @@ from .modules.reproducibility_guardian.handler import (
 from .handlers.mcp_handler import MCPStatusHandler, MCPReloadHandler, MCPServersHandler
 from .handlers.cell_executed import CellExecutedHandler
 from .handlers.cell_lifecycle import CellLifecycleHandler
+from .handlers.symbols import SymbolsHandler
 
 
 class DSAssistantExtension(ExtensionApp):
@@ -228,4 +229,6 @@ class DSAssistantExtension(ExtensionApp):
             # Smart Cell Context — execution + lifecycle hooks
             (url_path_join(base, "cell-executed"),  CellExecutedHandler),
             (url_path_join(base, "cell-lifecycle"), CellLifecycleHandler),
+            # @-mention autocomplete — symbol names from SummaryStore
+            (url_path_join(base, "symbols"), SymbolsHandler),
         ])

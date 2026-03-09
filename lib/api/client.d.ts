@@ -410,6 +410,15 @@ export declare class APIClient {
         error: string;
     }>;
     removeMCPServer(name: string): Promise<void>;
+    /**
+     * Fetch all symbol names defined in the current notebook from the SummaryStore.
+     * Used to populate the @-mention autocomplete dropdown.
+     * Returns [] on any error so callers never need to handle exceptions.
+     */
+    fetchSymbols(notebookPath: string): Promise<{
+        name: string;
+        vtype: string;
+    }[]>;
     toggleMCPServer(name: string, disabled: boolean): Promise<void>;
     private getXSRFToken;
 }

@@ -818,6 +818,23 @@ export class APIClient {
     if (!r.ok) throw new Error(`removeMCPServer failed: ${r.status}`);
   }
 
+  /**
+   * Fetch all symbol names defined in the current notebook from the SummaryStore.
+   * Used to populate the @-mention autocomplete dropdown.
+   * Returns [] on any error so callers never need to handle exceptions.
+   */
+  async fetchSymbols(notebookPath: string): Promise<{ name: string; vtype: string }[]> {
+    try {
+      const qs = new URLSearchParams({ notebook_path: notebookPath }).toString();
+      const r  = await fetch(`${this.baseUrl}/symbols?${qs}`);
+      if (!r.ok) return [];
+      const data = await r.json();
+      return Array.isArray(data.symbols) ? data.symbols : [];
+    } catch {
+      return [];
+    }
+  }
+
   async toggleMCPServer(name: string, disabled: boolean): Promise<void> {
     const r = await fetch(`${this.baseUrl}/mcp/servers`, {
       method: 'PATCH',

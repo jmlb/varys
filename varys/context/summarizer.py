@@ -360,8 +360,12 @@ async def build_markdown_summary_async(
             "deleted":          False,
         }
     except Exception as exc:
+        _model = getattr(getattr(provider, "_chat_client", None), "model", "?")
         log.warning(
-            "build_markdown_summary_async: LLM call failed, falling back to truncation: %s",
+            "build_markdown_summary_async: LLM call failed (model=%s). "
+            "Check ANTHROPIC_SIMPLE_TASKS_MODEL / DS_SIMPLE_TASKS_PROVIDER in varys.env. "
+            "Error: %s",
+            _model,
             exc,
         )
         return _build_markdown_summary(source)

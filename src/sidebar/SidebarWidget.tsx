@@ -2792,6 +2792,17 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
   const dragStateRef = useRef<{ startY: number; startH: number } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // ── @-mention autocomplete ─────────────────────────────────────────────────
+  // atAnchorPos: index of the triggering '@' in `input` (-1 = closed)
+  // atQuery:     partial text the user typed after '@' (used to filter)
+  // atSymbols:   full list fetched from /varys/symbols (cached until notebook changes)
+  // atFocusIdx:  keyboard-selected row index in the dropdown
+  const [atAnchorPos,  setAtAnchorPos]  = useState(-1);
+  const [atQuery,      setAtQuery]      = useState('');
+  const [atSymbols,    setAtSymbols]    = useState<{ name: string; vtype: string }[]>([]);
+  const [atFocusIdx,   setAtFocusIdx]   = useState(0);
+  const atDropdownRef = useRef<HTMLDivElement>(null);
+
   // Auto-resize textarea to fit content, capped at the user-configured max height.
   // Runs whenever `input` changes (including programmatic clear after send) and
   // whenever `inputHeight` changes (user dragged to a new max).
@@ -4313,7 +4324,51 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
   // Keyboard handler - Enter to send, Shift+Enter for newline
   // -------------------------------------------------------------------------
 
+  // Insert the selected @-mention suggestion into the textarea.
+  const insertAtSuggestion = (name: string) => {
+    // Replace '@<partial>' at atAnchorPos with '@<full_name> '
+    const before = input.slice(0, atAnchorPos);
+    const after  = input.slice(atAnchorPos + 1 + atQuery.length);
+    const newVal = `${before}@${name} ${after}`;
+    setInput(newVal);
+    setAtAnchorPos(-1);
+    // Move cursor to just after the inserted name
+    setTimeout(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      const pos = atAnchorPos + 1 + name.length + 1; // +1 for trailing space
+      el.setSelectionRange(pos, pos);
+      el.focus();
+    }, 0);
+  };
+
+  const atFiltered = atAnchorPos >= 0
+    ? atSymbols.filter(s => s.name.toLowerCase().startsWith(atQuery.toLowerCase())).slice(0, 8)
+    : [];
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
+    // When the @-mention dropdown is open, intercept navigation keys
+    if (atAnchorPos >= 0 && atFiltered.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setAtFocusIdx(i => Math.min(i + 1, atFiltered.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setAtFocusIdx(i => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        insertAtSuggestion(atFiltered[atFocusIdx]?.name ?? atFiltered[0].name);
+        return;
+      }
+      if (e.key === 'Escape') {
+        setAtAnchorPos(-1);
+        return;
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       void handleSend();
@@ -4925,11 +4980,56 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                 setShowCmdPopup(false);
                 setActiveCommand(null);
               }
+              // @-mention detection: look for @word_partial immediately before cursor
+              const cursor = (e.target as HTMLTextAreaElement).selectionStart ?? val.length;
+              const before = val.slice(0, cursor);
+              const atMatch = before.match(/@([A-Za-z_]\w*)$/);
+              if (atMatch) {
+                const anchor = before.length - atMatch[0].length;
+                setAtAnchorPos(anchor);
+                setAtQuery(atMatch[1]);
+                setAtFocusIdx(0);
+                // Fetch symbols lazily (re-fetch each time anchor opens so list stays fresh)
+                const nbPath = notebookReader.getFullContext()?.notebookPath ?? '';
+                if (nbPath) {
+                  apiClient.fetchSymbols(nbPath).then(syms => setAtSymbols(syms)).catch(() => {/* ignore */});
+                }
+              } else if (before.endsWith('@')) {
+                // User just typed '@' with nothing after it yet
+                const anchor = before.length - 1;
+                setAtAnchorPos(anchor);
+                setAtQuery('');
+                setAtFocusIdx(0);
+                const nbPath = notebookReader.getFullContext()?.notebookPath ?? '';
+                if (nbPath) {
+                  apiClient.fetchSymbols(nbPath).then(syms => setAtSymbols(syms)).catch(() => {/* ignore */});
+                }
+              } else {
+                setAtAnchorPos(-1);
+              }
             }}
             onKeyDown={handleKeyDown}
-            placeholder={contextChip ? `Describe your edit for ${contextChip.label}…` : "Ask Varys… (/command or Enter to send)"}
+            placeholder={contextChip ? `Describe your edit for ${contextChip.label}…` : "Ask Varys… (use @varName · /command · Enter to send)"}
             disabled={isLoading}
           />
+          {/* @-mention autocomplete dropdown */}
+          {atAnchorPos >= 0 && atFiltered.length > 0 && (
+            <div className="ds-at-menu" ref={atDropdownRef} role="listbox">
+              {atFiltered.map((sym, i) => (
+                <button
+                  key={sym.name}
+                  role="option"
+                  aria-selected={i === atFocusIdx}
+                  className={`ds-at-item${i === atFocusIdx ? ' ds-at-item--focused' : ''}`}
+                  onMouseDown={e => { e.preventDefault(); insertAtSuggestion(sym.name); }}
+                  onMouseEnter={() => setAtFocusIdx(i)}
+                >
+                  <span className="ds-at-item-name">@{sym.name}</span>
+                  {sym.vtype && <span className="ds-at-item-type">{sym.vtype}</span>}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="ds-assistant-input-bottom">
           <ModelSwitcher
