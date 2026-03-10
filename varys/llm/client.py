@@ -716,6 +716,25 @@ class ClaudeClient:
                             data["clarificationNeeded"] = None
                         return data
 
+                # No tool call emitted.  If the model was cut off by max_tokens,
+                # inject a re-plan nudge and retry (reuses the existing retry loop).
+                stop_reason = getattr(final_msg, "stop_reason", None)
+                if stop_reason == "max_tokens" and attempt < max_retries - 1:
+                    partial_text = next(
+                        (b.text for b in final_msg.content if hasattr(b, "text")), ""
+                    ).strip()
+                    messages = list(messages) + [
+                        {"role": "assistant", "content": partial_text or "(truncated)"},
+                        {
+                            "role": "user",
+                            "content": (
+                                "Your previous plan was cut short. "
+                                "Please provide a more concise version of the same plan."
+                            ),
+                        },
+                    ]
+                    continue
+
                 # Claude responded with text only — no tool call made.
                 # This can happen when the request is conversational. Surface
                 # the text as an advisory (chat) response so the frontend renders
@@ -822,42 +841,61 @@ class ClaudeClient:
         _THINKING_BUDGET = 8_000
         _MAX_TOKENS_THINKING = 16_000
         _MAX_TOKENS_DEFAULT  = 8_192
+        _MAX_CONTINUATIONS   = 2  # safety cap on seamless auto-continuation turns
 
-        api_kwargs: Dict[str, Any] = dict(
-            model=self.model,
-            max_tokens=_MAX_TOKENS_THINKING if use_thinking else _MAX_TOKENS_DEFAULT,
-            system=system,
-            messages=messages,
-        )
-        if use_thinking:
-            api_kwargs["thinking"] = {
-                "type": "enabled",
-                "budget_tokens": _THINKING_BUDGET,
-            }
-
-        async with self._aclient.messages.stream(**api_kwargs) as stream:
+        for _turn in range(_MAX_CONTINUATIONS + 1):
+            api_kwargs: Dict[str, Any] = dict(
+                model=self.model,
+                max_tokens=_MAX_TOKENS_THINKING if use_thinking else _MAX_TOKENS_DEFAULT,
+                system=system,
+                messages=messages,
+            )
             if use_thinking:
-                # Raw event iteration to capture both thinking and text deltas.
-                async for event in stream:
-                    if event.type != "content_block_delta":
-                        continue
-                    delta = event.delta
-                    if delta.type == "thinking_delta" and on_thought:
-                        await on_thought(delta.thinking)
-                        await asyncio.sleep(0)
-                    elif delta.type == "text_delta":
-                        await on_chunk(delta.text)
-                        await asyncio.sleep(0)
-            else:
-                async for text in stream.text_stream:
-                    await on_chunk(text)
+                api_kwargs["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": _THINKING_BUDGET,
+                }
 
-            final_chat = await stream.get_final_message()
-            if hasattr(final_chat, "usage") and final_chat.usage:
-                self._set_usage(
-                    getattr(final_chat.usage, "input_tokens", 0),
-                    getattr(final_chat.usage, "output_tokens", 0),
-                )
+            _turn_text: List[str] = []  # accumulate text for potential continuation
+
+            async with self._aclient.messages.stream(**api_kwargs) as stream:
+                if use_thinking:
+                    # Raw event iteration to capture both thinking and text deltas.
+                    async for event in stream:
+                        if event.type != "content_block_delta":
+                            continue
+                        delta = event.delta
+                        if delta.type == "thinking_delta" and on_thought:
+                            await on_thought(delta.thinking)
+                            await asyncio.sleep(0)
+                        elif delta.type == "text_delta":
+                            await on_chunk(delta.text)
+                            _turn_text.append(delta.text)
+                            await asyncio.sleep(0)
+                else:
+                    async for text in stream.text_stream:
+                        await on_chunk(text)
+                        _turn_text.append(text)
+
+                final_chat = await stream.get_final_message()
+                if hasattr(final_chat, "usage") and final_chat.usage:
+                    self._set_usage(
+                        getattr(final_chat.usage, "input_tokens", 0),
+                        getattr(final_chat.usage, "output_tokens", 0),
+                    )
+
+            # Auto-continue when the model was stopped by the token limit.
+            # We replay the partial text as an assistant turn and ask "Continue."
+            # so the response appears seamless to the user.
+            stop_reason = getattr(final_chat, "stop_reason", None)
+            if stop_reason != "max_tokens" or _turn >= _MAX_CONTINUATIONS:
+                break
+
+            partial = "".join(_turn_text)
+            messages = list(messages) + [
+                {"role": "assistant", "content": partial},
+                {"role": "user",      "content": "Continue."},
+            ]
 
     def _fallback_response(
         self,

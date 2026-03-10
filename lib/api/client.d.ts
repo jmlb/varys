@@ -398,12 +398,16 @@ export declare class APIClient {
         kernel_snapshot: Record<string, unknown>;
     }): void;
     /**
-     * Fire-and-forget: notify the backend of a cell lifecycle event (deleted / restored).
+     * Fire-and-forget: notify the backend of a cell lifecycle event.
+     * - deleted / restored: cell added to or removed from the notebook.
+     * - tags_changed: tag list mutated (add, remove, or auto-tag); the full
+     *   current tag list must be provided so the backend can patch in place.
      */
     cellLifecycle(payload: {
         cell_id: string;
         notebook_path: string;
-        action: 'deleted' | 'restored';
+        action: 'deleted' | 'restored' | 'tags_changed';
+        tags?: string[];
     }): void;
     healthCheck(): Promise<Record<string, unknown>>;
     /**
@@ -465,6 +469,14 @@ export declare class APIClient {
         name: string;
         vtype: string;
     }[]>;
+    /**
+     * Ask the backend to suggest tags for a single cell.
+     * Uses the simple-tasks LLM (or falls back to the chat provider).
+     * Always resolves — returns { tags: [] } on any error.
+     */
+    autoTagCell(cellSource: string, cellOutput?: string | null): Promise<{
+        tags: string[];
+    }>;
     toggleMCPServer(name: string, disabled: boolean): Promise<void>;
     private getXSRFToken;
 }

@@ -18,10 +18,23 @@
  * open so the user can interact without the DOM being destroyed under them.
  */
 import { INotebookTracker } from '@jupyterlab/notebook';
+/** Callback type injected from index.ts — calls POST /varys/auto-tag. */
+type AutoTagFn = (cellSource: string, cellOutput: string | null) => Promise<string[]>;
+/**
+ * Callback injected from index.ts — fires POST /varys/cell-lifecycle with
+ * action "tags_changed" so the SummaryStore is patched in place (no new
+ * version created).  A no-op on the backend when the cell has no record yet.
+ */
+type TagsChangedFn = (cellId: string, notebookPath: string, tags: string[]) => void;
 /**
  * Initialise the cell tag + position overlay system.
  * Call once from the main plugin activate() function.
- * Returns a cleanup function.
+ *
+ * @param tracker       JupyterLab notebook tracker
+ * @param onAutoTag     Optional callback that calls the backend auto-tag API.
+ *                      When provided, a ⚡ button is rendered on every cell.
+ * @returns Cleanup function to remove overlays and disconnect signals.
  */
-export declare function initCellTagOverlay(tracker: INotebookTracker): () => void;
+export declare function initCellTagOverlay(tracker: INotebookTracker, onAutoTag?: AutoTagFn, onTagsChanged?: TagsChangedFn): () => void;
+export {};
 //# sourceMappingURL=cellTagOverlay.d.ts.map

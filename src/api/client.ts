@@ -722,12 +722,16 @@ export class APIClient {
   }
 
   /**
-   * Fire-and-forget: notify the backend of a cell lifecycle event (deleted / restored).
+   * Fire-and-forget: notify the backend of a cell lifecycle event.
+   * - deleted / restored: cell added to or removed from the notebook.
+   * - tags_changed: tag list mutated (add, remove, or auto-tag); the full
+   *   current tag list must be provided so the backend can patch in place.
    */
   cellLifecycle(payload: {
     cell_id:       string;
     notebook_path: string;
-    action:        'deleted' | 'restored';
+    action:        'deleted' | 'restored' | 'tags_changed';
+    tags?:         string[];   // required when action === 'tags_changed'
   }): void {
     fetch(`${this.baseUrl}/cell-lifecycle`, {
       method:  'POST',
@@ -906,6 +910,31 @@ export class APIClient {
       return Array.isArray(data.symbols) ? data.symbols : [];
     } catch {
       return [];
+    }
+  }
+
+  /**
+   * Ask the backend to suggest tags for a single cell.
+   * Uses the simple-tasks LLM (or falls back to the chat provider).
+   * Always resolves — returns { tags: [] } on any error.
+   */
+  async autoTagCell(
+    cellSource: string,
+    cellOutput?: string | null,
+  ): Promise<{ tags: string[] }> {
+    try {
+      const r = await fetch(`${this.baseUrl}/auto-tag`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-XSRFToken':  this.getXSRFToken(),
+        },
+        body: JSON.stringify({ cellSource, cellOutput: cellOutput ?? null }),
+      });
+      if (!r.ok) return { tags: [] };
+      return r.json();
+    } catch {
+      return { tags: [] };
     }
   }
 

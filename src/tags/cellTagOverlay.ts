@@ -24,6 +24,49 @@ import type { IObservableList } from '@jupyterlab/observables';
 const OVERLAY_CLASS = 'ds-cell-tag-overlay';
 const INTERVAL_MS  = 1500;
 
+/** Callback type injected from index.ts — calls POST /varys/auto-tag. */
+type AutoTagFn = (
+  cellSource: string,
+  cellOutput: string | null,
+) => Promise<string[]>;
+
+/**
+ * Callback injected from index.ts — fires POST /varys/cell-lifecycle with
+ * action "tags_changed" so the SummaryStore is patched in place (no new
+ * version created).  A no-op on the backend when the cell has no record yet.
+ */
+type TagsChangedFn = (
+  cellId:       string,
+  notebookPath: string,
+  tags:         string[],
+) => void;
+
+/**
+ * Resolve the stable JupyterLab UUID and current notebook path for a cell
+ * at *cellIndex*, then call *onTagsChanged* with the new *tags* list.
+ * Safe to call with a null/undefined callback — becomes a no-op.
+ */
+function fireTagsChanged(
+  tracker:          INotebookTracker,
+  cellIndex:        number,
+  tags:             string[],
+  onTagsChanged?:   TagsChangedFn,
+): void {
+  if (!onTagsChanged) return;
+  const nb         = tracker.currentWidget?.content;
+  const cellModel  = nb?.model?.cells.get(cellIndex);
+  const cellId: string =
+    (cellModel as any)?.id ??
+    (cellModel as any)?.sharedModel?.id ?? '';
+  const notebookPath = tracker.currentWidget?.context?.path ?? '';
+  if (cellId && notebookPath) {
+    onTagsChanged(cellId, notebookPath, tags);
+  }
+}
+
+/** Cells currently waiting for an auto-tag response (by cell index). */
+const _autoTagPending = new Set<number>();
+
 const TAG_PALETTE = [
   '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
   '#06b6d4', '#f97316', '#ec4899', '#14b8a6', '#6366f1',
@@ -40,6 +83,38 @@ function tagColor(tag: string): string {
   let h = 0;
   for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
   return TAG_PALETTE[h % TAG_PALETTE.length];
+}
+
+// ── Cell output extraction ─────────────────────────────────────────────────
+
+/**
+ * Extract a plain-text summary of a code cell's outputs (max ~2 000 chars).
+ * Returns null for non-code cells or cells with no outputs.
+ */
+function extractCellOutputText(cellWidget: any): string | null {
+  const model = cellWidget?.model;
+  if (model?.type !== 'code') return null;
+  const outputs = model.outputs;
+  if (!outputs || outputs.length === 0) return null;
+
+  const parts: string[] = [];
+  for (let i = 0; i < outputs.length; i++) {
+    const out = outputs.get ? outputs.get(i) : outputs[i];
+    if (!out) continue;
+    const raw: any = typeof out.toJSON === 'function' ? out.toJSON() : out;
+    const otype = raw?.output_type ?? '';
+    if (otype === 'stream') {
+      const t = raw.text ?? '';
+      parts.push(Array.isArray(t) ? t.join('') : String(t));
+    } else if (otype === 'execute_result' || otype === 'display_data') {
+      const plain = raw.data?.['text/plain'] ?? '';
+      parts.push(Array.isArray(plain) ? plain.join('') : String(plain));
+    } else if (otype === 'error') {
+      parts.push(`${raw.ename ?? 'Error'}: ${raw.evalue ?? ''}`);
+    }
+  }
+  const full = parts.join('\n').trim();
+  return full ? full.slice(0, 2000) : null;
 }
 
 // ── Dropdown state ─────────────────────────────────────────────────────────
@@ -97,6 +172,7 @@ function showAddTagDropdown(
   cellIndex: number,
   currentTags: string[],
   refresh: () => void,
+  onTagsChanged?: TagsChangedFn,
 ): void {
   closeDropdown();
 
@@ -105,7 +181,9 @@ function showAddTagDropdown(
     if (!nb?.model) return;
     const cm = nb.model.cells.get(cellIndex);
     if (!cm) return;
-    writeTags(cm, [...currentTags, tag]);
+    const newTags = [...currentTags, tag];
+    writeTags(cm, newTags);
+    fireTagsChanged(tracker, cellIndex, newTags, onTagsChanged);
     closeDropdown();
     refresh();
   };
@@ -236,19 +314,27 @@ function deleteTag(
   cellIndex: number,
   tagToRemove: string,
   refresh: () => void,
+  onTagsChanged?: TagsChangedFn,
 ): void {
   const nb = tracker.currentWidget?.content;
   if (!nb?.model) return;
   const cm = nb.model.cells.get(cellIndex);
   if (!cm) return;
   const current = (cm.metadata['tags'] as string[] | undefined) ?? [];
-  writeTags(cm, current.filter(t => t !== tagToRemove));
+  const newTags = current.filter(t => t !== tagToRemove);
+  writeTags(cm, newTags);
+  fireTagsChanged(tracker, cellIndex, newTags, onTagsChanged);
   refresh();
 }
 
 // ── Main render ────────────────────────────────────────────────────────────
 
-function renderOverlays(tracker: INotebookTracker, refresh: () => void): void {
+function renderOverlays(
+  tracker: INotebookTracker,
+  refresh: () => void,
+  onAutoTag?: AutoTagFn,
+  onTagsChanged?: TagsChangedFn,
+): void {
   // Suppress re-render while user is interacting (dropdown open or pill pending)
   if (isDropdownOpen()) return;
   if (document.querySelector('.ds-cell-tag-pill--pending')) return;
@@ -273,7 +359,7 @@ function renderOverlays(tracker: INotebookTracker, refresh: () => void): void {
     const bar = document.createElement('div');
     bar.className = OVERLAY_CLASS;
 
-    // ── Left group: existing pills + [+] button ───────────────────────────
+    // ── Left group: existing pills + [+] button + [✨] button ────────────
     const leftGroup = document.createElement('span');
     leftGroup.className = 'ds-overlay-tags';
 
@@ -327,7 +413,7 @@ function renderOverlays(tracker: INotebookTracker, refresh: () => void): void {
         // suppress the re-render that follows deleteTag → refresh().
         pending = false;
         pill.classList.remove('ds-cell-tag-pill--pending');
-        deleteTag(tracker, cellIdx, tag, refresh);
+        deleteTag(tracker, cellIdx, tag, refresh, onTagsChanged);
       });
 
       leftGroup.appendChild(pill);
@@ -343,10 +429,52 @@ function renderOverlays(tracker: INotebookTracker, refresh: () => void): void {
     const cellIdx = i;
     addBtn.addEventListener('click', e => {
       e.stopPropagation();
-      showAddTagDropdown(addBtn, tracker, cellIdx, [...tags], refresh);
+      showAddTagDropdown(addBtn, tracker, cellIdx, [...tags], refresh, onTagsChanged);
     });
 
     leftGroup.appendChild(addBtn);
+
+    // [✨] auto-tag button — only shown when a callback is registered
+    if (onAutoTag) {
+      const isPending = _autoTagPending.has(cellIdx);
+
+      const autoBtn = document.createElement('button');
+      autoBtn.className = 'ds-overlay-autotag-btn' + (isPending ? ' ds-overlay-autotag-btn--loading' : '');
+      autoBtn.textContent = isPending ? '⋯' : '⚡';
+      autoBtn.title       = isPending ? 'Suggesting tags…' : 'Auto-suggest tags (AI)';
+      autoBtn.disabled    = isPending;
+      autoBtn.style.pointerEvents = 'auto';
+
+      autoBtn.addEventListener('click', async e => {
+        e.stopPropagation();
+        if (_autoTagPending.has(cellIdx)) return;
+
+        _autoTagPending.add(cellIdx);
+        refresh();   // show spinner immediately
+
+        try {
+          const source = (cellModel.sharedModel?.getSource?.() ?? '') as string;
+          const output = extractCellOutputText(cellWidget);
+
+          const suggested = await onAutoTag(source, output);
+
+          if (suggested.length > 0) {
+            const current = (cellModel.metadata['tags'] as string[] | undefined) ?? [];
+            const merged  = [...new Set([...current, ...suggested])];
+            writeTags(cellModel as any, merged);
+            fireTagsChanged(tracker, cellIdx, merged, onTagsChanged);
+          }
+        } catch (err) {
+          console.warn('[Varys] auto-tag failed:', err);
+        } finally {
+          _autoTagPending.delete(cellIdx);
+          refresh();
+        }
+      });
+
+      leftGroup.appendChild(autoBtn);
+    }
+
     bar.appendChild(leftGroup);
 
     // ── Right: position badge "#N" ────────────────────────────────────────
@@ -378,10 +506,18 @@ function connectModelSignal(tracker: INotebookTracker, refresh: () => void): voi
 /**
  * Initialise the cell tag + position overlay system.
  * Call once from the main plugin activate() function.
- * Returns a cleanup function.
+ *
+ * @param tracker       JupyterLab notebook tracker
+ * @param onAutoTag     Optional callback that calls the backend auto-tag API.
+ *                      When provided, a ⚡ button is rendered on every cell.
+ * @returns Cleanup function to remove overlays and disconnect signals.
  */
-export function initCellTagOverlay(tracker: INotebookTracker): () => void {
-  const refresh = () => renderOverlays(tracker, refresh);
+export function initCellTagOverlay(
+  tracker:        INotebookTracker,
+  onAutoTag?:     AutoTagFn,
+  onTagsChanged?: TagsChangedFn,
+): () => void {
+  const refresh = () => renderOverlays(tracker, refresh, onAutoTag, onTagsChanged);
 
   const onNotebookChanged = () => {
     closeDropdown();

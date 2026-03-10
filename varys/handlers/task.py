@@ -202,6 +202,20 @@ async def _run_mcp_tool_loop(
         tool_use_blocks = [b for b in final_msg.content if b.type == "tool_use"]
 
         if not tool_use_blocks:
+            # Detect truncation before giving up — if the model hit max_tokens it
+            # never finished the tool call JSON.  Inject a nudge and let the loop
+            # retry so the response appears seamless to the user.
+            stop_reason = getattr(final_msg, "stop_reason", None)
+            if stop_reason == "max_tokens" and _round < max_rounds - 1:
+                msgs.append({
+                    "role": "user",
+                    "content": (
+                        "Your previous response was cut off before you could finish the plan. "
+                        "Please provide a more concise version of the same plan."
+                    ),
+                })
+                continue
+
             # Pure text response — surface as advisory
             text = next(
                 (b.text for b in final_msg.content if hasattr(b, "text")), ""

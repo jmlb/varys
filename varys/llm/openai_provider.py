@@ -276,22 +276,44 @@ class OpenAIProvider(BaseLLMProvider):
         on_thought: Optional[Callable[[str], Awaitable[None]]] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> None:
+        _MAX_CONTINUATIONS = 2
         messages = self._build_messages(user, chat_history)
-        async with self._aclient.chat.completions.stream(
-            model=self.chat_model,
-            messages=[{"role": "system", "content": system}] + messages,
-            max_tokens=8192,
-            temperature=0.3,
-        ) as stream:
-            async for event in stream:
-                if event.choices and event.choices[0].delta.content:
-                    await on_chunk(event.choices[0].delta.content)
-            final_chat_comp = await stream.get_final_completion()
-            if final_chat_comp.usage:
-                self._set_usage(
-                    final_chat_comp.usage.prompt_tokens,
-                    final_chat_comp.usage.completion_tokens,
-                )
+
+        for _turn in range(_MAX_CONTINUATIONS + 1):
+            _turn_text: list[str] = []
+
+            async with self._aclient.chat.completions.stream(
+                model=self.chat_model,
+                messages=[{"role": "system", "content": system}] + messages,
+                max_tokens=8192,
+                temperature=0.3,
+            ) as stream:
+                async for event in stream:
+                    if event.choices and event.choices[0].delta.content:
+                        chunk = event.choices[0].delta.content
+                        await on_chunk(chunk)
+                        _turn_text.append(chunk)
+                final_chat_comp = await stream.get_final_completion()
+                if final_chat_comp.usage:
+                    self._set_usage(
+                        final_chat_comp.usage.prompt_tokens,
+                        final_chat_comp.usage.completion_tokens,
+                    )
+
+            # OpenAI signals truncation via finish_reason == "length"
+            finish_reason = (
+                final_chat_comp.choices[0].finish_reason
+                if final_chat_comp.choices
+                else None
+            )
+            if finish_reason != "length" or _turn >= _MAX_CONTINUATIONS:
+                break
+
+            partial = "".join(_turn_text)
+            messages = list(messages) + [
+                {"role": "assistant", "content": partial},
+                {"role": "user",      "content": "Continue."},
+            ]
 
     def _build_messages(
         self,

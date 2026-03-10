@@ -31,6 +31,7 @@ from .handlers.mcp_handler import MCPStatusHandler, MCPReloadHandler, MCPServers
 from .handlers.cell_executed import CellExecutedHandler
 from .handlers.cell_lifecycle import CellLifecycleHandler
 from .handlers.symbols import SymbolsHandler
+from .handlers.auto_tag import AutoTagHandler
 
 
 class DSAssistantExtension(ExtensionApp):
@@ -266,4 +267,6 @@ class DSAssistantExtension(ExtensionApp):
             (url_path_join(base, "cell-lifecycle"), CellLifecycleHandler),
             # @-mention autocomplete — symbol names from SummaryStore
             (url_path_join(base, "symbols"), SymbolsHandler),
+            # LLM-based auto-tagging for a single cell
+            (url_path_join(base, "auto-tag"), AutoTagHandler),
         ])

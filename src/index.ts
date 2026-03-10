@@ -446,7 +446,18 @@ const plugin: JupyterFrontEndPlugin<void> = {
     }
 
     // ── Cell tag overlay (tag pills rendered directly on cells) ──────────────
-    initCellTagOverlay(notebookTracker);
+    initCellTagOverlay(
+      notebookTracker,
+      // ⚡ auto-tag callback — calls POST /varys/auto-tag
+      async (src, out) => {
+        const result = await apiClient.autoTagCell(src, out);
+        return result.tags;
+      },
+      // tag-change callback — patches summary_store.json in place (no new version)
+      (cellId, notebookPath, tags) => {
+        apiClient.cellLifecycle({ cell_id: cellId, notebook_path: notebookPath, action: 'tags_changed', tags });
+      },
+    );
 
     // ── Output overlay: badges + context menu (D + C + E) ────────────────────
     initOutputOverlay(notebookTracker, output => {
