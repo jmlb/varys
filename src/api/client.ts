@@ -269,6 +269,12 @@ export interface TaskResponse {
    */
   errorProvider?: string;
   /**
+   * True when errorType === "context_too_long" and the context contained at
+   * least one cell image.  Lets the frontend decide whether to offer the image
+   * recovery options alongside the token-limit message.
+   */
+  errorHasImages?: boolean;
+  /**
    * Populated when resize mode was active and at least one image was processed.
    * Frontend uses this to show a post-action confirmation notice.
    */
@@ -394,6 +400,16 @@ export class APIClient {
                 cellInsertionMode: 'chat',
                 errorType: 'image_too_large',
                 errorProvider: (event as any).provider ?? '',
+              } as TaskResponse;
+            } else if (event.type === 'context_too_long') {
+              // Context budget exceeded — distinct from image-size errors.
+              lastDone = {
+                operationId: 'context_error',
+                steps: [],
+                requiresApproval: false,
+                cellInsertionMode: 'chat',
+                errorType: 'context_too_long',
+                errorHasImages: (event as any).has_images ?? false,
               } as TaskResponse;
             } else if (event.type === 'error') {
               // Surface API-level errors (billing, rate-limit, auth, etc.) as

@@ -179,13 +179,16 @@ interface Message {
   /**
    * Optional subtype for system messages that require specialised rendering.
    * 'error_recovery' — renders an image-error recovery prompt with command chips.
+   * 'context_too_long' — renders a context-size advisory notice.
    */
-  subtype?: 'error_recovery';
+  subtype?: 'error_recovery' | 'context_too_long';
   /**
    * LLM provider at the time of an image_too_large error (e.g. "anthropic", "openai").
    * Used by the recovery prompt to show only the relevant resize option.
    */
   errorProvider?: string;
+  /** True when a context_too_long error occurred and the context had at least one image. */
+  errorHasImages?: boolean;
 }
 
 // Report generation is triggered only by the explicit /report command.
@@ -3899,6 +3902,22 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
         return;
       }
 
+      // ── Context too long — render advisory notice ─────────────────────
+      if (response.errorType === 'context_too_long') {
+        if (streamMsgId) {
+          setMessages(prev => prev.filter(m => m.id !== streamMsgId));
+        }
+        setMessages(prev => [...prev, {
+          id: generateId(),
+          role: 'system' as const,
+          subtype: 'context_too_long' as const,
+          content: message,
+          errorHasImages: response.errorHasImages ?? false,
+          timestamp: new Date(),
+        }]);
+        return;
+      }
+
       // ── Post-action feedback after resize ─────────────────────────────
       if (response.imageResizeInfo && response.imageResizeInfo.count > 0) {
         const { count, warnings: imgWarnings } = response.imageResizeInfo;
@@ -4795,6 +4814,38 @@ const DSAssistantChat: React.FC<SidebarProps> = ({
                   });
                 }}
               />
+            ) : msg.subtype === 'context_too_long' ? (
+              /* ── Context too long — advisory notice ─────────── */
+              <div className="ds-ctx-too-long">
+                <span className="ds-ctx-too-long-icon">⚠️</span>
+                <div className="ds-ctx-too-long-body">
+                  <p className="ds-ctx-too-long-title">Context too large</p>
+                  <p className="ds-ctx-too-long-desc">
+                    Your prompt exceeded the model&apos;s token limit.
+                    {msg.errorHasImages
+                      ? ' The context includes figures — try '
+                      : ' This is caused by text (chat history, code, outputs), not by images. Try '}
+                  </p>
+                  {msg.errorHasImages && (
+                    <div className="ds-ctx-too-long-actions">
+                      <button
+                        className="ds-ctx-too-long-btn"
+                        onClick={() => {
+                          setImageMode({ mode: 'no_figures' });
+                          setInput(msg.content);
+                          requestAnimationFrame(() => textareaRef.current?.focus());
+                        }}
+                      >
+                        /no_figures
+                      </button>
+                      <span className="ds-ctx-too-long-or">or clear the chat history below.</span>
+                    </div>
+                  )}
+                  {!msg.errorHasImages && (
+                    <span className="ds-ctx-too-long-hint">clearing the chat history (trash icon) or asking about fewer cells.</span>
+                  )}
+                </div>
+              </div>
             ) : msg.role === 'disambiguation' ? (
               /* ── Disambiguation card ───────────────────────────── */
               <DisambiguationCard

@@ -251,6 +251,12 @@ export interface TaskResponse {
      */
     errorProvider?: string;
     /**
+     * True when errorType === "context_too_long" and the context contained at
+     * least one cell image.  Lets the frontend decide whether to offer the image
+     * recovery options alongside the token-limit message.
+     */
+    errorHasImages?: boolean;
+    /**
      * Populated when resize mode was active and at least one image was processed.
      * Frontend uses this to show a post-action confirmation notice.
      */
