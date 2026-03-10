@@ -459,6 +459,49 @@ class ClaudeClient:
 
         return blocks
 
+    def _build_content_blocks_from_text(
+        self,
+        user_text: str,
+        notebook_context: Dict[str, Any],
+    ) -> List[Any]:
+        """Build Anthropic content blocks using a pre-formatted text message.
+
+        Unlike _build_content_blocks(), this method accepts an already-built
+        text string (e.g., from build_notebook_context()) and appends image
+        blocks for selectedOutput and per-cell images.  Used in chat/advisory
+        mode so the LLM receives actual image data without the
+        'create_operation_plan' instruction that _build_content_blocks() adds.
+        """
+        blocks: List[Any] = [{"type": "text", "text": user_text}]
+
+        # selectedOutput image (highest priority — user right-clicked a specific output)
+        sel = notebook_context.get("selectedOutput")
+        if sel and isinstance(sel, dict):
+            mime     = sel.get("mimeType", "")
+            img_data = sel.get("imageData")
+            label    = sel.get("label", "selected output")
+            if img_data and mime.startswith("image"):
+                media = "image/jpeg" if "jpeg" in mime else "image/png"
+                blocks.append({"type": "text", "text": f"[User selected this specific output: {label}]"})
+                blocks.append({"type": "image", "source": {"type": "base64", "media_type": media, "data": img_data}})
+            elif sel.get("textData"):
+                blocks.append({"type": "text", "text": f"[User selected this specific output — {label}:\n{sel['textData']}]"})
+
+        # Per-cell images (existing behaviour — same logic as _build_content_blocks)
+        for cell in notebook_context.get("cells", []):
+            img = cell.get("imageOutput")
+            if img:
+                cell_idx  = cell.get("index")
+                label_c   = f"#{cell_idx + 1}" if isinstance(cell_idx, int) else "#?"
+                raw_mime  = cell.get("imageOutputMime") or "image/png"
+                media_type = raw_mime if raw_mime in (
+                    "image/png", "image/jpeg", "image/webp", "image/gif"
+                ) else "image/png"
+                blocks.append({"type": "text", "text": f"[Visualization output from cell {label_c}:]"})
+                blocks.append({"type": "image", "source": {"type": "base64", "media_type": media_type, "data": img}})
+
+        return blocks
+
     async def plan_task(
         self,
         user_message: str,
@@ -754,12 +797,17 @@ class ClaudeClient:
     async def stream_chat(
         self,
         system: str,
-        user: str,
+        user: Any,  # str or List[content blocks] (e.g. from _build_content_blocks_from_text)
         on_chunk: Callable[[str], Awaitable[None]],
         on_thought: Optional[Callable[[str], Awaitable[None]]] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> None:
         """Stream a free-form chat response, calling on_chunk for each token.
+
+        ``user`` may be a plain string or a list of Anthropic content blocks
+        (text + image).  _prepend_history() handles both forms transparently,
+        so image blocks from _build_content_blocks_from_text() are forwarded
+        to the API unchanged.
 
         Extended thinking is always active for supported models (claude-3-7+,
         claude-4 family). thinking_delta events are routed to on_thought when

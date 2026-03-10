@@ -66,7 +66,7 @@ class BaseLLMProvider(ABC):
     async def chat(
         self,
         system: str,
-        user: str,
+        user: Any,  # str or List[content blocks] for vision-capable providers
         chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> str:
         """Free-form chat: send a system + user message and return raw text.
@@ -74,17 +74,23 @@ class BaseLLMProvider(ABC):
         Unlike plan_task (which enforces a JSON schema for cell operations),
         this method returns unstructured text — used for report generation
         and other open-ended tasks.
+
+        ``user`` may be a plain string or a list of Anthropic content blocks
+        (text + image blocks) for providers that support vision inputs.
         """
 
     async def stream_chat(
         self,
         system: str,
-        user: str,
+        user: Any,  # str or List[content blocks] for vision-capable providers
         on_chunk: Callable[[str], Awaitable[None]],
         on_thought: Optional[Callable[[str], Awaitable[None]]] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> None:
         """Stream a chat response, calling on_chunk for each text token.
+
+        ``user`` may be a plain string or a list of Anthropic content blocks
+        (text + image blocks) — see ClaudeClient._build_content_blocks_from_text().
 
         Default implementation buffers the full response via chat() and calls
         on_chunk once. Override in subclasses that support native streaming.

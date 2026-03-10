@@ -37,6 +37,103 @@ def _strip_null(text: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Vision image fallback — load from .ipynb file
+# ---------------------------------------------------------------------------
+
+def _enrich_images_from_nb_file(
+    notebook_context: dict,
+    notebook_path: str,
+    root_dir: str,
+) -> dict:
+    """Return an enriched copy of notebook_context with image data populated
+    from the on-disk .ipynb file.
+
+    The frontend sometimes omits large base64 images from the HTTP payload
+    (serialisation overhead / size limits).  The notebook file on disk always
+    has the full data because JupyterLab auto-saves after every execution.
+    We only need to open the file when a mimeType hint indicates an image is
+    present but imageData / imageOutput is missing.
+    """
+    import json as _nb_json_m
+    from pathlib import Path as _NBP
+
+    try:
+        nb_file = _NBP(root_dir) / notebook_path
+        if not nb_file.is_file():
+            return notebook_context
+
+        nb_data  = _nb_json_m.loads(nb_file.read_text(encoding="utf-8"))
+        nb_cells = nb_data.get("cells", [])
+
+        # Build a flat map: cell_index -> first image output found
+        # {cell_index: (base64_str, mime_type)}
+        _cell_img_map: dict = {}
+        for ci, nb_cell in enumerate(nb_cells):
+            if nb_cell.get("cell_type") != "code":
+                continue
+            for nb_out in nb_cell.get("outputs", []):
+                d = nb_out.get("data", {})
+                for m in ("image/png", "image/jpeg", "image/webp"):
+                    v = d.get(m)
+                    if v:
+                        b64 = "".join(v) if isinstance(v, list) else str(v)
+                        if ci not in _cell_img_map:
+                            _cell_img_map[ci] = (b64, m)
+                        break
+
+        if not _cell_img_map:
+            return notebook_context
+
+        ctx     = dict(notebook_context)
+        changed = False
+
+        # Enrich selectedOutput.imageData
+        _sel = ctx.get("selectedOutput") or {}
+        if (
+            isinstance(_sel, dict)
+            and _sel.get("mimeType", "").startswith("image")
+            and not _sel.get("imageData")
+        ):
+            sc_idx = _sel.get("cellIndex", 0)
+            so_idx = _sel.get("outputIndex", 0)
+            # Use per-output extraction when we have an exact output index
+            if sc_idx < len(nb_cells):
+                nb_outs = nb_cells[sc_idx].get("outputs", [])
+                if so_idx < len(nb_outs):
+                    d = nb_outs[so_idx].get("data", {})
+                    for m in ("image/png", "image/jpeg", "image/webp"):
+                        v = d.get(m)
+                        if v:
+                            b64 = "".join(v) if isinstance(v, list) else str(v)
+                            ctx["selectedOutput"] = {**_sel, "imageData": b64, "mimeType": m}
+                            changed = True
+                            break
+            # Fallback: use the cell-level image map
+            if not changed and sc_idx in _cell_img_map:
+                b64, m = _cell_img_map[sc_idx]
+                ctx["selectedOutput"] = {**_sel, "imageData": b64, "mimeType": m}
+                changed = True
+
+        # Enrich cells that are missing imageOutput
+        new_cells = list(ctx.get("cells", []))
+        for i, cell in enumerate(new_cells):
+            c_idx = cell.get("index", i)
+            if not cell.get("imageOutput") and c_idx in _cell_img_map:
+                b64, m = _cell_img_map[c_idx]
+                new_cells[i] = {**cell, "imageOutput": b64, "imageOutputMime": m}
+                changed = True
+
+        if changed:
+            ctx["cells"] = new_cells
+            return ctx
+
+    except Exception as _exc:
+        log.debug("Vision image fallback failed: %s", _exc)
+
+    return notebook_context
+
+
+# ---------------------------------------------------------------------------
 # MCP agentic loop helper
 # ---------------------------------------------------------------------------
 
@@ -780,6 +877,55 @@ class TaskHandler(JupyterHandler):
                                 "Based on this reasoning, provide your final response."
                             )
 
+                    # ── Vision upgrade: attach image blocks for Anthropic ─────
+                    # build_notebook_context() only produces text; for vision-
+                    # capable providers with image outputs we upgrade final_user
+                    # to a content-block list so images are actually sent to the
+                    # API instead of being mentioned as "(image attached separately)".
+                    _aclient_v = getattr(provider, "_chat_client", None)
+                    if (
+                        provider.has_vision()
+                        and _aclient_v is not None
+                        and hasattr(_aclient_v, "_build_content_blocks_from_text")
+                    ):
+                        _sel = notebook_context.get("selectedOutput") or {}
+                        _has_images = (
+                            (isinstance(_sel, dict) and bool(_sel.get("imageData")))
+                            or any(c.get("imageOutput") for c in notebook_context.get("cells", []))
+                        )
+
+                        # Fallback: if the frontend didn't serialise image bytes
+                        # (large images are often dropped from the HTTP payload),
+                        # read the image data directly from the .ipynb file.
+                        # We trigger this whenever a mimeType hint says there is
+                        # an image but the actual bytes are absent.
+                        if not _has_images and notebook_path and root_dir:
+                            _sel_mime = (
+                                isinstance(_sel, dict)
+                                and _sel.get("mimeType", "").startswith("image")
+                            )
+                            if _sel_mime:
+                                notebook_context = _enrich_images_from_nb_file(
+                                    notebook_context, notebook_path, root_dir
+                                )
+                                _sel = notebook_context.get("selectedOutput") or {}
+                                _has_images = (
+                                    (isinstance(_sel, dict) and bool(_sel.get("imageData")))
+                                    or any(c.get("imageOutput") for c in notebook_context.get("cells", []))
+                                )
+                                if _has_images:
+                                    log.debug(
+                                        "Vision: loaded image from notebook file %s",
+                                        notebook_path,
+                                    )
+
+                        if _has_images:
+                            # Preserve any thought-summary text already in final_user
+                            _text = final_user if isinstance(final_user, str) else user
+                            final_user = _aclient_v._build_content_blocks_from_text(
+                                _text, notebook_context
+                            )
+
                     # ── External MCP tool loop (when servers are connected) ────
                     mcp_manager = self.settings.get("ds_mcp_manager")
                     aclient = getattr(provider, "_chat_client", None)
@@ -804,7 +950,15 @@ class TaskHandler(JupyterHandler):
                                 "When the user asks for data or actions that require external access, "
                                 "call the appropriate tool — do NOT say you cannot access the internet.\n\n"
                                 f"{tool_lines}\n\n"
-                                "Always prefer calling a tool over apologising for lack of access."
+                                "Always prefer calling a tool over apologising for lack of access.\n\n"
+                                "## IMPORTANT — Cell outputs and figures\n"
+                                "Any images or figures from notebook cell outputs are already attached "
+                                "to this conversation as vision content blocks. "
+                                "You MUST use those embedded image blocks to answer questions about "
+                                "plots, charts, or figures. "
+                                "Do NOT use the filesystem or any other tool to read the notebook "
+                                ".ipynb file in order to retrieve image data — the images are already "
+                                "directly visible to you in the conversation."
                             )
                             msgs = aclient._prepend_history(chat_history, final_user)
                             chat_result = await _run_mcp_tool_loop(
@@ -863,8 +1017,36 @@ class TaskHandler(JupyterHandler):
                     return
 
                 # Non-streaming chat path
+                # Apply the same vision upgrade as the streaming path so images
+                # are included when the provider is vision-capable.
+                _user_for_chat = user
+                _aclient_v2 = getattr(provider, "_chat_client", None)
+                if (
+                    provider.has_vision()
+                    and _aclient_v2 is not None
+                    and hasattr(_aclient_v2, "_build_content_blocks_from_text")
+                ):
+                    _sel2 = notebook_context.get("selectedOutput") or {}
+                    _has_images2 = (
+                        (isinstance(_sel2, dict) and bool(_sel2.get("imageData")))
+                        or any(c.get("imageOutput") for c in notebook_context.get("cells", []))
+                    )
+                    if not _has_images2 and notebook_path and root_dir:
+                        if isinstance(_sel2, dict) and _sel2.get("mimeType", "").startswith("image"):
+                            notebook_context = _enrich_images_from_nb_file(
+                                notebook_context, notebook_path, root_dir
+                            )
+                            _sel2 = notebook_context.get("selectedOutput") or {}
+                            _has_images2 = (
+                                (isinstance(_sel2, dict) and bool(_sel2.get("imageData")))
+                                or any(c.get("imageOutput") for c in notebook_context.get("cells", []))
+                            )
+                    if _has_images2:
+                        _user_for_chat = _aclient_v2._build_content_blocks_from_text(
+                            user, notebook_context
+                        )
                 chat_text = await provider.chat(
-                    system=system, user=user, chat_history=chat_history
+                    system=system, user=_user_for_chat, chat_history=chat_history
                 )
                 response = {
                     "operationId":         op_id,

@@ -172,7 +172,7 @@ class AnthropicProvider(BaseLLMProvider):
     async def chat(
         self,
         system: str,
-        user: str,
+        user: Any,  # str or List[content blocks] (e.g. from _build_content_blocks_from_text)
         chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> str:
         if not self._chat_client._aclient:
@@ -195,7 +195,7 @@ class AnthropicProvider(BaseLLMProvider):
     async def stream_chat(
         self,
         system: str,
-        user: str,
+        user: Any,  # str or List[content blocks] (e.g. from _build_content_blocks_from_text)
         on_chunk: Callable[[str], Awaitable[None]],
         on_thought: Optional[Callable[[str], Awaitable[None]]] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,

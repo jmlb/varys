@@ -2576,16 +2576,17 @@ const ThreadBar: React.FC<ThreadBarProps> = ({
       </div>
 
       {/* ··· / +N  — manage all threads, access hidden ones, create new */}
-      <button
-        className={`ds-thread-overflow-btn${open ? ' ds-thread-overflow-btn--open' : ''}`}
-        onClick={() => setOpen(o => !o)}
-        title={open ? 'Close thread menu' : 'Manage threads'}
-        aria-label="Thread menu"
-      >
-        {hiddenCount > 0 ? `+${hiddenCount}` : '···'}
-      </button>
+      <div className="ds-thread-overflow-wrap">
+        <button
+          className={`ds-thread-overflow-btn${open ? ' ds-thread-overflow-btn--open' : ''}`}
+          onClick={() => setOpen(o => !o)}
+          title={open ? 'Close thread menu' : 'Manage threads'}
+          aria-label="Thread menu"
+        >
+          {hiddenCount > 0 ? `+${hiddenCount}` : '···'}
+        </button>
 
-      {/* Management popup */}
+      {/* Management popup — anchored to the ··· button, not the full bar */}
       {open && (
         <div className="ds-thread-popup">
           {/* Notebook context header */}
@@ -2677,6 +2678,7 @@ const ThreadBar: React.FC<ThreadBarProps> = ({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

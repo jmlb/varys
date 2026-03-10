@@ -1686,6 +1686,12 @@
   border-bottom-color: var(--jp-brand-color1, #1976d2);
 }
 
+/* Wrapper that establishes the positioning context for the popup */
+.ds-thread-overflow-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
 /* ··· / +N  overflow + manage button */
 .ds-thread-overflow-btn {
   flex-shrink: 0;
@@ -2004,8 +2010,8 @@
 .ds-thread-popup {
   position: absolute;
   top: calc(100% + 2px);
-  right: 0;
-  left: auto;
+  left: 0;
+  right: auto;
   z-index: 1000;
   min-width: 200px;
   max-width: 280px;
@@ -2204,6 +2210,17 @@
   background: var(--ds-surface2, #2a2a2a);
   border-color: var(--ds-border, rgba(255,255,255,0.2));
   color: var(--ds-text, #e0e0e0);
+}
+.ds-chat-night .ds-thread-action-btn {
+  color: var(--ds-text-dim, #6b6f88);
+}
+.ds-chat-night .ds-thread-action-btn:hover {
+  background: rgba(255,255,255,0.12);
+  color: var(--ds-text, #c5c5cc);
+}
+.ds-chat-night .ds-thread-action-delete:hover {
+  color: #ff6b6b;
+  background: rgba(229, 57, 53, 0.22);
 }
 
 /* =============================================================
