@@ -85,10 +85,13 @@ export function extractPlotLabels(source: string): string[] {
 
 /** Determine the dominant MIME type for a single output model object. */
 function dominantMime(output: any): string {
-  const type: string = output.output_type ?? output.type ?? '';
+  // JupyterLab wraps nbformat dicts in IOutputModel objects.
+  // toJSON() returns the underlying plain nbformat dict with all fields intact.
+  const raw: any = typeof output.toJSON === 'function' ? output.toJSON() : output;
+  const type: string = raw.output_type ?? raw.type ?? output.output_type ?? output.type ?? '';
   if (type === 'stream') return 'text/plain';
   if (type === 'error') return 'error';
-  const data = output.data ?? {};
+  const data = raw.data ?? output.data ?? {};
   if (data['image/png'])       return 'image/png';
   if (data['image/jpeg'])      return 'image/jpeg';
   if (data['image/svg+xml'])   return 'image/svg+xml';
@@ -118,12 +121,16 @@ function tableToText(output: any): string {
 
 /** Extract raw base64 from an image output (strips data-URI prefix). */
 function extractBase64(output: any): string | undefined {
-  const data = output.data ?? {};
+  // JupyterLab wraps nbformat dicts in IOutputModel objects whose .data
+  // property may not be a plain dict.  toJSON() returns the raw nbformat
+  // dict reliably — same pattern used in NotebookReader._extractOutputImpl.
+  const raw: any = typeof output.toJSON === 'function' ? output.toJSON() : output;
+  const data = raw.data ?? output.data ?? {};
   const png  = data['image/png'];
   const jpeg = data['image/jpeg'];
-  const raw  = png ?? jpeg;
-  if (!raw) return undefined;
-  const str = Array.isArray(raw) ? raw.join('') : String(raw);
+  const src  = png ?? jpeg;
+  if (!src) return undefined;
+  const str = Array.isArray(src) ? src.join('') : String(src);
   return str.replace(/^data:image\/[^;]+;base64,/, '').trim();
 }
 
